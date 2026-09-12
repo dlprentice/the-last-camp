@@ -1,7 +1,14 @@
 # Contributor and agent guide
 
-Read README.md, CONTRIBUTING.md and docs/development.md before changing the project.
 This is a Godot 4.7.2 standard GDScript project using native Jolt and Forward+ Vulkan.
+
+Read the documentation relevant to the task:
+
+- [README.md](README.md) for setup, controls, supported platforms and release contents.
+- [CONTRIBUTING.md](CONTRIBUTING.md) when preparing an issue report or contribution,
+  including review evidence and attribution requirements.
+- [docs/development.md](docs/development.md) for the applicable import, test, capture,
+  performance, rendering, export or asset-preparation procedure.
 
 - Run checks locally. Do not add or dispatch hosted workflows without maintainer approval.
 - Preserve source changes, credits and existing outputs. Use fresh output directories.
