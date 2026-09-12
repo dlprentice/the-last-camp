@@ -1,0 +1,156 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.4.2",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 160560,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 27888,
+      "max": [
+        0.07658656686544418,
+        0.05715522915124893,
+        0.04439559206366539
+      ],
+      "min": [
+        -0.07027817517518997,
+        -0.01463993638753891,
+        -0.04466071352362633
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 27888,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 27888,
+      "bufferView": 1,
+      "byteOffset": 20
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 321120,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 321120,
+      "byteLength": 892416,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "stone_01_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/stone_01_nor_gl_1k.jpg"
+    },
+    {
+      "name": "stone_01_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/stone_01_diff_1k.jpg"
+    },
+    {
+      "name": "stone_01_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/stone_01_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "stone_01.bin",
+      "byteLength": 1213536
+    }
+  ],
+  "materials": [
+    {
+      "name": "stone_01",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Plane.001",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 1,
+            "TEXCOORD_0": 2,
+            "NORMAL": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "stone_01",
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
+}

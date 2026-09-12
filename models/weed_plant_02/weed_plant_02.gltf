@@ -1,0 +1,447 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.4.2",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 8901,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 6819,
+      "bufferView": 0,
+      "byteOffset": 17804
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 5298,
+      "bufferView": 0,
+      "byteOffset": 31444
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 5784,
+      "bufferView": 0,
+      "byteOffset": 42040
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 6546,
+      "bufferView": 0,
+      "byteOffset": 53608
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 2059,
+      "max": [
+        0.13378866016864777,
+        0.06389475613832474,
+        0.17979809641838074
+      ],
+      "min": [
+        -0.08561167120933533,
+        -0.00856288243085146,
+        -0.11112131178379059
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 2059,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 2059,
+      "bufferView": 1,
+      "byteOffset": 24
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1656,
+      "max": [
+        0.11226735264062881,
+        0.06651004403829575,
+        0.08741479367017746
+      ],
+      "min": [
+        -0.07528062909841537,
+        -0.001182800973765552,
+        -0.11112130433320999
+      ],
+      "bufferView": 2,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1656,
+      "bufferView": 2,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 1656,
+      "bufferView": 2,
+      "byteOffset": 24
+    },
+    {
+      "type": "VEC4",
+      "componentType": 5123,
+      "count": 1199,
+      "normalized": true,
+      "bufferView": 3,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1199,
+      "max": [
+        0.0803200751543045,
+        0.053356561809778214,
+        0.07560799270868301
+      ],
+      "min": [
+        -0.062056250870227814,
+        -0.0015672353329136968,
+        -0.0678434818983078
+      ],
+      "bufferView": 3,
+      "byteOffset": 8
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1199,
+      "bufferView": 3,
+      "byteOffset": 20
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 1199,
+      "bufferView": 3,
+      "byteOffset": 32
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1428,
+      "max": [
+        0.07741555571556091,
+        0.03851133957505226,
+        0.046274278312921524
+      ],
+      "min": [
+        -0.07664976269006729,
+        -0.0004347926005721092,
+        -0.06183432415127754
+      ],
+      "bufferView": 4,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1428,
+      "bufferView": 4,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 1428,
+      "bufferView": 4,
+      "byteOffset": 24
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1614,
+      "max": [
+        0.039641283452510834,
+        0.0366172157227993,
+        0.027607137337327003
+      ],
+      "min": [
+        -0.07960858196020126,
+        -0.0034620026126503944,
+        -0.03337923809885979
+      ],
+      "bufferView": 5,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 1614,
+      "bufferView": 5,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 1614,
+      "bufferView": 5,
+      "byteOffset": 24
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 66700,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 66700,
+      "byteLength": 65888,
+      "byteStride": 32,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 132588,
+      "byteLength": 52992,
+      "byteStride": 32,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 185580,
+      "byteLength": 47960,
+      "byteStride": 40,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 233540,
+      "byteLength": 45696,
+      "byteStride": 32,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 279236,
+      "byteLength": 51648,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "weed_plant_02_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/weed_plant_02_nor_gl_1k.jpg"
+    },
+    {
+      "name": "weed_plant_02_diff-weed_plant_02_alpha",
+      "mimeType": "image/png",
+      "uri": "textures/weed_plant_02_diff_1k.png"
+    },
+    {
+      "name": "weed_plant_02_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/weed_plant_02_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "weed_plant_02.bin",
+      "byteLength": 330884
+    }
+  ],
+  "materials": [
+    {
+      "name": "weed_plant_02",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.5,
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Plane.001",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 5,
+            "NORMAL": 6,
+            "TEXCOORD_0": 7
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    },
+    {
+      "name": "Plane.003",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 8,
+            "NORMAL": 9,
+            "TEXCOORD_0": 10
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 1
+        }
+      ]
+    },
+    {
+      "name": "Plane.033",
+      "primitives": [
+        {
+          "attributes": {
+            "COLOR_0": 11,
+            "POSITION": 12,
+            "NORMAL": 13,
+            "TEXCOORD_0": 14
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 2
+        }
+      ]
+    },
+    {
+      "name": "Plane.042",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 15,
+            "NORMAL": 16,
+            "TEXCOORD_0": 17
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 3
+        }
+      ]
+    },
+    {
+      "name": "Plane.012",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 18,
+            "NORMAL": 19,
+            "TEXCOORD_0": 20
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "weed_plant_02_a_LOD0",
+      "mesh": 0
+    },
+    {
+      "name": "weed_plant_02_b_LOD0",
+      "translation": [
+        0.5,
+        0,
+        0
+      ],
+      "mesh": 1
+    },
+    {
+      "name": "weed_plant_02_c_LOD0",
+      "translation": [
+        1,
+        0,
+        0
+      ],
+      "mesh": 2
+    },
+    {
+      "name": "weed_plant_02_d_LOD0",
+      "translation": [
+        1.500000238418579,
+        0,
+        0
+      ],
+      "mesh": 3
+    },
+    {
+      "name": "weed_plant_02_e_LOD0",
+      "translation": [
+        2,
+        0,
+        0
+      ],
+      "mesh": 4
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "scene": 0
+}

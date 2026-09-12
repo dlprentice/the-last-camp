@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://7044v1bit6e1"
+path="res://.godot/imported/pond_probes.glsl-a0c81ef67fed700bbbb6cc9569370eaa.res"
+
+[deps]
+
+source_file="res://shaders/compute/pond_probes.glsl"
+dest_files=["res://.godot/imported/pond_probes.glsl-a0c81ef67fed700bbbb6cc9569370eaa.res"]
+
+[params]
+

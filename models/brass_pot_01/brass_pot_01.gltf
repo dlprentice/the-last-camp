@@ -1,0 +1,155 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.4.2",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 11280,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 2250,
+      "max": [
+        0.1509324014186859,
+        0.2900947332382202,
+        0.15080177783966064
+      ],
+      "min": [
+        -0.15101325511932373,
+        -0.0008529216283932328,
+        -0.15089081227779388
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 2250,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 2250,
+      "bufferView": 1,
+      "byteOffset": 24
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 22560,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 22560,
+      "byteLength": 72000,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "brass_pot_01_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/brass_pot_01_nor_gl_1k.jpg"
+    },
+    {
+      "name": "brass_pot_01_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/brass_pot_01_diff_1k.jpg"
+    },
+    {
+      "name": "brass_pot_01_metal-brass_pot_01_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/brass_pot_01_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "brass_pot_01.bin",
+      "byteLength": 94560
+    }
+  ],
+  "materials": [
+    {
+      "name": "brass_pot_01",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "brass_pot_01",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 1,
+            "NORMAL": 2,
+            "TEXCOORD_0": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "brass_pot_01",
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "blend_export",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
+}

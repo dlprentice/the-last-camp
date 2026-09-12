@@ -1,0 +1,163 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.4.2",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 81981,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 18285,
+      "max": [
+        0.048936210572719574,
+        0.2132624387741089,
+        0.07108771800994873
+      ],
+      "min": [
+        -0.5347539782524109,
+        -0.005937241483479738,
+        -0.07500956952571869
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 18285,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 18285,
+      "bufferView": 1,
+      "byteOffset": 20
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 163964,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 163964,
+      "byteLength": 585120,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "shrub_04_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/shrub_04_nor_gl_1k.jpg"
+    },
+    {
+      "name": "shrub_04_diff",
+      "mimeType": "image/png",
+      "uri": "textures/shrub_04_diff_1k.png"
+    },
+    {
+      "name": "shrub_04_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/shrub_04_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "shrub_04.bin",
+      "byteLength": 749084
+    }
+  ],
+  "materials": [
+    {
+      "name": "shrub_04",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.5,
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Plane.063",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 1,
+            "TEXCOORD_0": 2,
+            "NORMAL": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "shrub_04",
+      "translation": [
+        0.5103073120117188,
+        0,
+        0
+      ],
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
+}

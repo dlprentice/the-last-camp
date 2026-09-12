@@ -1,0 +1,155 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.4.2",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 7644,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 2323,
+      "max": [
+        0.020298300310969353,
+        0.08159002661705017,
+        0.5462324023246765
+      ],
+      "min": [
+        -0.02053544484078884,
+        -0.08493000268936157,
+        -0.08674678206443787
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 2323,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 2323,
+      "bufferView": 1,
+      "byteOffset": 24
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 15288,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 15288,
+      "byteLength": 74336,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "handsaw_wood_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/handsaw_wood_nor_gl_1k.jpg"
+    },
+    {
+      "name": "handsaw_wood_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/handsaw_wood_diff_1k.jpg"
+    },
+    {
+      "name": "handsaw_wood_metal-handsaw_wood_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/handsaw_wood_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "handsaw_wood.bin",
+      "byteLength": 89624
+    }
+  ],
+  "materials": [
+    {
+      "name": "handsaw_wood",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Plane.013",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 1,
+            "NORMAL": 2,
+            "TEXCOORD_0": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "handsaw_wood",
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
+}

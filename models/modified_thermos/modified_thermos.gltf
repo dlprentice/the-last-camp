@@ -1,0 +1,155 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.4.2",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 34728,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 9408,
+      "max": [
+        0.0921388790011406,
+        0.3060409724712372,
+        0.05053623393177986
+      ],
+      "min": [
+        -0.050536200404167175,
+        -0.00018321066454518586,
+        -0.05053620785474777
+      ],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 9408,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 9408,
+      "bufferView": 1,
+      "byteOffset": 24
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 69456,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 69456,
+      "byteLength": 301056,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "modified_thermos_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/modified_thermos_nor_gl_1k.jpg"
+    },
+    {
+      "name": "modified_thermos_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/modified_thermos_diff_1k.jpg"
+    },
+    {
+      "name": "modified_thermos_metal-modified_thermos_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/modified_thermos_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "modified_thermos.bin",
+      "byteLength": 370512
+    }
+  ],
+  "materials": [
+    {
+      "name": "modified_thermos",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Mesh.004",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 1,
+            "NORMAL": 2,
+            "TEXCOORD_0": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "modified_thermos",
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
+}

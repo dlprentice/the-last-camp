@@ -1,0 +1,23 @@
+# Godot build cache and imports
+.godot/
+__pycache__/
+# Downloaded source textures (re-fetched by tools/import_textures.py)
+tools/downloads/
+# Movie Maker output and encodes
+*.avi
+*.mp4
+# Editor leftovers
+*.tmp
+.DS_Store
+
+# rendered videos (project output stays in the repo, ignored)
+renders/
+/local-data/
+/.worktrees/
+/.env
+/.env.*
+/override.cfg
+*.log
+*.x86_64
+*.zip
+*.tar.gz

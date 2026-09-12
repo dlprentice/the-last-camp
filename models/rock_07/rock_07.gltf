@@ -1,0 +1,164 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.4.2",
+    "version": "2.0"
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 44532,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC4",
+      "componentType": 5126,
+      "count": 7914,
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 7914,
+      "max": [
+        0.08130179345607758,
+        0.1418129950761795,
+        0.14230197668075562
+      ],
+      "min": [
+        -0.0875801146030426,
+        -0.00190715491771698,
+        -0.17797498404979706
+      ],
+      "bufferView": 1,
+      "byteOffset": 16
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 7914,
+      "bufferView": 1,
+      "byteOffset": 28
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 7914,
+      "bufferView": 1,
+      "byteOffset": 40
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 89064,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 89064,
+      "byteLength": 379872,
+      "byteStride": 48,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "rock_07_nor_gl",
+      "mimeType": "image/jpeg",
+      "uri": "textures/rock_07_nor_gl_1k.jpg"
+    },
+    {
+      "name": "rock_07_diff",
+      "mimeType": "image/jpeg",
+      "uri": "textures/rock_07_diff_1k.jpg"
+    },
+    {
+      "name": "rock_07_rough",
+      "mimeType": "image/jpeg",
+      "uri": "textures/rock_07_arm_1k.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "rock_07.bin",
+      "byteLength": 468936
+    }
+  ],
+  "materials": [
+    {
+      "name": "rock_07",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0,
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "realCap_Model_3",
+      "primitives": [
+        {
+          "attributes": {
+            "COLOR_0": 1,
+            "POSITION": 2,
+            "NORMAL": 3,
+            "TEXCOORD_0": 4
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "rock_07",
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0
+}
