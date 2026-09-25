@@ -2,8 +2,8 @@
 
 ## Dependencies
 
-Playing from source requires standard Godot 4.7.2 and a Vulkan-capable desktop
-GPU. Use the matching 4.7.2 export templates to build a Linux executable.
+Playing from source requires standard Godot 4.8 dev6 and a Vulkan-capable desktop
+GPU. Use the matching 4.8 dev6 export templates to build a Linux executable.
 The project uses GDScript and native Jolt; Mono, .NET, addons and GDExtensions
 are not required.
 

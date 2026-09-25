@@ -2,7 +2,8 @@
 
 **The Last Camp — created by David Prentice.**
 
-Built with [Godot Engine 4.7.2](https://godotengine.org/license/), using
+Built with [Godot Engine 4.8](https://godotengine.org/license/) (the published film and reel were rendered
+with 4.7.2), using
 Forward+ Vulkan, GDScript and native Jolt physics. The main film and reel
 contain environmental sound and Foley; there is no background music.
 

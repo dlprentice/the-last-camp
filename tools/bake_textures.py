@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline texture baker for *The Last Camp* (Godot 4.7).
+"""Offline texture baker for *The Last Camp* (Godot 4.8).
 
 Generates the project's foliage atlases and utility maps by default. Explicit
 fallback PBR studies must use --only and a separate --out directory.

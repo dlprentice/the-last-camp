@@ -1,6 +1,6 @@
 # Contributor and agent guide
 
-This is a Godot 4.7.2 standard GDScript project using native Jolt and Forward+ Vulkan.
+This is a Godot 4.8 dev6 standard GDScript project using native Jolt and Forward+ Vulkan.
 
 Read the documentation relevant to the task:
 

@@ -138,7 +138,7 @@ func _build_overlay() -> void:
 	_end_title = UiTheme.label("Stay a little longer.", 46, Color(0.93, 0.89, 0.79))
 	_end_title.add_theme_font_override("font", serif)
 	_place(_end_title, Vector2(-600, -60), Vector2(600, 20))
-	_end_note = UiTheme.label("THE LAST CAMP\nCaptured in Godot 4.7.2", 18, UiTheme.MUTED)
+	_end_note = UiTheme.label("THE LAST CAMP\nCaptured in Godot 4.8", 18, UiTheme.MUTED)
 	_place(_end_note, Vector2(-600, 30), Vector2(600, 110))
 	for label in [_title, _subtitle, _end_title, _end_note]:
 		label.modulate.a = 0.0
@@ -180,7 +180,7 @@ func play(name: String) -> void:
 	_subtitle.text = "A F T E R G L O W" if name == "afterglow" else name.to_upper()
 	if name == "one_night":
 		_subtitle.text = "O N E  N I G H T"
-		_end_note.text = "Captured in Godot 4.7.2"
+		_end_note.text = "Captured in Godot 4.8"
 	_shots = sequence(name)
 	# Inspect selected complete shots at their real pace before a full export.
 	# The delivered film omits this review-only argument.
@@ -313,13 +313,13 @@ func _build_credit_roll(compact: bool) -> void:
 	_roll.position = Vector2(210.0, 1080.0)
 	_black.add_child(_roll)
 	_roll_line("THE LAST CAMP", 54, Color(0.93, 0.89, 0.79), true)
-	_roll_line("A rendering tech demo made with Godot 4.7.2", 24, UiTheme.MUTED)
+	_roll_line("A rendering tech demo made with Godot 4.8", 24, UiTheme.MUTED)
 	_roll_gap(70)
 	_roll_header("Created by")
 	_roll_line("David Prentice", 30, UiTheme.TEXT)
 	_roll_gap(50)
 	_roll_header("Rendered in")
-	_roll_line("Godot Engine 4.7.2  ·  Forward+  ·  Vulkan", 24, UiTheme.TEXT)
+	_roll_line("Godot Engine 4.8  ·  Forward+  ·  Vulkan", 24, UiTheme.TEXT)
 	_roll_line("Movie Maker mode, 1920x1080 at 60 frames per second", 22, UiTheme.MUTED)
 	_roll_gap(50)
 	_roll_header("Everything grown by the project")

@@ -107,7 +107,7 @@ class CaptureContracts(unittest.TestCase):
         options = render.parse_args(["screenshots", "--out", str(self.path / "output")])
         with mock.patch.object(render, "executable", side_effect=lambda name: name), \
              mock.patch.object(subprocess, "check_output", return_value="4.6.stable"), \
-             self.assertRaisesRegex(RuntimeError, "4.7.2 required"):
+             self.assertRaisesRegex(RuntimeError, "4.8 dev6 required"):
             render.preflight(options)
         self.assertFalse((self.path / "output").exists())
 
@@ -203,7 +203,7 @@ class CaptureContracts(unittest.TestCase):
 
     def test_failure_manifest_and_credits_are_retained(self):
         out = self.path / "failed"
-        checked = {"tools": {}, "engine": "4.7.2.stable", "source_sha": "test-sha", "source_dirty": False}
+        checked = {"tools": {}, "engine": "4.8.dev6.official", "source_sha": "test-sha", "source_dirty": False}
         with mock.patch.object(render, "preflight", return_value=checked), \
              mock.patch.object(render, "capture", side_effect=RuntimeError("intentional fixture failure")), \
              self.assertRaisesRegex(RuntimeError, "intentional"):
@@ -212,7 +212,7 @@ class CaptureContracts(unittest.TestCase):
         self.assertTrue((out / "credits.md").exists())
 
     def test_check_mode_never_creates_output_or_renders(self):
-        checked = {"tools": {}, "engine": "4.7.2.stable", "source_sha": "test-sha", "source_dirty": False}
+        checked = {"tools": {}, "engine": "4.8.dev6.official", "source_sha": "test-sha", "source_dirty": False}
         with mock.patch.object(render, "preflight", return_value=checked), mock.patch.object(render, "capture") as capture:
             self.assertEqual(render.main(["video", "--check", "--out", str(self.path / "check")]), 0)
         self.assertFalse((self.path / "check").exists())

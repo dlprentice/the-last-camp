@@ -1,10 +1,17 @@
 # Validation and known limits
 
-The release targets **Godot 4.7.2 standard**, Forward+ Vulkan and native Jolt.
+The project targets **Godot 4.8 dev6 standard**, Forward+ Vulkan and native Jolt.
 Linux x86-64 is the tested platform. Converted assets are included in source;
 the first import creates a new local cache.
 
-## Desktop evidence
+## Godot 4.8 dev6
+
+Checked on September 25, 2026 with `4.8.dev6.official.8898c2b3d` from an empty cache: the import is clean,
+all **92 Godot tests** pass, and the High scene smoke test builds the complete scene (1,278 near/main trees,
+641 habitat batches, 18 fish) with no engine errors or warnings. The measurements below are from the
+September 12 release on Godot 4.7.2; they have not been repeated on 4.8.
+
+## Release evidence (Godot 4.7.2, September 12)
 
 Measured on September 12, 2026 with an NVIDIA RTX 4060 Laptop GPU (8 GB VRAM),
 NVIDIA driver 610.57.04, 31 GiB system RAM, and Godot

@@ -31,7 +31,7 @@ func _ready() -> void:
 	_title = UiTheme.label("THE LAST CAMP", 44, UiTheme.ACCENT)
 	_title.add_theme_constant_override("outline_size", 0)
 	box.add_child(_title)
-	var sub := UiTheme.label("A Godot 4.7 rendering study", 16, UiTheme.MUTED)
+	var sub := UiTheme.label("A Godot 4.8 rendering study", 16, UiTheme.MUTED)
 	box.add_child(sub)
 
 	_bar = ProgressBar.new()

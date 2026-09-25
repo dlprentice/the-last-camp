@@ -52,6 +52,6 @@ echo "[$(date +%T)] encode exit $? -> $OUT/${NAME}_4k.mp4"
 python3 - "$OUT/credits.md" <<'PY'
 from pathlib import Path
 import sys
-intro = "# The Last Camp — film credits\n\nCaptured in Godot 4.7.2. Environmental sound and Foley only; no background music.\n\n"
+intro = "# The Last Camp — film credits\n\nCaptured in Godot 4.8. Environmental sound and Foley only; no background music.\n\n"
 Path(sys.argv[1]).write_text(intro + Path("textures/SOURCES.md").read_text() + "\n" + Path("audio/SOURCES.md").read_text() + "\n" + Path("models/SOURCES.md").read_text() + "\n" + Path("THIRD_PARTY_NOTICES.md").read_text())
 PY

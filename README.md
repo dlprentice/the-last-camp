@@ -1,7 +1,7 @@
 # The Last Camp
 
-A forest campsite you can walk through, and an evening-to-dawn film rendered in
-**Godot 4.7.2**. Explore the pond, tend the fire, skip stones, watch the weather
+A forest campsite you can walk through, and an evening-to-dawn film made in
+**Godot**. Explore the pond, tend the fire, skip stones, watch the weather
 change, or use the free camera to inspect the scene.
 
 ![The camp and its wooded approach](docs/images/arrival.png)
@@ -17,7 +17,8 @@ the playable demo's frame rate.
 
 ## Start here
 
-Install the **standard Godot 4.7.2 editor**. The project needs a Vulkan-capable
+Install the **standard Godot 4.8 dev6 editor**, a development snapshot from
+[godotengine.org](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-6/). The project needs a Vulkan-capable
 GPU and Forward+; the Compatibility renderer and web/mobile exports are not
 supported. Linux x86-64 is the tested platform. Other desktop platforms are
 not validated by this release.
@@ -36,7 +37,7 @@ Space or a click skips the opening camera once loading is complete.
 
 The default preset starts at High and can adapt downward. Use
 `godot --path . --fullscreen -- --quality=medium` to select a fixed preset.
-This is a demanding visual showcase: on an RTX 4060 Laptop, the current High
+This is a demanding visual showcase: on an RTX 4060 Laptop under Godot 4.7.2, the High
 benchmark measured **13.5 FPS at 1080p output** with 0.77 internal resolution
 scale. See [validation and limitations](docs/validation.md).
 

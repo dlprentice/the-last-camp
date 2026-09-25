@@ -4,7 +4,7 @@
 Each manifest entry downloads the glTF at the chosen texture resolution into the
 ignored ``tools/downloads/models/`` cache, then ``gltf-transform optimize`` writes
 ``models/<name>/<name>.gltf`` with its ``.bin`` and JPEG textures beside it:
-uncompressed geometry (Godot 4.7 has no Draco or meshopt decoder), textures capped
+uncompressed geometry (Godot 4.8 has no Draco or meshopt decoder), textures capped
 at the requested size and, where requested, meshoptimizer simplification for
 scan-density meshes. External textures let Godot import them as ordinary VRAM
 compressed, mipmapped textures (the script writes their ``.import`` settings), and

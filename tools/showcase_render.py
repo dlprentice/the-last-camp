@@ -109,7 +109,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=["screenshots", "video"])
     parser.add_argument("--out", type=Path, help="new directory; otherwise create a unique directory under local-data")
-    parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"), help="Godot 4.7.2 executable path")
+    parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"), help="Godot 4.8 dev6 executable path")
     parser.add_argument("--driver", choices=["vulkan", "d3d12", "metal"], default="vulkan")
     parser.add_argument("--display-driver", choices=["x11", "wayland"],
                         default=os.environ.get("DISPLAY_DRIVER") or None,
@@ -152,8 +152,8 @@ def preflight(options: argparse.Namespace) -> dict:
             if not re.search(r"\s" + codec + r"\s", codecs):
                 raise RuntimeError(f"ffmpeg is missing the required {codec} encoder")
     version = subprocess.check_output([tools["godot"], "--version"], text=True, timeout=20).strip()
-    if not version.startswith("4.7.2."):
-        raise RuntimeError(f"Pinned Godot 4.7.2 required; received {version}")
+    if not version.startswith("4.8.dev6."):
+        raise RuntimeError(f"Pinned Godot 4.8 dev6 required; received {version}")
     for path in ("project.godot", "textures/SOURCES.md", "audio/SOURCES.md", "models/SOURCES.md", "THIRD_PARTY_NOTICES.md", "tools/movie_audio_filter.py"):
         if not (ROOT / path).is_file():
             raise RuntimeError(f"Incomplete project checkout: missing {path}")
