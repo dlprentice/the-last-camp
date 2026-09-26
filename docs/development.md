@@ -19,12 +19,16 @@ Run from the repository root. `godot` below must resolve to the .NET build.
 
 ```bash
 dotnet build --nologo
-godot --headless --path . --import
+godot --headless --path . --import --quit-after 120 --max-fps 30
 godot --headless --path . --script res://tests/RunTests.cs
 godot --headless --path . --script res://tests/SceneContractProbe.cs
 godot --headless --path . --script res://tests/FingerprintProbe.cs
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
+
+Keep `--quit-after` after `--import`: 4.8 dev6's default one-frame import exit
+can race its background help-cache worker. The extra headless iterations allow
+that work to finish before shutdown; they do not launch gameplay or GPU rendering.
 
 Where installed, the optional `godot-headless` machine wrapper builds C# first
 and isolates user data. A plain Godot invocation needs an explicit rebuild

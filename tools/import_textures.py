@@ -9,7 +9,7 @@ No downloads are performed; missing source files fail before conversion:
 Retained sources live in tools/downloads/. The script also writes
 textures/SOURCES.md (attribution) and Godot .import settings for every texture
 in textures/ (VRAM compressed BC7, mipmapped). Run
-``godot --headless --path . --import`` afterwards so the imported copies exist.
+``godot --headless --path . --import --quit-after 120 --max-fps 30`` afterwards so the imported copies exist.
 
 Usage:
     python3 tools/import_textures.py                  # everything

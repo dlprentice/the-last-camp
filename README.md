@@ -28,7 +28,7 @@ Other desktop platforms are not validated.
 git clone https://github.com/dlprentice/the-last-camp.git
 cd the-last-camp
 dotnet build
-godot --headless --path . --import
+godot --headless --path . --import --quit-after 120 --max-fps 30
 godot --path . --fullscreen
 ```
 

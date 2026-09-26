@@ -26,6 +26,13 @@ mesh channels, dressing transforms, meadow/grass batches, camera routes, analyti
 waves and the generated audio bank. They also check the no-music film cues.
 These are sampled contracts, not proof of every runtime state.
 
+An additional primary-checkout import exposed a shutdown abort with a null
+editor singleton. Its native worker stack is consistent with the engine's
+[background script-documentation path](https://github.com/godotengine/godot/blob/8898c2b3d/editor/doc/editor_help.cpp#L2996).
+A fresh, isolated user-cache import completed cleanly using
+`--import --quit-after 120 --max-fps 30`, with no new crash. The setup commands
+include this shutdown-race mitigation; it is not a patch to the engine.
+
 No shipped model, texture, recording or shader was changed during the conversion.
 The Blender check used a synthetic fixture; existing asset provenance remains
 unchanged. The executable package includes the exact .NET runtime pack's license
