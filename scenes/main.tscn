@@ -1,42 +1,6 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scripts/core/main.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/world/world_controller.gd" id="2_world"]
-[ext_resource type="Script" path="res://scripts/camp/camp.gd" id="3_camp"]
-[ext_resource type="Script" path="res://scripts/player/player.gd" id="4_player"]
-[ext_resource type="Script" path="res://scripts/core/intro_dolly.gd" id="5_intro"]
-[ext_resource type="Script" path="res://scripts/ui/loading_screen.gd" id="6_loading"]
-[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="7_hud"]
-[ext_resource type="Script" path="res://scripts/camp/biome_dressing.gd" id="8_biome"]
-[ext_resource type="Script" path="res://scripts/camp/forest_floor_dressing.gd" id="9_floor"]
-[ext_resource type="Script" path="res://scripts/world/terrain_field_director.gd" id="10_terrain"]
+[ext_resource type="Script" path="res://scripts/core/Main.cs" id="1_main"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
-
-[node name="World" type="Node3D" parent="."]
-script = ExtResource("2_world")
-
-[node name="Camp" type="Node3D" parent="."]
-script = ExtResource("3_camp")
-
-[node name="TerrainFieldDirector" type="Node" parent="."]
-script = ExtResource("10_terrain")
-
-[node name="BiomeDressing" type="Node3D" parent="."]
-script = ExtResource("8_biome")
-
-[node name="ForestFloorDressing" type="Node3D" parent="."]
-script = ExtResource("9_floor")
-
-[node name="Player" type="CharacterBody3D" parent="."]
-script = ExtResource("4_player")
-
-[node name="Intro" type="Node3D" parent="."]
-script = ExtResource("5_intro")
-
-[node name="HUD" type="CanvasLayer" parent="."]
-script = ExtResource("7_hud")
-
-[node name="Loading" type="CanvasLayer" parent="."]
-script = ExtResource("6_loading")

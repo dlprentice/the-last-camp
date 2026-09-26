@@ -1,7 +1,7 @@
 # Godot build cache and imports
 .godot/
 __pycache__/
-# Downloaded source textures (re-fetched by tools/import_textures.py)
+# Retained source caches used by the offline asset tools
 tools/downloads/
 # Movie Maker output and encodes
 *.avi
@@ -21,3 +21,7 @@ renders/
 *.x86_64
 *.zip
 *.tar.gz
+
+# .NET SDK output (Godot normally places these under .godot/)
+/bin/
+/obj/

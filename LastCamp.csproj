@@ -1,0 +1,21 @@
+<Project Sdk="Godot.NET.Sdk/4.8.0-dev.6">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>LastCamp</RootNamespace>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize>true</Optimize>
+    <TieredCompilation>false</TieredCompilation>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <DefaultItemExcludes>$(DefaultItemExcludes);local-data/**;.qa/**;.worktrees/**;.claude/**</DefaultItemExcludes>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'ExportRelease'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'ExportRelease'">
+    <Compile Remove="tests/**/*.cs;tools/**/*.cs" />
+  </ItemGroup>
+</Project>
