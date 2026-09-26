@@ -452,7 +452,7 @@ def main() -> int:
     refreshed = set(names) if args.credits_only and args.only else set()
     if not args.credits_only:
         if shutil.which("gltf-transform") is None:
-            parser.error("gltf-transform is required (pinned toolchain, ~/.local/bin)")
+            parser.error("gltf-transform is required on PATH (docs/development.md)")
         for name in names:
             entry = MANIFEST[name]
             print(f"{name} <- polyhaven/{entry.asset} @ {entry.res}", flush=True)
