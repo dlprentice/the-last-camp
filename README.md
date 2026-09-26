@@ -7,39 +7,43 @@ change, or use the free camera to inspect the scene.
 ![The camp and its wooded approach](docs/images/arrival.png)
 
 The project combines procedural terrain, trees, grass and camp geometry with
-credited photoscanned materials and dressing. It uses GDScript, native Jolt
+credited photoscanned materials and dressing. All game logic, diagnostics and scene construction use C#, native Jolt
 physics and Forward+ Vulkan. There are no addons or GDExtensions.
 
-The film is **5:37 at 1920×1080, 60 FPS**, including credits. A **1:51 showcase
+The published film is **5:37 at 1920×1080, 60 FPS**, including credits. A **1:51 showcase
 reel** offers a shorter tour. Both use environmental sound and Foley with no
 background music. Movie Maker renders them offline; their output FPS is not
 the playable demo's frame rate.
 
 ## Start here
 
-Install the **standard Godot 4.8 dev6 editor**, a development snapshot from
+Install **Godot 4.8 dev6 .NET**, its matching .NET export templates, and the **.NET 8 SDK**. The engine is a development snapshot from
 [godotengine.org](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-6/). The project needs a Vulkan-capable
 GPU and Forward+; the Compatibility renderer and web/mobile exports are not
-supported. Linux x86-64 is the tested platform. Other desktop platforms are
-not validated by this release.
+supported. The current C# conversion is checked on Linux x86-64 with CPU-only tests.
+Rendered appearance, gameplay and GPU performance have not yet been revalidated.
+Other desktop platforms are not validated.
 
 ```bash
 git clone https://github.com/dlprentice/the-last-camp.git
 cd the-last-camp
+dotnet build
 godot --headless --path . --import
 godot --path . --fullscreen
 ```
 
-The first import builds Godot's local asset and script caches. The converted
+The first import builds Godot's local asset cache. Rebuild the C# assembly with
+`dotnet build` after changing source. Everything is constructed in code; opening
+the editor is optional, and the one-node main scene is only a bootstrap. The converted
 textures, models and audio are included: no asset downloads, Python packages
 or account sign-in are needed to play. Allow the loading screen to finish;
 Space or a click skips the opening camera once loading is complete.
 
 The default preset starts at High and can adapt downward. Use
 `godot --path . --fullscreen -- --quality=medium` to select a fixed preset.
-This is a demanding visual showcase: on an RTX 4060 Laptop under Godot 4.7.2, the High
-benchmark measured **13.5 FPS at 1080p output** with 0.77 internal resolution
-scale. See [validation and limitations](docs/validation.md).
+This is a demanding visual showcase. The earlier release's performance figures
+do not establish the C# version's frame rate, and changing language alone does not
+make its rendering faster. See [validation and limits](docs/validation.md).
 
 ## Controls
 
@@ -81,13 +85,15 @@ contains the build, test, capture and asset-tool commands.
 
 Download the full film, shorter reel and Linux package from the
 [release page](https://github.com/dlprentice/the-last-camp/releases/tag/v1.0.0).
-They are distributed separately from Git source, with credits and SHA-256 checksums. Render your own copy with:
+Those are the earlier Godot 4.7.2 release's artifacts, not captures or a binary of
+the current C# source. They are distributed with credits and SHA-256 checksums.
+Render the current source, once its visual checks are authorized, with:
 
 ```bash
-DISPLAY_DRIVER=x11 tools/render1080.sh one_night
+tools/render1080.sh one_night
 ```
 
-This needs a graphical Linux session, Godot, FFmpeg with libx264, Python,
+This needs a graphical Linux session, Godot .NET, the .NET SDK, FFmpeg with libx264, Python,
 NumPy, Pillow and ripgrep. It writes a fresh directory under
 `local-data/renders/` and prints the exact output path. Expect substantially
 longer than the film's running time. See [the rendering guide](docs/development.md#rendering).
@@ -104,4 +110,5 @@ licenses; the recordings include **CC BY 3.0**, so this is not an all-CC0 asset 
 
 If you share the film, include a link to the credits alongside it. The source
 contains all nine material sets, 35 credited model assets and six recording
-sources. The README screenshots are unaltered captures from the running demo.
+sources. The README screenshots are unaltered captures of the earlier release; they are
+not new evidence for the C# conversion.

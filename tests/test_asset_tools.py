@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import contextlib
-import datetime as dt
 import importlib.util
 import io
 import json
@@ -67,7 +66,7 @@ class ModelCredits(unittest.TestCase):
         os.utime(path, (4102444800, 4102444800))
 
     def test_partial_import_preserves_unselected_rows_without_their_cache(self):
-        def download(entry):
+        def load_cached_sources(entry):
             self.metadata(entry.asset, "2026-09-12")
             source = self.cache / entry.asset / "source.gltf"
             self.geometry(source)
@@ -78,7 +77,7 @@ class ModelCredits(unittest.TestCase):
 
         with mock.patch.object(sys, "argv", ["import_models.py", "--only", "selected"]), \
              mock.patch.object(models.shutil, "which", return_value="fixture-converter"), \
-             mock.patch.object(models, "download", side_effect=download) as fetched, \
+             mock.patch.object(models, "load_cached_sources", side_effect=load_cached_sources) as fetched, \
              mock.patch.object(models, "convert", side_effect=convert) as converted, \
              contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(models.main(), 0)
@@ -89,11 +88,12 @@ class ModelCredits(unittest.TestCase):
         self.assertEqual(rows["untouched"], self.original_rows[0])
         self.assertIn("Verified Creator (Photography)", rows["selected"])
         self.assertIn("| 2026-09-12 | 2 tris |", rows["selected"])
+        self.assertIn("Blender/Python", rows["selected"])
         self.assertNotIn("2100-01-01", rows["selected"])
 
     def test_credits_only_preserves_rows_and_dates_without_any_private_cache(self):
         with mock.patch.object(sys, "argv", ["import_models.py", "--credits-only"]), \
-             mock.patch.object(models, "download") as fetched, \
+             mock.patch.object(models, "load_cached_sources") as fetched, \
              mock.patch.object(models, "convert") as converted, \
              contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(models.main(), 0)
@@ -109,6 +109,31 @@ class ModelCredits(unittest.TestCase):
         row = models.retained_source_rows()["selected"]
         self.assertIn("Verified Creator (Photography)", row)
         self.assertIn("| 2026-09-10 |", row)
+        self.assertIn("Original alterations.", row)
+        self.assertNotIn("Blender", row)
+
+    def test_credits_only_selected_refresh_keeps_original_conversion_recipe(self):
+        self.metadata("selected")
+        self.geometry(self.output / "selected/selected.gltf")
+        with mock.patch.object(sys, "argv", ["import_models.py", "--credits-only", "--only", "selected"]), \
+             mock.patch.object(models, "convert") as converted, \
+             contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(models.main(), 0)
+        converted.assert_not_called()
+        rows = models.retained_source_rows()
+        self.assertEqual(rows["untouched"], self.original_rows[0])
+        self.assertIn("Verified Creator (Photography)", rows["selected"])
+        self.assertIn("Original alterations.", rows["selected"])
+        self.assertNotIn("Blender", rows["selected"])
+
+    def test_credits_only_cannot_invent_missing_conversion_history(self):
+        self.sources.write_text("# Fixture credits\n\n" + self.original_rows[0] + "\n")
+        original = self.sources.read_text()
+        self.metadata("selected", "2026-09-12")
+        self.geometry(self.output / "selected/selected.gltf")
+        with self.assertRaisesRegex(RuntimeError, "No recorded conversion provenance"):
+            models.write_sources(list(self.manifest), {"selected"})
+        self.assertEqual(self.sources.read_text(), original)
 
     def test_missing_provenance_does_not_fabricate_a_date_or_replace_existing_credits(self):
         self.sources.write_text("# Fixture credits\n\n" + self.original_rows[0] + "\n")
@@ -127,33 +152,32 @@ class ModelCredits(unittest.TestCase):
             models.write_sources(list(self.manifest), {"selected"})
         self.assertEqual(self.sources.read_text(), original)
 
-    def test_real_source_fetch_records_a_date_and_cache_reuse_preserves_it(self):
+    def test_cached_sources_never_invent_or_refresh_a_retrieval_date(self):
         entry = self.manifest["selected"]
-        variant = {"url": "https://example.invalid/selected.gltf"}
-        files = {"gltf": {"1k": {"gltf": variant}}}
+        self.metadata("selected")
+        folder = self.cache / "selected"
+        source = folder / "1k/selected.gltf"
+        self.geometry(source)
+        variant = {"url": "https://example.invalid/selected.gltf", "md5": models.file_md5(source)}
+        (folder / "files.json").write_text(json.dumps({"gltf": {"1k": {"gltf": variant}}}))
+        self.assertEqual(models.load_cached_sources(entry), source)
+        receipt = folder / "retrieved.json"
+        self.assertFalse(receipt.exists())
+        receipt.write_text('{"asset": "selected", "date": "2026-09-01"}\n')
+        models.load_cached_sources(entry)
+        self.assertEqual(json.loads(receipt.read_text())["date"], "2026-09-01")
 
-        def metadata(path, dest):
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            data = files if path.startswith("files/") else {"authors": {"Test": "All"}}
-            dest.write_text(json.dumps(data))
-            return data
-
-        def fetch(url, dest, md5=None):
-            if not dest.exists():
-                self.geometry(dest)
-            return dest
-
-        with mock.patch.object(models, "api_json", side_effect=metadata), \
-             mock.patch.object(models, "fetch", side_effect=fetch), \
-             mock.patch.object(models, "compose_cutouts", side_effect=lambda entry, files, path: path):
-            models.download(entry)
-            receipt = self.cache / "selected/retrieved.json"
-            self.assertEqual(json.loads(receipt.read_text()), {
-                "asset": "selected", "date": dt.date.today().isoformat(),
-            })
-            receipt.write_text('{"asset": "selected", "date": "2026-09-01"}\n')
-            models.download(entry)
-            self.assertEqual(json.loads(receipt.read_text())["date"], "2026-09-01")
+    def test_missing_or_changed_cached_source_fails_without_touching_it(self):
+        path = self.path / "missing/source.gltf"
+        with self.assertRaisesRegex(FileNotFoundError, "no downloads"):
+            models.fetch("https://example.invalid/model.gltf", path)
+        self.assertFalse(path.parent.exists())
+        path.parent.mkdir()
+        path.write_bytes(b"retained source")
+        before = path.read_bytes()
+        with self.assertRaisesRegex(FileNotFoundError, "recorded hash"):
+            models.fetch("https://example.invalid/model.gltf", path, "0" * 32)
+        self.assertEqual(path.read_bytes(), before)
 
 
 class ModelConversionSafety(unittest.TestCase):
@@ -201,7 +225,7 @@ class ModelConversionSafety(unittest.TestCase):
 
     def test_converter_failure_leaves_original_model_and_imports_untouched(self):
         def fail(args, **kwargs):
-            Path(args[3]).write_text("partial candidate")
+            Path(args[args.index("--output") + 1]).write_text("partial candidate")
             kwargs["stdout"].write("fixture converter failure\n")
             raise models.subprocess.CalledProcessError(1, args)
 
@@ -216,7 +240,7 @@ class ModelConversionSafety(unittest.TestCase):
     def test_missing_or_truncated_dependencies_fail_before_replacing_original(self):
         for mode in ("missing", "truncated"):
             def incomplete(args, **kwargs):
-                path = Path(args[3])
+                path = Path(args[args.index("--output") + 1])
                 self.converted_fixture(path)
                 buffer = path.parent / "selected.bin"
                 if mode == "missing":
@@ -233,7 +257,7 @@ class ModelConversionSafety(unittest.TestCase):
     def test_external_dependency_path_is_rejected_before_promotion(self):
         for mode in ("parent", "absolute", "remote"):
             def escaped(args, **kwargs):
-                path = Path(args[3])
+                path = Path(args[args.index("--output") + 1])
                 self.converted_fixture(path)
                 doc = json.loads(path.read_text())
                 doc["buffers"][0]["uri"] = {
@@ -250,7 +274,7 @@ class ModelConversionSafety(unittest.TestCase):
             self.assertEqual(self.snapshot(self.out.parent), self.before)
 
     def test_success_promotes_complete_model_preserving_uids_notices_and_previous_copy(self):
-        with mock.patch.object(models.subprocess, "run", side_effect=lambda args, **kw: self.converted_fixture(Path(args[3]))):
+        with mock.patch.object(models.subprocess, "run", side_effect=lambda args, **kw: self.converted_fixture(Path(args[args.index("--output") + 1]))):
             models.convert(self.entry, self.source, self.out)
         models.validate_conversion(self.out)
         self.assertEqual(models.glb_stats(self.out), (1, 3))
@@ -272,7 +296,7 @@ class ModelConversionSafety(unittest.TestCase):
                 raise OSError("fixture promotion failure")
             return original_rename(path, target)
 
-        with mock.patch.object(models.subprocess, "run", side_effect=lambda args, **kw: self.converted_fixture(Path(args[3]))), \
+        with mock.patch.object(models.subprocess, "run", side_effect=lambda args, **kw: self.converted_fixture(Path(args[args.index("--output") + 1]))), \
              mock.patch.object(Path, "rename", new=rename), \
              self.assertRaisesRegex(OSError, "promotion failure"):
             models.convert(self.entry, self.source, self.out)

@@ -22,9 +22,18 @@ mkdir -p "$OUT_ROOT" "$WORK_ROOT"
 OUT=$(mktemp -d "$OUT_ROOT/${NAME}-4k.XXXXXX")
 WORK=$(mktemp -d "$WORK_ROOT/${NAME}-4k.XXXXXX")
 trap 'echo "Render files retained: $WORK; output: $OUT"' EXIT
+GODOT=${GODOT:-godot}
+case "$("$GODOT" --version)" in 4.8.dev6.mono.*) ;; *) echo "Godot 4.8 dev6 .NET required" >&2; exit 2 ;; esac
+export GODOT
+dotnet build --nologo > "$OUT/build.log" 2>&1
+ENGINE=("$GODOT" --path "$PWD")
+if command -v godot-offscreen >/dev/null; then
+  ENGINE=(godot-offscreen --path "$PWD" --driver "${DISPLAY_DRIVER:-x11}" --timeout "${RENDER_TIMEOUT:-14400}" --done-marker '^CINEMATIC_DONE' --)
+elif [[ -n "${DISPLAY_DRIVER:-}" ]]; then
+  ENGINE+=(--display-driver "$DISPLAY_DRIVER")
+fi
 echo "[$(date +%T)] render $NAME"
-# Keep desktop presentation from pacing this fixed-step offline render.
-godot --path . ${DISPLAY_DRIVER:+--display-driver "$DISPLAY_DRIVER"} --rendering-driver vulkan --disable-vsync --fullscreen --write-movie "$WORK/audio.avi" --fixed-fps 60 \
+"${ENGINE[@]}" --rendering-driver vulkan --disable-vsync --fullscreen --write-movie "$WORK/audio.avi" --fixed-fps 60 \
   -- --cinematic="$NAME" ${QUALITY:+--quality="$QUALITY"} --movie-size=3840x2160 --frames-dir="$WORK/frames" > "$WORK/render.log" 2>&1
 echo "[$(date +%T)] render exit $? frames=$(ls "$WORK/frames" | wc -l)"
 # Frames start at the first drawn frame after the loading screen; the movie

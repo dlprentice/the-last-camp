@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Fetches CC0 PBR sets (Poly Haven photoscans and ambientCG canvas) and packs them into
-the project's texture convention, replacing the synthesised sets:
+"""Repacks retained CC0 PBR source caches into the project's texture convention.
+No downloads are performed; missing source files fail before conversion:
 
   textures/{set}_albedo.png   sRGB colour
   textures/{set}_normal.png   OpenGL (Y+) tangent-space normal map
   textures/{set}_orm.png      R = ambient occlusion, G = roughness, B = height
 
-Downloads are cached in tools/downloads/. The script also writes
+Retained sources live in tools/downloads/. The script also writes
 textures/SOURCES.md (attribution) and Godot .import settings for every texture
 in textures/ (VRAM compressed BC7, mipmapped). Run
 ``godot --headless --path . --import`` afterwards so the imported copies exist.
@@ -25,7 +25,6 @@ import json
 import pathlib
 import re
 import sys
-import urllib.request
 import zipfile
 
 import numpy as np
@@ -86,22 +85,12 @@ def write_sources() -> None:
         "`models/SOURCES.md`.\n"
     )
 
-USER_AGENT = "the-last-camp-importer/1.0 (Godot tech demo)"
 
 
 def fetch(url: str, dest: pathlib.Path) -> pathlib.Path:
     if dest.exists() and dest.stat().st_size > 0:
         return dest
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    print(f"  fetching {url}")
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=180) as response, open(dest, "wb") as out:
-        while True:
-            chunk = response.read(1 << 20)
-            if not chunk:
-                break
-            out.write(chunk)
-    return dest
+    raise FileNotFoundError(f"Retained source missing: {dest} ({url}); no downloads are performed")
 
 
 # ------------------------------------------------------------------ sources

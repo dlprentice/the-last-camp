@@ -55,3 +55,11 @@ The engine is a separate dependency of the source project. Linux release
 packages include `GODOT-NOTICES.txt`, extracted from the actual exported
 executable, with its engine license, third-party copyrights and license texts.
 Distribute that file, `LICENSE`, this notice and `credits.md` alongside the binary.
+
+## .NET runtime
+
+The C# project uses .NET 8. Self-contained Linux packages also carry
+`DOTNET-RUNTIME-LICENSE.TXT` and `DOTNET-RUNTIME-THIRD-PARTY-NOTICES.TXT`, copied
+from the exact runtime pack identified by the exported dependency manifest.
+Keep both with the executable and its `data_LastCamp_linuxbsd_x86_64/` directory.
+The exporter refuses a package if either runtime notice is missing.

@@ -109,7 +109,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=["screenshots", "video"])
     parser.add_argument("--out", type=Path, help="new directory; otherwise create a unique directory under local-data")
-    parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"), help="Godot 4.8 dev6 executable path")
+    parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"), help="Godot 4.8 dev6 .NET executable path")
     parser.add_argument("--driver", choices=["vulkan", "d3d12", "metal"], default="vulkan")
     parser.add_argument("--display-driver", choices=["x11", "wayland"],
                         default=os.environ.get("DISPLAY_DRIVER") or None,
@@ -142,7 +142,9 @@ def executable(name: str) -> str:
 
 
 def preflight(options: argparse.Namespace) -> dict:
-    tools = {"godot": executable(options.godot), "git": executable("git")}
+    tools = {"godot": executable(options.godot), "git": executable("git"), "dotnet": executable("dotnet")}
+    if sys.platform == "linux" and (offscreen := shutil.which("godot-offscreen")):
+        tools["offscreen"] = offscreen
     if options.mode == "video":
         tools.update({name: executable(name) for name in ("ffmpeg", "ffprobe")})
         # Check codecs before an expensive scene render, not after it.
@@ -152,8 +154,8 @@ def preflight(options: argparse.Namespace) -> dict:
             if not re.search(r"\s" + codec + r"\s", codecs):
                 raise RuntimeError(f"ffmpeg is missing the required {codec} encoder")
     version = subprocess.check_output([tools["godot"], "--version"], text=True, timeout=20).strip()
-    if not version.startswith("4.8.dev6."):
-        raise RuntimeError(f"Pinned Godot 4.8 dev6 required; received {version}")
+    if not version.startswith("4.8.dev6.mono."):
+        raise RuntimeError(f"Pinned Godot 4.8 dev6 required (.NET build); received {version}")
     for path in ("project.godot", "textures/SOURCES.md", "audio/SOURCES.md", "models/SOURCES.md", "THIRD_PARTY_NOTICES.md", "tools/movie_audio_filter.py"):
         if not (ROOT / path).is_file():
             raise RuntimeError(f"Incomplete project checkout: missing {path}")
@@ -225,6 +227,7 @@ def validate_movie(info: dict, duration: float, fps: int, dimensions: tuple[int,
 
 def capture(options: argparse.Namespace, checked: dict, out: Path, manifest: dict) -> None:
     tools = checked["tools"]
+    command([tools["dotnet"], "build", "--nologo"], out / "build.log", options.timeout)
     base = [tools["godot"], "--path", str(ROOT), "--fullscreen", "--rendering-method", "forward_plus",
             "--rendering-driver", options.driver, "--disable-vsync"]
     if options.display_driver:
@@ -239,6 +242,12 @@ def capture(options: argparse.Namespace, checked: dict, out: Path, manifest: dic
                        f"--capture-quality={options.quality}", "--skip-cards"]
         if options.cinematic_shots:
             args.append(f"--cinematic-shots={options.cinematic_shots}")
+    if "offscreen" in tools:
+        # The optional machine wrapper owns display isolation and the GPU lock.
+        marker = "^CAPTURE_DONE" if options.mode == "screenshots" else "^CINEMATIC_DONE"
+        args = ["env", f"GODOT={tools['godot']}", tools["offscreen"], "--path", str(ROOT),
+                "--driver", options.display_driver or "x11", "--timeout", str(options.timeout),
+                "--qa", str(out / "offscreen"), "--done-marker", marker, "--", *args[1:]]
     manifest["engine_command"] = args
     text = command(args, out / "render.log", options.timeout)
     device = re.search(r"^(?:Vulkan|D3D12|Direct3D|Metal).*Using Device.*$", text, re.M)

@@ -203,7 +203,7 @@ class CaptureContracts(unittest.TestCase):
 
     def test_failure_manifest_and_credits_are_retained(self):
         out = self.path / "failed"
-        checked = {"tools": {}, "engine": "4.8.dev6.official", "source_sha": "test-sha", "source_dirty": False}
+        checked = {"tools": {}, "engine": "4.8.dev6.mono.official", "source_sha": "test-sha", "source_dirty": False}
         with mock.patch.object(render, "preflight", return_value=checked), \
              mock.patch.object(render, "capture", side_effect=RuntimeError("intentional fixture failure")), \
              self.assertRaisesRegex(RuntimeError, "intentional"):
@@ -212,7 +212,7 @@ class CaptureContracts(unittest.TestCase):
         self.assertTrue((out / "credits.md").exists())
 
     def test_check_mode_never_creates_output_or_renders(self):
-        checked = {"tools": {}, "engine": "4.8.dev6.official", "source_sha": "test-sha", "source_dirty": False}
+        checked = {"tools": {}, "engine": "4.8.dev6.mono.official", "source_sha": "test-sha", "source_dirty": False}
         with mock.patch.object(render, "preflight", return_value=checked), mock.patch.object(render, "capture") as capture:
             self.assertEqual(render.main(["video", "--check", "--out", str(self.path / "check")]), 0)
         self.assertFalse((self.path / "check").exists())
@@ -230,9 +230,11 @@ class CaptureContracts(unittest.TestCase):
         out = self.path / "encoded"
         out.mkdir()
         options = render.parse_args(["video", "--fps", "30", "--display-driver", "x11", "--cinematic-shots", "7,8"])
-        checked = {"tools": {"godot": "fixture-godot", "ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe")}}
+        checked = {"tools": {"dotnet": "fixture-dotnet", "godot": "fixture-godot", "ffmpeg": shutil.which("ffmpeg"), "ffprobe": shutil.which("ffprobe")}}
         original = render.command
         def controlled(args, log, timeout):
+            if args[0] == "fixture-dotnet":
+                return "Build succeeded."
             if args[0] == "fixture-godot":
                 self.assertEqual(args[args.index("--display-driver") + 1], "x11")
                 self.assertLess(args.index("--display-driver"), args.index("--"))

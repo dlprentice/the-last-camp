@@ -1,77 +1,57 @@
 # Validation and known limits
 
-The project targets **Godot 4.8 dev6 standard**, Forward+ Vulkan and native Jolt.
-Linux x86-64 is the tested platform. Converted assets are included in source;
-the first import creates a new local cache.
+The source targets **Godot 4.8 dev6 .NET**, C#, Forward+ Vulkan and native Jolt.
+The conversion checks below were run on September 26, 2026 with
+`4.8.dev6.mono.official.8898c2b3d` and .NET SDK 8.0.424 on Linux x86-64.
 
-## Godot 4.8 dev6
-
-Checked on September 25, 2026 with `4.8.dev6.official.8898c2b3d` from an empty cache: the import is clean,
-all **92 Godot tests** pass, and the High scene smoke test builds the complete scene (1,278 near/main trees,
-641 habitat batches, 18 fish) with no engine errors or warnings. The measurements below are from the
-September 12 release on Godot 4.7.2; they have not been repeated on 4.8.
-
-## Release evidence (Godot 4.7.2, September 12)
-
-Measured on September 12, 2026 with an NVIDIA RTX 4060 Laptop GPU (8 GB VRAM),
-NVIDIA driver 610.57.04, 31 GiB system RAM, and Godot
-`4.7.2.stable.official.ed1daf0bf`:
+## Checked without rendering
 
 | Check | Observed result |
 | --- | --- |
-| Godot regressions | 92 passed, zero failed |
-| Complete High scene construction | Passed; 1,278 near/main trees, 641 habitat batches and 18 fish reported (ridge trees are additional) |
-| Native captures | Nine full-scene High views at 1920×1080, actual NVIDIA Vulkan device |
-| Exported game traversal | All 15 waypoints and photo-mode, lantern, fire-feeding and quality-change checks passed |
-| High benchmark | 13.5 FPS mean, 74.23 ms mean frame time, 93.28 ms p99, 10.7 FPS 1% low; 297 measured frames |
+| C# compilation and Godot import | Passed without errors or warnings |
+| C# regression suite | 96 passed, zero failed: the original 92 tests plus four conversion checks |
+| Python tooling suite | 47 passed, zero failed |
+| Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
+| Deterministic content and audio | All 1,065 SHA-256 fingerprints match the GDScript reference byte for byte |
+| Capture dependency preflight and shell syntax | Passed; no capture was launched |
+| Blender conversion fixture | Separate LOD object names and alpha preserved; 448 triangles reduced to 224, and a 64×64 texture resized to 32×32 |
+| Linux .NET release package | Exported successfully with its self-contained runtime and required license notices |
+| Standalone package metadata | Zero world children constructed; nine material, 35 model and six recording-source credit entries verified from embedded resources |
 
-The benchmark used 1920×1080 output and High's 0.77 internal scale, without
-Movie Maker or fixed FPS. It is a short repeatable route, not a benchmark of
-every possible view or machine. Peak memory and separate CPU/GPU timings were
-not newly measured in this pass.
+The [conversion fixtures](../tests/fixtures/README.md) come from source commit
+`265d2f4a9cc59bc69306d2cb43b45aba8f0f3937`, measured on the same engine revision.
+The scene comparison normalizes script identity and excludes script-defined
+fields. Content fingerprints cover sampled terrain, vegetation plans, generated
+mesh channels, dressing transforms, meadow/grass batches, camera routes, analytic
+waves and the generated audio bank. They also check the no-music film cues.
+These are sampled contracts, not proof of every runtime state.
 
-## Clean-source and distribution checks
+No shipped model, texture, recording or shader was changed during the conversion.
+The Blender check used a synthetic fixture; existing asset provenance remains
+unchanged. The executable package includes the exact .NET runtime pack's license
+and third-party notices, alongside Godot and project notices. Its metadata check
+does not enter the game world.
 
-A separate source copy imported successfully from an empty Godot cache, without
-private asset-download caches. All **92 Godot tests** and **44 Python tests**
-passed; the Python suite includes asset-attribution and safe-rebaking checks.
-The capture preflight and shell syntax checks passed.
+## Validation still on hold
 
-A fresh Linux release export was checked through its own embedded resources:
-all **nine material, 35 model and six recording-source credit entries** were
-present, together with the project and shader license notices. The package
-also contains the exported engine's own license and component notices.
-Its complete High scene construction check passed from the standalone binary
-with no project directory or external asset cache.
+Rendering and gameplay are on hold until explicitly authorized by the maintainer.
+The converted build has **not** been rendered, played, captured, benchmarked or
+subjectively listened to. Full-scene construction, interactions, traversal,
+camera motion, shader behavior, audio timing and long-running cleanup still need
+runtime verification. GPU compute and worker-thread behavior under the complete
+scene are not established by the CPU-only suite.
 
-## Delivered movies
+There is no current FPS claim or demonstrated performance improvement from C#.
+CPU/GPU frame times, memory, collection pauses and hitches need measurement in the
+exported build on the actual hardware. Offline Movie Maker output FPS is not
+interactive performance. Other operating systems and GPUs have not been tested;
+Godot's .NET build does not support the project's web export.
 
-| Output | Duration | Frames | Audio |
-| --- | --- | --- | --- |
-| Main film | 337 seconds | 20,220 at 1080p60 | −20.9 LUFS integrated, 20.3 LU range, −2.0 dBTP |
-| Showcase reel | 111 seconds | 6,660 at 1080p60 | −20.7 LUFS integrated, 13.1 LU range, −2.0 dBTP |
+The [v1.0.0 release](https://github.com/dlprentice/the-last-camp/releases/tag/v1.0.0)
+movies, screenshots and executable were produced before the C# conversion using
+Godot 4.7.2. They remain historical release artifacts, not validation of this
+build. Visual limitations visible in that release are not claimed fixed by a
+language migration.
 
-Both full H.264/AAC movies decoded without errors. Visual checks covered
-complete contact sheets, full-size scene views and sampled playback, with
-both water crossings examined in motion. This does not mean every frame was
-individually inspected. The audio checks are source and meter checks;
-subjective listening approval is not claimed.
-
-## Known limits
-
-- Full forest coverage is expensive. High is not a realtime 60 FPS target on
-  the measured laptop; use a lower preset for interactive exploration.
-- Pine branch tiers and some close plant cards remain visibly procedural.
-  Daytime flames are softer than night flames, and wet surfaces can look pale.
-- Surfacing includes a conspicuous brief lens/waterline band. Water optics,
-  wave propagation, weather and animal behaviour use the approximations
-  described in [architecture](architecture.md).
-- A previous run that switched through every quality preset lost the Vulkan
-  device on this driver. Subsequent bounded runs and final films completed;
-  the intermittent driver's root cause is unresolved.
-- Other operating systems and GPUs, web/mobile exports and long-duration
-  gameplay have not received equivalent validation.
-
-See [development](development.md) for reproducible checks. Runtime behaviour
-and visual quality need their own checks; unit-test counts and offline output
-FPS do not establish either.
+See [development](development.md) for the checks and the separate rendering,
+traversal, listening and performance procedures to use after the hold is lifted.

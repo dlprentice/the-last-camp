@@ -1,6 +1,11 @@
 # Contributor and agent guide
 
-This is a Godot 4.8 dev6 standard GDScript project using native Jolt and Forward+ Vulkan.
+This is a Godot 4.8 dev6 .NET C# project using native Jolt and Forward+ Vulkan.
+
+Game logic, tests, diagnostics and capture harnesses are C#. Build the world,
+materials and UI in code; retain only the minimal main-scene bootstrap. No editor
+authoring, previews or tool scripts. Python/Blender asset tooling and GPU shaders
+keep their native languages. Keep the project self-contained.
 
 Read the documentation relevant to the task:
 
@@ -27,3 +32,8 @@ Read the documentation relevant to the task:
   offline Movie Maker output. Describe measurements and remaining limitations accurately.
 - Do not commit credentials, caches, generated movies, private machine notes or prior
   development history. master is the default branch of the clean public source edition.
+
+The C# conversion has a rendering hold: do not render, launch gameplay, capture or
+benchmark until the maintainer explicitly authorizes it. Compilation, imports,
+CPU-only test scripts and the metadata-only export check are allowed. Keep visual
+and performance validation marked pending while this hold is in effect.

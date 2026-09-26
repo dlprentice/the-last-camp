@@ -2,9 +2,9 @@
 
 **The Last Camp — created by David Prentice.**
 
-Built with [Godot Engine 4.8](https://godotengine.org/license/) (the published film and reel were rendered
+Built with [Godot Engine 4.8 dev6 .NET](https://godotengine.org/license/) (the published film and reel were rendered
 with 4.7.2), using
-Forward+ Vulkan, GDScript and native Jolt physics. The main film and reel
+Forward+ Vulkan, C# and native Jolt physics. The main film and reel
 contain environmental sound and Foley; there is no background music.
 
 Every external asset is listed by title, creator, source link, license and
@@ -29,6 +29,8 @@ that are retained as optional assets but not placed in the scene.
 
 For a video upload, retain the end credits and link this page so the source
 and license links travel with the film. For a playable build, distribute its
-`LICENSE`, `THIRD_PARTY_NOTICES.md`, `GODOT-NOTICES.txt` and `credits.md` files
-with the executable. Original code uses [MIT](LICENSE); third-party files
+`LICENSE`, `THIRD_PARTY_NOTICES.md`, `GODOT-NOTICES.txt`,
+`DOTNET-RUNTIME-LICENSE.TXT`, `DOTNET-RUNTIME-THIRD-PARTY-NOTICES.TXT` and
+`credits.md` files
+with the executable and its `data_LastCamp_linuxbsd_x86_64/` runtime directory. Original code uses [MIT](LICENSE); third-party files
 keep their asset-specific terms.

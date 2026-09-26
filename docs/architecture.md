@@ -1,14 +1,17 @@
 # Architecture
 
 The scene builds from a deterministic plan when the project starts. Most
-geometry is generated in GDScript; converted photoscans supply selected
-materials, plants, deadwood and small props. `scenes/main.tscn` connects the
-world, camp, player, camera and UI.
+geometry is generated in C#; converted photoscans supply selected
+materials, plants, deadwood and small props. `scenes/main.tscn` is a one-node bootstrap. `scripts/content/MainScene.cs`
+constructs the world, camp, player, camera and UI in code, preserving their ready
+order. There are no editor tools, authored resource files or GDScript components.
 
 ## Source map
 
 | Location | Responsibility |
 | --- | --- |
+| `scripts/content/` | Root scene builder and native generated-asset loading |
+| `scripts/runtime/` | Local C# helpers for engine numeric, collection and Variant semantics |
 | `scripts/core/` | Loading, application modes, quality presets, cinematics, camera paths, capture, traversal and profiling tools |
 | `scripts/world/` | Terrain field and mesh, atmosphere, time of day, weather, rain contacts, underwater effects and post processing |
 | `scripts/generation/` | Mesh builders, tree species and branching, grass and meadow generation |
@@ -66,7 +69,7 @@ keep props supported and reserve walking/camera routes.
 Birds, fish and insects have authored behaviours and paths; they are not a
 complete ecological simulation. The audio director combines credited field
 recordings with generated wildlife calls and Foley, applying distance,
-shelter and underwater filtering. `camp_score.gd` is a retained synthesis
+shelter and underwater filtering. `CampScore.cs` is a retained synthesis
 study; the film does not construct its music player.
 
 ## Cameras and output
@@ -81,5 +84,5 @@ is slower than realtime. The film preset applies supersampling and expensive
 lighting settings. The export tools trim loading/shutdown frames, encode
 BT.709 H.264 video, and master native audio without adding music.
 
-See [validation](validation.md) for measured performance and remaining visible
-limitations, and [development](development.md) for the commands.
+See [validation](validation.md) for verified contracts and pending runtime checks,
+and [development](development.md) for the commands.
