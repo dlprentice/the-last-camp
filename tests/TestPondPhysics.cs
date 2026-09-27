@@ -16,6 +16,30 @@ namespace LastCamp.Tests;
 
 public partial class TestPondPhysics : TestCase
 {
+    public void test_gpu_probe_callback_is_engine_callable_and_rejects_stale_results()
+    {
+        using PondSimulation simulation = new PondSimulation();
+        assert_true(simulation.HasMethod("_on_probes"), "GPU readback callback is registered with Godot");
+        if (!simulation.HasMethod("_on_probes")) return;
+        simulation._active = true;
+        simulation._session = 7;
+        simulation._probe_generation = 3;
+        Vector2[] positions = { new Vector2(2, 4), new Vector2(3, 5) };
+        float[] heights = { 0.0125f, -0.025f };
+        byte[] bytes = new byte[heights.Length * sizeof(float)];
+        Buffer.BlockCopy(heights, 0, bytes, 0, bytes.Length);
+        simulation.Call("_on_probes", 7L, 3L, 10L, 1.5, positions, bytes);
+        assert_near(simulation.get_probe_sample_time(), 1.5, 0, "native invocation delivers sample time");
+        assert_eq(simulation.get_probe_heights().Count, 2, "both packed samples arrive");
+        assert_near(simulation.get_probe_heights()[1], heights[1], 0, "readback preserves signed float height");
+        simulation.Call("_on_probes", 7L, 3L, 9L, 1.0, positions, bytes);
+        simulation.Call("_on_probes", 7L, 2L, 11L, 2.0, positions, bytes);
+        simulation.Call("_on_probes", 6L, 3L, 12L, 3.0, positions, bytes);
+        simulation.Call("_on_probes", 7L, 3L, 13L, 4.0, positions, new byte[1]);
+        assert_near(simulation.get_probe_sample_time(), 1.5, 0, "old sessions, layouts, serials and truncated buffers are ignored");
+        simulation._active = false;
+    }
+
     public void test_buoyancy_supports_weight_and_drag_opposes_motion()
     {
         double mass = Canoe.FLOATING_MASS;

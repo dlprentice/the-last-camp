@@ -343,18 +343,22 @@ public partial class PondSimulation : RefCounted
         EmitSignal(SignalName.ready_changed, available);
     }
 
-    public void _on_probes(long session, long generation, long serial, double sample_time, List<Vector2> positions, List<byte> bytes)
+    // Engine-deferred callbacks require Variant-compatible packed arrays. A
+    // managed List<T> compiles but Godot cannot register or invoke that method.
+    public void _on_probes(long session, long generation, long serial, double sample_time, Vector2[] positions, byte[] bytes)
     {
         if (!_active || session != _session || generation != _probe_generation || serial <= _sampled_serial)
         {
             return;
         }
-        if ((long)bytes.Count != (long)positions.Count * 4)
+        if (bytes.Length != positions.Length * sizeof(float))
         {
             return;
         }
-        _probe_heights = G.to_float32_array(bytes);
-        _sampled_positions = positions;
+        float[] heights = new float[positions.Length];
+        Buffer.BlockCopy(bytes, 0, heights, 0, bytes.Length);
+        _probe_heights = new List<float>(heights);
+        _sampled_positions = new List<Vector2>(positions);
         _sampled_serial = serial;
         _sampled_time = sample_time;
     }

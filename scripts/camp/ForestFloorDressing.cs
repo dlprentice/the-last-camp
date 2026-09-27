@@ -111,7 +111,7 @@ public partial class ForestFloorDressing : Node3D
         {
             MeshInstance3D node = new MeshInstance3D();
             node.Name = G.format("RootFlare_%d_%d", new Godot.Collections.Array { G.Index(key2, "x"), G.Index(key2, "y") });
-            node.Mesh = G.Call(groups[key2], "commit", default(Variant), true).As<Mesh>();
+            node.Mesh = groups[key2].As<MeshBuilder>().commit(null, true);
             node.MaterialOverride = material;
             node.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
             node.GIMode = GeometryInstance3D.GIModeEnum.Static;

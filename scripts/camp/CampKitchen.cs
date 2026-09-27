@@ -119,9 +119,10 @@ public partial class CampKitchen : Node3D
         Vector3 _t3 = mug.Rotation;
         _t3.Y = -0.5f;
         mug.Rotation = _t3;
-        Vector3 _t4 = FieldKit.mug(this, new Vector3(0.34f, (float)CLOTH_TOP, 0.12f), new Color(0.20f, 0.33f, 0.34f)).Rotation;
+        Node3D secondMug = FieldKit.mug(this, new Vector3(0.34f, (float)CLOTH_TOP, 0.12f), new Color(0.20f, 0.33f, 0.34f));
+        Vector3 _t4 = secondMug.Rotation;
         _t4.Y = 1.6f;
-        FieldKit.mug(this, new Vector3(0.34f, (float)CLOTH_TOP, 0.12f), new Color(0.20f, 0.33f, 0.34f)).Rotation = _t4;
+        secondMug.Rotation = _t4;
         _add_journal();
         _add_crate(wood);
     }

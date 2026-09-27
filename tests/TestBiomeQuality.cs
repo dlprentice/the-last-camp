@@ -67,6 +67,22 @@ public partial class TestBiomeQuality : TestCase
         assert_gt(stone.SurfaceGetArrayLen(0), 20, "moss-stone source has real geometry");
     }
 
+    public void test_root_batches_commit_real_meshes()
+    {
+        TerrainField field = new TerrainField();
+        ScenePlan plan = new ScenePlan(field);
+        plan.build();
+        ForestFloorDressing dressing = new ForestFloorDressing { _field = field, _plan = plan };
+        dressing._build_buttress_roots();
+        assert_gt(dressing.GetChildCount(), 0, "the woodland has root batches");
+        foreach (MeshInstance3D batch in dressing.GetChildren())
+        {
+            assert_true(batch.Mesh != null, "a committed root batch has a mesh");
+            if (batch.Mesh is ArrayMesh mesh) assert_gt(mesh.SurfaceGetArrayLen(0), 0, "root batches contain vertices");
+        }
+        dressing.Free();
+    }
+
     public void test_shore_distance_has_expected_sign()
     {
         double east_angle = 0.0;

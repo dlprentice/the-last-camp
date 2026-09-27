@@ -396,6 +396,7 @@ public partial class TestCamp : TestCase
         tree.Root.AddChild(kitchen);
         kitchen.build();
         assert_eq((long)kitchen.feet.Count, 4, "the table has four measured feet");
+        assert_eq(kitchen.GetChildren().Count(node => node.Name.ToString().StartsWith("EnamelMug", StringComparison.Ordinal)), 2, "the table has exactly two mugs without coincident duplicate geometry");
         foreach (Vector3 foot in kitchen.feet)
         {
             assert_near(foot.Y, field.height(foot.X, foot.Z) - 0.025, 0.002, "every foot meets the ground");
