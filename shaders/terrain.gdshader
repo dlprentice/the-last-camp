@@ -72,12 +72,15 @@ vec4 height_weights(vec4 m, vec4 h) {
 
 // Grass blades are drawn as geometry above this surface, so the turf's own
 // height field only needs a hint of relief; pebbles and litter keep theirs.
-vec4 sample_heights(vec2 uv, vec2 dx, vec2 dy) {
-	return vec4(
-			textureGrad(grass_orm, uv, dx, dy).b * 0.35 + 0.3,
-			textureGrad(litter_orm, uv, dx, dy).b,
-			textureGrad(mud_orm, uv, dx, dy).b,
-			textureGrad(path_orm, uv, dx, dy).b);
+vec4 sample_heights(vec2 uv, vec2 dx, vec2 dy, vec4 weights) {
+	// Most terrain fragments use one or two layers. Do not march textures
+	// whose weight is exactly zero through every parallax step.
+	vec4 heights = vec4(0.0);
+	if (weights.x > 0.0) heights.x = textureGrad(grass_orm, uv, dx, dy).b * 0.35 + 0.3;
+	if (weights.y > 0.0) heights.y = textureGrad(litter_orm, uv, dx, dy).b;
+	if (weights.z > 0.0) heights.z = textureGrad(mud_orm, uv, dx, dy).b;
+	if (weights.w > 0.0) heights.w = textureGrad(path_orm, uv, dx, dy).b;
+	return heights;
 }
 
 // Parallax occlusion over the mask-blended height field. The offset is
@@ -96,7 +99,7 @@ vec2 parallax(vec2 uv, vec3 view_ts, vec4 m, vec2 dx, vec2 dy, float depth_scale
 	vec2 delta = (view_ts.xy / max(view_ts.z, 0.5)) * depth_scale * tile_near / steps;
 	vec2 cur = uv;
 	float cur_layer = 0.0;
-	float cur_h = 1.0 - dot(m, sample_heights(cur, dx, dy));
+	float cur_h = 1.0 - dot(m, sample_heights(cur, dx, dy, m));
 	float prev_h = cur_h;
 	for (int i = 0; i < 32; i++) {
 		if (i >= step_count || cur_layer >= cur_h) {
@@ -105,7 +108,7 @@ vec2 parallax(vec2 uv, vec3 view_ts, vec4 m, vec2 dx, vec2 dy, float depth_scale
 		cur -= delta;
 		cur_layer += layer_depth;
 		prev_h = cur_h;
-		cur_h = 1.0 - dot(m, sample_heights(cur, dx, dy));
+		cur_h = 1.0 - dot(m, sample_heights(cur, dx, dy, m));
 	}
 	// Linear interpolation between the last two samples.
 	float after = cur_h - cur_layer;

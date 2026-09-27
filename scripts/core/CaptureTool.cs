@@ -346,7 +346,7 @@ public partial class CaptureTool : Node
         Spline look = new Spline(BENCH_LOOK);
         foreach (QualityPreset.Tier tier in tiers)
         {
-            Quality.Instance.apply(tier);
+            if (Quality.Instance.current.tier != tier) Quality.Instance.apply(tier);
             QualityPreset preset = Quality.Instance.current;
             // Measure the complete layout after a preset change, not its worker build.
             while (Game.Instance.camp.understory._replant_thread != null)
@@ -356,20 +356,23 @@ public partial class CaptureTool : Node
             camera.GlobalPosition = ground_relative(path.sample(0.0));
             camera.LookAt(ground_relative(look.sample(0.0)), Vector3.Up);
             await _wait(WARMUP_SECONDS);
-            List<float> frame_times = new List<float>();
+            FrameMetrics metrics = new FrameMetrics(GetViewport(), Game.Instance.camp.pond);
+            ulong measured_start = Time.GetTicksUsec();
             double elapsed = 0.0;
             while (elapsed < BENCH_SECONDS)
             {
-                double dt = GetProcessDeltaTime();
-                elapsed += dt;
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                metrics.Sample();
+                elapsed = (Time.GetTicksUsec() - measured_start) / 1000000.0;
                 double u = elapsed / BENCH_SECONDS;
                 camera.GlobalPosition = ground_relative(path.sample(u));
                 camera.LookAt(ground_relative(look.sample(u)), Vector3.Up);
-                frame_times.Add((float)(dt * 1000.0));
-                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
-            results[preset.display_name.ToLowerInvariant()] = summarise(frame_times);
-            G.print(G.format("BENCH %s: %s", new Godot.Collections.Array { preset.display_name, Json.Stringify(results[preset.display_name.ToLowerInvariant()]) }));
+            Godot.Collections.Dictionary row = metrics.Report();
+            row["render_scale"] = preset.render_scale;
+            row["upscaler"] = preset.upscaler.ToString();
+            results[preset.display_name.ToLowerInvariant()] = row;
+            GD.Print($"BENCH {preset.display_name}: mean={row["mean_ms"]}ms p99={row["p99_ms"]}ms fps={row["fps"]} GPU={row["main_view_gpu_ms"]}ms draws={row["mean_draw_calls"]}");
         }
         FileAccess file = FileAccess.Open(out_path, FileAccess.ModeFlags.Write);
         if (file != null)
@@ -391,7 +394,7 @@ public partial class CaptureTool : Node
         RenderingServer.ViewportSetMeasureRenderTime(rid, true);
         WorldController world = Game.Instance.world;
         Camp camp = Game.Instance.camp;
-        Node scene = GetTree().CurrentScene;
+        Node scene = camp.GetParent();
         Node floor_dressing = scene.GetNodeOrNull("ForestFloorDressing");
         Node biome_dressing = scene.GetNodeOrNull("BiomeDressing");
         Node habitat = camp.GetNodeOrNull("HabitatDiversity");
@@ -432,6 +435,13 @@ public partial class CaptureTool : Node
 {
     RenderingServer.DirectionalSoftShadowFilterSetQuality(RenderingServer.ShadowQuality.SoftLow);
     RenderingServer.PositionalSoftShadowFilterSetQuality(RenderingServer.ShadowQuality.SoftLow);
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "shadow 4096 four" }, { (StringName)"apply", Callable.From(() =>
+{
+    RenderingServer.DirectionalShadowAtlasSetSize(4096, true);
+    world.sun.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits;
+    world.sun.DirectionalShadowSplit1 = 0.08f;
+    world.sun.DirectionalShadowSplit2 = 0.23f;
+    world.sun.DirectionalShadowSplit3 = 0.50f;
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "shadow atlas 2048" }, { (StringName)"apply", Callable.From(() => RenderingServer.DirectionalShadowAtlasSetSize(2048, true)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "shadow 2 splits" }, { (StringName)"apply", Callable.From(() =>
 {
     world.sun.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel2Splits;
@@ -490,7 +500,7 @@ public partial class CaptureTool : Node
     }
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "ridges hidden" }, { (StringName)"apply", Callable.From(() =>
 {
-    camp.ridge_forest.Visible = false;
+    foreach (MultiMeshInstance3D ridge in camp.forest.ridge_multimeshes) ridge.Visible = false;
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "forest hidden" }, { (StringName)"apply", Callable.From(() =>
 {
     camp.forest.Visible = false;
@@ -498,12 +508,12 @@ public partial class CaptureTool : Node
 {
     foreach (Node n in camp.forest.GetChildren())
     {
-        if (n is GeometryInstance3D && !((string)((GeometryInstance3D)n).Name).StartsWith("FarTrees_", StringComparison.Ordinal))
+        if (n is MeshInstance3D)
         {
             ((GeometryInstance3D)n).Visible = false;
         }
     }
-}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "far trees hidden" }, { (StringName)"apply", Callable.From(() => _profile_hide(camp.forest, new Godot.Collections.Array { "FarTrees_" })) } }, new Godot.Collections.Dictionary { { (StringName)"name", "veg shadows off" }, { (StringName)"apply", Callable.From(() =>
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "far trees hidden" }, { (StringName)"apply", Callable.From(() => { foreach (var batch in camp.forest.far_multimeshes) batch.Visible = false; }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "veg shadows off" }, { (StringName)"apply", Callable.From(() =>
 {
     _profile_no_shadows(camp.understory);
     if (floor_dressing != null)
@@ -548,7 +558,7 @@ public partial class CaptureTool : Node
 {
     foreach (Node n4 in camp.forest.GetChildren())
     {
-        if (n4 is GeometryInstance3D && ((string)((GeometryInstance3D)n4).Name).EndsWith("_leaves", StringComparison.Ordinal) || (string)n4.Name == "FarTrees_leaves")
+        if (n4 is GeometryInstance3D geometry && geometry.MaterialOverride is ShaderMaterial leafMaterial && leafMaterial.Shader.ResourcePath == "res://shaders/foliage.gdshader")
         {
             n4.Set("visible", false);
         }
@@ -557,7 +567,7 @@ public partial class CaptureTool : Node
 {
     foreach (Node n5 in camp.forest.GetChildren())
     {
-        if (n5 is GeometryInstance3D && ((string)((GeometryInstance3D)n5).Name).EndsWith("_bark", StringComparison.Ordinal) || (string)n5.Name == "FarTrees_bark")
+        if (n5 is GeometryInstance3D geometry && geometry.MaterialOverride is ShaderMaterial barkMaterial && barkMaterial.Shader.ResourcePath == "res://shaders/bark.gdshader")
         {
             n5.Set("visible", false);
         }
@@ -568,7 +578,7 @@ public partial class CaptureTool : Node
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "overdraw shot" }, { (StringName)"apply", Callable.From(() =>
 {
     GetViewport().DebugDraw = Viewport.DebugDrawEnum.Overdraw;
-}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "impostors off" }, { (StringName)"apply", Callable.From(() => camp.forest.set_switch_distance(100000.0)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "impostors at 30 m" }, { (StringName)"apply", Callable.From(() => camp.forest.set_switch_distance(30.0)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "leaf lod old" }, { (StringName)"apply", Callable.From(() => camp.forest.set_leaf_lod(new Godot.Collections.Array { 45.0, 120.0, 0.48, 0.12 }, new Godot.Collections.Array { 45.0, 120.0, 0.48, 0.12 }, Quality.Instance.current.foliage_distance)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "leaf lod strong" }, { (StringName)"apply", Callable.From(() => camp.forest.set_leaf_lod(new Godot.Collections.Array { 24.0, 80.0, 0.78, 0.6 }, new Godot.Collections.Array { 30.0, 90.0, 0.88, 1.0 }, Quality.Instance.current.foliage_distance)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "grass lod bias 0.5" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.understory, new Godot.Collections.Array { "Grass_", "HillGrass_", "MeadowTussocks_" }, 0.5)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "grass lod bias 0.25" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.understory, new Godot.Collections.Array { "Grass_", "HillGrass_", "MeadowTussocks_" }, 0.25)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "tree lod bias 0.5" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.forest, new Godot.Collections.Array { "" }, 0.5)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "tree lod bias 0.25" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.forest, new Godot.Collections.Array { "" }, 0.25)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "taa off" }, { (StringName)"apply", Callable.From(() =>
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "impostors off" }, { (StringName)"apply", Callable.From(() => camp.forest.set_switch_distance(100000.0)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "impostors at 30 m" }, { (StringName)"apply", Callable.From(() => camp.forest.set_switch_distance(30.0)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "leaf lod old" }, { (StringName)"apply", Callable.From(() => camp.forest.set_leaf_lod(new Godot.Collections.Array { 45.0, 120.0, 0.48, 0.12 }, new Godot.Collections.Array { 45.0, 120.0, 0.48, 0.12 }, Quality.Instance.current.foliage_distance)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "leaf lod strong" }, { (StringName)"apply", Callable.From(() => camp.forest.set_leaf_lod(new Godot.Collections.Array { 24.0, 80.0, 0.78, 0.6 }, new Godot.Collections.Array { 30.0, 90.0, 0.88, 1.0 }, Quality.Instance.current.foliage_distance)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "grass lod bias 0.5" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.understory, new Godot.Collections.Array { "Grass_", "HillGrass_", "MeadowTussocks_" }, 0.5)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "grass lod bias 0.25" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.understory, new Godot.Collections.Array { "Grass_", "HillGrass_", "MeadowTussocks_" }, 0.25)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "tree lod bias 0.5" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.forest, new Godot.Collections.Array { "" }, 0.5)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "tree lod bias 0.25" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.forest, new Godot.Collections.Array { "" }, 0.25)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "terrain occlusion" }, { (StringName)"apply", Callable.From(() => GetViewport().UseOcclusionCulling = true) } }, new Godot.Collections.Dictionary { { (StringName)"name", "tree lod bias 0.1" }, { (StringName)"apply", Callable.From(() => _profile_lod_bias(camp.forest, new Godot.Collections.Array { "" }, 0.1)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "occlusion and tree lod 0.1" }, { (StringName)"apply", Callable.From(() => { GetViewport().UseOcclusionCulling = true; _profile_lod_bias(camp.forest, new Godot.Collections.Array { "" }, 0.1); }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "taa off" }, { (StringName)"apply", Callable.From(() =>
 {
     GetViewport().UseTaa = false;
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "fsr2 77%" }, { (StringName)"apply", Callable.From(() =>
@@ -598,7 +608,12 @@ public partial class CaptureTool : Node
                 {
                     continue;
                 }
+                // Aggressive native tree mesh LOD changes triggered a repeatable
+                // device-loss fault on the tested 4.8 dev6/NVIDIA combination.
+                // Keep these diagnostic cases explicit, never in the default run.
+                if (wanted.Count == 0 && c["name"].AsString().Contains("tree lod", StringComparison.Ordinal)) continue;
                 Callable apply = c["apply"].AsCallable();
+                GD.Print($"PROFILE_BEGIN {c["name"]}");
                 apply.Call();
                 await _wait(1.2);
                 double gpu = 0.0;
@@ -615,17 +630,27 @@ public partial class CaptureTool : Node
                 gpu /= (double)samples;
                 cpu /= (double)samples;
                 frame /= (double)samples;
-                if (G.eq(c["name"], "overdraw shot"))
+                if (Game.Instance.has_flag("profile-images") || G.eq(c["name"], "overdraw shot"))
                 {
-                    GetViewport().GetTexture().GetImage().SavePng(out_path.GetBaseDir().PathJoin(G.format("overdraw_%s.png", vp_name)));
+                    string imageDir = out_path.GetBaseDir().PathJoin(out_path.GetFile().GetBaseName() + "-stills");
+                    DirAccess.MakeDirRecursiveAbsolute(imageDir);
+                    await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+                    GetViewport().GetTexture().GetImage().SavePng(imageDir.PathJoin(G.format("%s_%s.png", new Godot.Collections.Array { vp_name, c["name"].AsString().Replace(" ", "_") })));
                 }
                 long objects = (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame);
                 long primitives = (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalPrimitivesInFrame);
                 long draw_calls = (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame);
                 rows[c["name"]] = new Godot.Collections.Dictionary { { (StringName)"gpu_ms", snappedf(gpu, 0.01) }, { (StringName)"cpu_ms", snappedf(cpu, 0.01) }, { (StringName)"frame_ms", snappedf(frame, 0.01) }, { (StringName)"objects", objects }, { (StringName)"primitives", primitives }, { (StringName)"draw_calls", draw_calls } };
                 G.print(G.format("PROFILE %-22s gpu %6.2f ms   cpu %6.2f ms   frame %6.2f ms   objects %6d   tris %9d   draws %5d", new Godot.Collections.Array { c["name"], gpu, cpu, frame, objects, primitives, draw_calls }));
-                _restore_profile_state();
-                await _wait(0.4);
+                // The baseline mutates nothing. Do not rebuild renderer state
+                // or invalidate GI between it and the first actual experiment.
+                if (c["name"].AsString() != "all on")
+                {
+                    GD.Print($"PROFILE_RESTORE {c["name"]}");
+                    _restore_profile_state();
+                    GD.Print($"PROFILE_RESTORED {c["name"]}");
+                    await _wait(0.4);
+                }
             }
             report[vp_name] = rows;
         }
@@ -762,6 +787,7 @@ public partial class CaptureTool : Node
         Game.Instance.world.sun.ShadowEnabled = true;
         Game.Instance.world.sun.ShadowCasterMask = unchecked((uint)(_profile_sun_casters));
         GetViewport().DebugDraw = Viewport.DebugDrawEnum.Disabled;
+        GetViewport().UseOcclusionCulling = Game.Instance.has_flag("terrain-occlusion");
         Quality.Instance.apply(Quality.Instance.current.tier);
     }
 

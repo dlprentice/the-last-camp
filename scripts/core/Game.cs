@@ -70,6 +70,8 @@ public partial class Game : Node
     public AudioDirector audio;
     public Hud hud;
     public Camera3D photo_camera;
+    public Viewport render_viewport;
+    public CampSession session;
 
     /// Parsed `--key=value` / `--flag` arguments passed after `--` on the command line.
     public Godot.Collections.Dictionary user_args = new Godot.Collections.Dictionary();
@@ -108,6 +110,11 @@ public partial class Game : Node
         user_args = parse_user_args(new List<string>(OS.GetCmdlineUserArgs()));
         _apply_movie_size();
         _apply_mouse_mode();
+        if (!InputMap.HasAction("camp_journal"))
+        {
+            InputMap.AddAction("camp_journal");
+            InputMap.ActionAddEvent("camp_journal", new InputEventKey { PhysicalKeycode = Key.J });
+        }
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -221,7 +228,7 @@ public partial class Game : Node
     public string save_screenshot()
     {
         DirAccess.MakeDirRecursiveAbsolute(SCREENSHOT_DIR);
-        Image image = GetViewport().GetTexture().GetImage();
+        Image image = (render_viewport ?? GetViewport()).GetTexture().GetImage();
         string stamp = Time.GetDatetimeStringFromSystem(false, true).Replace(":", "-").Replace(" ", "_");
         string path = G.format("%s/last_camp_%s.png", new Godot.Collections.Array { SCREENSHOT_DIR, stamp });
         Error err = image.SavePng(path);
@@ -265,6 +272,8 @@ public partial class Game : Node
         audio = null;
         hud = null;
         photo_camera = null;
+        render_viewport = null;
+        session = null;
         if (Instance == this) Instance = null;
         G.drain_finalizers();
     }

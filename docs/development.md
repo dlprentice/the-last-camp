@@ -40,16 +40,9 @@ Their reference hashes and scope are documented in [tests/fixtures](../tests/fix
 A passing CPU check does not establish rendered appearance, audio mix, traversal
 or hardware performance.
 
-## Rendering hold
-
-The C# conversion currently has a maintainer-requested rendering hold. Do not
-run the GPU, gameplay or Movie Maker commands below until that hold is explicitly
-lifted. Compilation, imports, CPU-only probes and the metadata-only package check
-can run during the hold. See [validation](validation.md) for actual coverage.
-
 ## Capture, traversal and performance
 
-After the hold is lifted:
+See [validation](validation.md) for actual coverage. Capture named views with:
 
 ```bash
 python3 tools/showcase_render.py screenshots --quality high --shots arrival,pond,night_tent
@@ -65,7 +58,7 @@ Otherwise they open an ordinary game window in the caller's graphical session.
 On machines providing the offscreen wrapper, direct checks use fresh paths:
 
 ```bash
-godot-offscreen --timeout 600 -- -- --skip-intro --quality=high --traverse="$PWD/local-data/traversal/run-1"
+godot-offscreen --timeout 600 -- -- --skip-intro --quality=high --session-check --traverse="$PWD/local-data/traversal/run-1"
 godot-offscreen --timeout 600 -- -- --benchmark=high --out="$PWD/local-data/benchmark-high.json"
 ```
 

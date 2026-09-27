@@ -33,7 +33,7 @@ Read the documentation relevant to the task:
 - Do not commit credentials, caches, generated movies, private machine notes or prior
   development history. master is the default branch of the clean public source edition.
 
-The C# conversion has a rendering hold: do not render, launch gameplay, capture or
-benchmark until the maintainer explicitly authorizes it. Compilation, imports,
-CPU-only test scripts and the metadata-only export check are allowed. Keep visual
-and performance validation marked pending while this hold is in effect.
+Runtime testing, rendering and performance work are authorized. Use isolated
+offscreen GPU runs, retain before/after evidence, and measure the exported game.
+Keep visual and performance claims limited to what has actually been inspected
+and measured; the conversion's CPU fixtures alone do not establish acceptance.

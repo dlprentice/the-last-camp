@@ -63,6 +63,11 @@ public partial class Pond : Node3D
     public Vector3 _skip_direction = Vector3.Left;
     public long _skip_index = 0;
     public MeshInstance3D _stone;
+    private StoneFlight _playerStone;
+    private double _stoneAccumulator;
+    public int best_skips;
+    public int last_skips;
+    private readonly PhysicsRayQueryParameters3D _stoneQuery = new() { CollisionMask = 1 };
     public PondSimulation simulation;
     public double surface_time = 0.0;
     public bool simulation_paused = false;
@@ -624,7 +629,7 @@ public partial class Pond : Node3D
     public bool skip_stone(Vector3 origin, Vector3 direction)
     {
         /// Three diminishing ballistic hops, with an impact sound at each contact.
-        if (_skip_age >= 0.0 || direction.LengthSquared() < 0.01)
+        if (_skip_age >= 0.0 || _playerStone?.Active == true || direction.LengthSquared() < 0.01)
         {
             return false;
         }
@@ -645,6 +650,11 @@ public partial class Pond : Node3D
 
     public void _update_skip(double delta)
     {
+        if (_playerStone?.Active == true)
+        {
+            _update_player_stone(delta);
+            return;
+        }
         if (_skip_age < 0.0)
         {
             return;
@@ -676,6 +686,53 @@ public partial class Pond : Node3D
         {
             _skip_age = -1.0;
             _stone.Visible = false;
+        }
+    }
+
+    public bool throw_stone(Vector3 origin, Vector3 direction, double charge)
+    {
+        if (_skip_age >= 0 || _playerStone?.Active == true || direction.LengthSquared() < 0.01) return false;
+        _playerStone = new StoneFlight(origin, direction, (float)charge);
+        _stoneAccumulator = 0;
+        _stone.GlobalPosition = origin;
+        _stone.Visible = true;
+        return true;
+    }
+
+    private void _update_player_stone(double delta)
+    {
+        const float step = 1f / 120f;
+        // Fixed-size steps keep the score independent of rendering FPS. A long
+        // stalled frame catches up at most a quarter-second, not an unbounded loop.
+        _stoneAccumulator += Math.Min(delta, 0.25);
+        while (_stoneAccumulator >= step && _playerStone.Active)
+        {
+            _stoneAccumulator -= step;
+            Vector3 before = _playerStone.Position;
+            Vector3 predicted = before + _playerStone.Velocity * step;
+            float ground = (float)field.surface_height(predicted.X, predicted.Z);
+            float water = (float)surface_height(new Vector2(predicted.X, predicted.Z));
+            StoneFlight.Contact contact = _playerStone.Step(step, water, ground);
+            _stoneQuery.From = before;
+            _stoneQuery.To = _playerStone.Position;
+            if (GetWorld3D().DirectSpaceState.IntersectRay(_stoneQuery).Count > 0) _playerStone.Stop();
+            if (contact == StoneFlight.Contact.Skip || contact == StoneFlight.Contact.Sink)
+            {
+                ripple(_playerStone.Position, Math.Max(0.15, 0.9 * Math.Pow(0.70, _playerStone.Skips)));
+                Game.Instance.audio?.water_impact(_playerStone.Position, _playerStone.Skips);
+            }
+        }
+        _stone.GlobalPosition = _playerStone.Position;
+        _stone.RotateZ((float)(delta * 18));
+        if (!_playerStone.Active)
+        {
+            last_skips = _playerStone.Skips;
+            bool record = last_skips > best_skips;
+            best_skips = Math.Max(best_skips, last_skips);
+            Game.Instance.session?.RecordSkips(last_skips);
+            _stone.Visible = false;
+            string result = last_skips == 0 ? "Sunk — try a stronger, flatter throw." : $"{last_skips} skip{(last_skips == 1 ? "" : "s")}  ·  {(record ? "New best" : "Best")}: {best_skips}";
+            Game.Instance.hud?.notify(result);
         }
     }
 

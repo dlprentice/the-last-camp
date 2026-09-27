@@ -20,12 +20,55 @@ public partial class Main : Node3D
 {
     public Main()
     {
+        _sceneRoot = this;
         // Metadata-only package checks must never construct or enter the world.
         if (!OS.GetCmdlineUserArgs().Contains("--package-check"))
-            MainScene.BuildInto(this);
+        {
+            string[] args = OS.GetCmdlineUserArgs();
+            bool capture = args.Any(a => new[] { "--capture", "--benchmark", "--profile", "--traverse", "--cinematic", "--review-assets", "--check-pond", "--movie-size" }.Any(flag => a == flag || a.StartsWith(flag + "=", StringComparison.Ordinal)));
+            if (capture && DisplayServer.GetName() != "headless")
+            {
+                Vector2I size = new(1920, 1080);
+                string dimensions = args.FirstOrDefault(a => a.StartsWith("--movie-size=", StringComparison.Ordinal));
+                if (dimensions != null)
+                {
+                    string[] values = dimensions.Split('=')[1].Split('x');
+                    if (values.Length == 2 && int.TryParse(values[0], out int w) && int.TryParse(values[1], out int h) && w >= 16 && h >= 16)
+                        size = new Vector2I(w, h);
+                }
+                // The display can be tiled or resized while a tool runs. Its
+                // window is only a presenter; the complete game renders here.
+                var presenter = new SubViewportContainer { Name = "CapturePresenter", Size = size, Stretch = false };
+                AddChild(presenter);
+                _captureViewport = new SubViewport { Name = "CaptureViewport", Size = size, OwnWorld3D = true,
+                    RenderTargetUpdateMode = SubViewport.UpdateMode.Always, AudioListenerEnable3D = true };
+                presenter.AddChild(_captureViewport);
+                _sceneRoot = new Node3D { Name = "WorldRoot" };
+                _captureViewport.AddChild(_sceneRoot);
+            }
+            MainScene.BuildInto(_sceneRoot);
+        }
     }
 
-    public override void _ExitTree() => G.drain_finalizers();
+    private readonly Node3D _sceneRoot;
+    private readonly SubViewport _captureViewport;
+
+    public override void _EnterTree()
+    {
+        Game.Instance.render_viewport = _captureViewport ?? GetViewport();
+        if (_captureViewport != null)
+        {
+            GetViewport().Disable3D = true;
+            Quality.Instance._apply_viewport(_captureViewport, Quality.Instance.current);
+            GD.Print($"FIXED_VIEWPORT {_captureViewport.Size}");
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        if (Game.Instance != null) Game.Instance.render_viewport = null;
+        G.drain_finalizers();
+    }
 
     public Camp camp;
     public WorldController world;
@@ -45,12 +88,12 @@ public partial class Main : Node3D
             Game.Instance.quit_cleanly(result);
             return;
         }
-        camp = GetNode<Camp>("Camp");
-        world = GetNode<WorldController>("World");
-        player = GetNode<Player>("Player");
-        intro = GetNode<IntroDolly>("Intro");
-        loading = GetNode<LoadingScreen>("Loading");
-        hud = GetNode<Hud>("HUD");
+        camp = _sceneRoot.GetNode<Camp>("Camp");
+        world = _sceneRoot.GetNode<WorldController>("World");
+        player = _sceneRoot.GetNode<Player>("Player");
+        intro = _sceneRoot.GetNode<IntroDolly>("Intro");
+        loading = _sceneRoot.GetNode<LoadingScreen>("Loading");
+        hud = _sceneRoot.GetNode<Hud>("HUD");
         Game.Instance.mode = Game.Mode.LOADING;
         camp.Connect(Camp.SignalName.stage_started, new Callable(this, Main.MethodName._on_stage_started));
         if (Game.Instance.is_tool_run())
@@ -60,16 +103,24 @@ public partial class Main : Node3D
         long t0 = (long)Time.GetTicksMsec();
         // The opaque loading UI needs only 2D. Avoid rendering half-built forest
         // stages while their CPU-side upload buffers are still resident.
-        bool restore_3d = GetViewport().Disable3D;
-        GetViewport().Disable3D = true;
+        Viewport renderer = Game.Instance.render_viewport;
+        bool restore_3d = renderer.Disable3D;
+        renderer.Disable3D = true;
         await camp.build();
         if (!IsInsideTree())
         {
             return;
         }
-        // Opt-in performance experiment: hero trees beyond 45 m become baked
-        // billboards. Off by default because the demo draws the whole scene at
-        // full distance; enable with -- --impostors to measure.
+        // Keep distant woodland coverage using lit canopy atlases. Full meshes
+        // return near the player; the comparison flag is for profiling only.
+        if (!Game.Instance.has_flag("full-tree-meshes"))
+        {
+            TreeImpostors ridges = new TreeImpostors();
+            camp.AddChild(ridges);
+            loading.set_progress("Preparing distant canopies", 0.90);
+            await ridges.bake_ridges(camp.forest);
+            camp.forest.attach_ridge_impostors(ridges);
+        }
         if (Game.Instance.has_flag("impostors"))
         {
             TreeImpostors impostors = new TreeImpostors();
@@ -81,10 +132,11 @@ public partial class Main : Node3D
                 return;
             }
             camp.forest.attach_impostors(impostors);
+            camp.forest.attach_far_impostors(impostors);
         }
-        GetNode<BiomeDressing>("BiomeDressing").setup(camp);
+        _sceneRoot.GetNode<BiomeDressing>("BiomeDressing").setup(camp);
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        GetNode<ForestFloorDressing>("ForestFloorDressing").setup(camp);
+        _sceneRoot.GetNode<ForestFloorDressing>("ForestFloorDressing").setup(camp);
         ScannedDressing scanned = new ScannedDressing();
         camp.AddChild(scanned);
         scanned.setup(camp);
@@ -95,7 +147,7 @@ public partial class Main : Node3D
         CanopyDrips drips = new CanopyDrips();
         camp.AddChild(drips);
         drips.setup(camp, world);
-        TerrainFieldDirector director = GetNode<TerrainFieldDirector>("TerrainFieldDirector");
+        TerrainFieldDirector director = _sceneRoot.GetNode<TerrainFieldDirector>("TerrainFieldDirector");
         while (director._rain_thread != null)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -106,7 +158,7 @@ public partial class Main : Node3D
         }
         long t_built = (long)Time.GetTicksMsec();
         loading.set_progress("Warming up the renderer", 0.96);
-        GetViewport().Disable3D = restore_3d;
+        renderer.Disable3D = restore_3d;
         await world.warm_up();
         if (!IsInsideTree())
         {
@@ -127,7 +179,7 @@ public partial class Main : Node3D
         {
             loading.finish();
             CaptureTool capture = new CaptureTool();
-            AddChild(capture);
+            _sceneRoot.AddChild(capture);
             capture.run_pond_check(Game.Instance.arg_value("out", "res://local-data/pond-check"));
             return;
         }
@@ -135,7 +187,7 @@ public partial class Main : Node3D
         {
             loading.finish();
             AssetReview review = new AssetReview();
-            AddChild(review);
+            _sceneRoot.AddChild(review);
             review.run(Game.Instance.arg_value("review-assets", "res://local-data/asset-review"));
             return;
         }
@@ -143,7 +195,7 @@ public partial class Main : Node3D
         {
             loading.finish();
             CaptureTool capture2 = new CaptureTool();
-            AddChild(capture2);
+            _sceneRoot.AddChild(capture2);
             capture2.run_benchmark(Game.Instance.arg_value("benchmark", ""), Game.Instance.arg_value("out", "user://benchmark.json"));
             return;
         }
@@ -151,7 +203,7 @@ public partial class Main : Node3D
         {
             loading.finish();
             Cinematic cinematic = new Cinematic();
-            AddChild(cinematic);
+            _sceneRoot.AddChild(cinematic);
             cinematic.play(Game.Instance.arg_value("cinematic", "showreel"));
             return;
         }
@@ -159,7 +211,7 @@ public partial class Main : Node3D
         {
             loading.finish();
             CaptureTool capture3 = new CaptureTool();
-            AddChild(capture3);
+            _sceneRoot.AddChild(capture3);
             capture3.run_profile(Game.Instance.arg_value("out", "user://profile.json"));
             return;
         }
@@ -167,18 +219,20 @@ public partial class Main : Node3D
         {
             loading.finish();
             CaptureTool capture4 = new CaptureTool();
-            AddChild(capture4);
+            _sceneRoot.AddChild(capture4);
             capture4.run_capture(Game.Instance.arg_value("capture", "res://local-data/captures"), Game.Instance.arg_value("shots", ""));
             return;
         }
         loading.finish();
+        if (!Game.Instance.is_tool_run() || Game.Instance.has_flag("session-check"))
+            _sceneRoot.AddChild(new CampSession { Name = "Evening" });
         if (Game.Instance.has_flag("skip-intro"))
         {
             player.begin();
             if (Game.Instance.has_flag("traverse"))
             {
                 TraversalCheck traversal = new TraversalCheck();
-                AddChild(traversal);
+                _sceneRoot.AddChild(traversal);
                 traversal.run(player, Game.Instance.arg_value("traverse", "res://local-data/traversal"));
             }
         }

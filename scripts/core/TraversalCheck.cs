@@ -152,6 +152,7 @@ public partial class TraversalCheck : Node
         }
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        GD.Print($"TRAVERSAL_FRAME label={label} frame={Engine.GetFramesDrawn()}");
         Image image = GetViewport().GetTexture().GetImage();
         if (image != null)
         {
@@ -187,18 +188,56 @@ public partial class TraversalCheck : Node
         _player.toggle_lantern();
         _check("lantern toggles on and off", lit && !_player.lantern_on);
 
-        _player.yaw = atan2(-(0.0 - _player.GlobalPosition.X), -(0.0 - _player.GlobalPosition.Z));
-        _player.pitch = -0.45;
-        await ToSignal(GetTree().CreateTimer(0.8), SceneTreeTimer.SignalName.Timeout);
-        Node focus = _player._focus;
-        bool fed = false;
-        if (focus != null && focus.HasMethod("interact"))
-        {
-            focus.Call("interact", _player);
-            fed = true;
-        }
-        _check("facing the fire offers an interaction and feeding it succeeds", fed);
+        // Pick up actual firewood first. Calling any focused interactable used to
+        // be reported as successful feeding, even with empty hands and no fuel change.
+        await _go_to("woodpile_approach", new Vector2(4.6f, -0.05f));
+        Interactable wood = Game.Instance.camp.campsite.woodpile;
+        await _aim_and_interact(wood.GlobalPosition + Vector3.Up * 0.28f, wood);
+        _check("woodpile pickup equips a log", _player.held_item == "log");
+        await _screenshot("carrying_firewood");
+        await _go_to("fire_feed_approach", new Vector2(1.7f, 1.8f));
+        Firepit fire = Game.Instance.camp.campsite.firepit;
+        double fuelBefore = fire.intensity;
+        await _aim_and_interact(fire.GlobalPosition + Vector3.Up * 0.3f, fire.body);
+        _check("feeding consumes the carried log and increases the fire", _player.held_item == "" && fire.intensity > fuelBefore + 0.3);
         await _screenshot("fire_fed");
+        await _aim_and_interact(fire.GlobalPosition + Vector3.Up * 0.3f, fire.body);
+        _check("empty-handed fire interaction starts resting", _player.resting);
+        Input.ActionPress("move_back");
+        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        Input.ActionRelease("move_back");
+        _check("movement leaves the resting pose", !_player.resting);
+
+        await _go_to("stones_around_fire", new Vector2(-3.6f, 3.6f));
+        await _go_to("stones_shore", new Vector2(-9, 2));
+        await _go_to("stones_dock_root", new Vector2(-16, 6.3f));
+        await _go_to("stones_dock_end", new Vector2(-23.1f, 5.4f));
+        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+        Vector3 supportedPosition = _player.GlobalPosition;
+        Game.Instance.hud._toggle_pause();
+        await ToSignal(GetTree().CreateTimer(0.2, true), SceneTreeTimer.SignalName.Timeout);
+        Game.Instance.hud._toggle_pause();
+        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        _check("pausing and resuming preserves the dock support", _player.GlobalPosition.DistanceTo(supportedPosition) < 0.1 && _player.IsOnFloor());
+        _player.photo.enter(_player.camera);
+        await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+        _player.photo.exit();
+        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        _check("photo mode restores the dock position without sinking", _player.GlobalPosition.DistanceTo(supportedPosition) < 0.1 && _player.IsOnFloor());
+        Interactable stones = Game.Instance.camp.campsite.dock.GetNode<Interactable>("SkippingStones");
+        await _aim_and_interact(stones.GlobalPosition, stones);
+        _check("stone pickup equips a stone", _player.held_item == "stone");
+        Vector3 throwDirection = -Game.Instance.camp.campsite.dock.GlobalBasis.Z;
+        _player.yaw = Math.Atan2(-throwDirection.X, -throwDirection.Z);
+        _player.pitch = -0.02;
+        _player.GetViewport().PushInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = true });
+        await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+        await _screenshot("stone_aim");
+        _check("holding throw charges the stone", _player.charging_stone && _player.stone_charge > 0.9);
+        _player.GetViewport().PushInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = false });
+        await ToSignal(GetTree().CreateTimer(5), SceneTreeTimer.SignalName.Timeout);
+        _check("release consumes the stone and produces water skips", _player.held_item == "" && Game.Instance.camp.pond.last_skips >= 2);
+        await _screenshot("stone_result");
 
         QualityPreset.Tier start_tier = Quality.Instance.current.tier;
         Quality.Instance.apply(QualityPreset.Tier.MEDIUM);
@@ -215,6 +254,55 @@ public partial class TraversalCheck : Node
         }
         _check("quality steps down to Medium and back without errors", medium && Quality.Instance.current.tier == start_tier);
         await _screenshot("after_quality_change");
+        if (Game.Instance.session is CampSession evening)
+        {
+            _check("camp journal recognises completed evening activities", evening.ReadyForNight);
+            _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = true });
+            await ToSignal(GetTree().CreateTimer(0.2, true), SceneTreeTimer.SignalName.Timeout);
+            _check("journal input opens a paused readable journal", Game.Instance.hud.JournalVisible && GetTree().Paused);
+            await _screenshot("journal");
+            _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = false });
+            _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = true });
+            _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = false });
+            _check("closing the journal resumes play", !GetTree().Paused && Game.Instance.mode == Game.Mode.PLAY);
+            await _go_to("tent_return_dock", new Vector2(-16, 6.3f));
+            await _go_to("tent_return_bank", new Vector2(-14.2f, 6.6f));
+            await _go_to("tent_return_shore", new Vector2(-9, 2));
+            await _go_to("tent_return_clearing", new Vector2(-3.6f, 3.6f));
+            await _go_to("tent_return_seats", new Vector2(3.8f, 3.8f));
+            await _go_to("tent_return_door", new Vector2(4.4f, -0.4f));
+            await _go_to("tent_around_woodpile", new Vector2(3.6f, -2.8f));
+            Vector3 entrance = Game.Instance.camp.campsite.tent.ToGlobal(new Vector3(-0.3f, 0, -2.6f));
+            await _go_to("tent_entrance", new Vector2(entrance.X, entrance.Z));
+            var bed = Game.Instance.camp.campsite.tent.GetNode<Interactable>("BedrollRest");
+            Game.Instance.world.hour = 19;
+            await _aim_and_interact(bed.GlobalPosition, bed);
+            await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
+            _check("resting at the tent advances to dusk and restores control", !evening.Resting && _player.enabled && Game.Instance.world.hour > 20);
+            await _aim_and_interact(bed.GlobalPosition, bed);
+            await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
+            _check("sleeping completes the evening and returns to playable dawn", evening.MorningReached && evening.Completed == 4 && _player.enabled && Game.Instance.world.hour < 7);
+            await _screenshot("morning_completed");
+        }
+    }
+
+    private async Task _aim_and_interact(Vector3 target, Node expected)
+    {
+        // Walking decelerates after key release. Aim from the settled eye, not
+        // the previous moving pose (small objects otherwise slip off the ray).
+        await ToSignal(GetTree().CreateTimer(0.35), SceneTreeTimer.SignalName.Timeout);
+        Vector3 direction = target - _player.eye_position();
+        _player.yaw = Math.Atan2(-direction.X, -direction.Z);
+        _player.pitch = Math.Atan2(direction.Y, new Vector2(direction.X, direction.Z).Length());
+        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        _player.interact_ray.ForceRaycastUpdate();
+        _player._update_focus();
+        if (_player.focus() != expected)
+            GD.Print($"TRAVERSAL_AIM expected={expected.Name} eye={_player.eye_position()} target={target} distance={direction.Length():F2} hit={(_player.interact_ray.GetCollider() as Node)?.Name}");
+        _check($"interaction ray reaches {expected.Name}", _player.focus() == expected);
+        _player.GetViewport().PushInput(new InputEventAction { Action = "interact", Pressed = true });
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        _player.GetViewport().PushInput(new InputEventAction { Action = "interact", Pressed = false });
     }
 
     public void _check(string label, bool ok)

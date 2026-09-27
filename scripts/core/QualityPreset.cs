@@ -184,7 +184,6 @@ public partial class QualityPreset : RefCounted
         p.grass_distance = 260.0;
         p.foliage_distance = 0.8;
         p.ridge_detail = 0.5;
-        p.ridge_far_band = false;
         p.particle_scale = 0.7;
         p.anisotropy = Viewport.AnisotropicFiltering.Anisotropy8X;
         p.parallax_steps = 8;
@@ -224,7 +223,6 @@ public partial class QualityPreset : RefCounted
         p.anisotropy = Viewport.AnisotropicFiltering.Anisotropy4X;
         p.parallax_steps = 0;
         p.ridge_detail = 0.4;
-        p.ridge_far_band = false;
         return p;
     }
 

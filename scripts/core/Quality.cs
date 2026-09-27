@@ -128,7 +128,7 @@ public partial class Quality : Node
     {
         bool movie = Game.Instance.has_flag("film-quality") || Game.Instance.has_flag("cinematic") && !Game.Instance.has_flag("capture-quality");
         current = movie && tier == QualityPreset.Tier.ULTRA ? QualityPreset.film() : QualityPreset.for_tier(tier);
-        _apply_viewport(GetTree().Root, current);
+        _apply_viewport(Game.Instance.render_viewport ?? GetTree().Root, current);
         _apply_renderer(current);
         EmitSignal(SignalName.preset_changed, current);
     }

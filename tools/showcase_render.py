@@ -91,7 +91,7 @@ def positive_seconds(value: str) -> int:
 
 def shot_names(value: str) -> str:
     names = [name.strip() for name in value.split(",")]
-    if not names or any(not re.fullmatch(r"[A-Za-z0-9_]+", name) for name in names):
+    if not names or any(not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]*", name) for name in names):
         raise argparse.ArgumentTypeError("shots must be comma-separated names, without paths or empty entries")
     return ",".join(dict.fromkeys(names))
 

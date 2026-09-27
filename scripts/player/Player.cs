@@ -54,6 +54,7 @@ public partial class Player : CharacterBody3D
     public Node3D hand_lantern;
 
     public bool enabled = false;
+    private bool _spawned;
     public double yaw = 0.0;
     public double pitch = 0.0;
     public bool crouching = false;
@@ -61,6 +62,11 @@ public partial class Player : CharacterBody3D
     public bool in_water = false;
     public double water_depth = 0.0;
     public StringName held_item = "";
+    public bool resting;
+    public bool charging_stone;
+    public double stone_charge;
+    private MeshInstance3D _heldLog;
+    private MeshInstance3D _heldStone;
     public bool lantern_on = false;
 
     public double _bob_phase = 0.0;
@@ -119,6 +125,18 @@ public partial class Player : CharacterBody3D
         camera.AddChild(interact_ray);
 
         _build_hand_lantern();
+        _heldLog = new MeshInstance3D {
+            Name = "CarriedFirewood", Mesh = PropMeshes.bark_log_mesh(0.62, 0.085, 8471, 0.04),
+            Position = new Vector3(0.04f, 0.17f, -0.10f), Rotation = new Vector3(0.1f, -0.4f, 0.16f),
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
+        _heldLog.SetSurfaceOverrideMaterial(0, PropMaterials.bark("bark_oak", 0.65));
+        _heldLog.SetSurfaceOverrideMaterial(1, PropMaterials.wood(new Color(0.95f, 0.85f, 0.66f), 0.15, 0, 1));
+        hand_socket.AddChild(_heldLog);
+        _heldStone = new MeshInstance3D {
+            Name = "CarriedStone", Mesh = PropMeshes.rock(8342, 1),
+            MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.20f, 0.23f, 0.22f), Roughness = 0.8f }, Scale = new Vector3(0.055f, 0.018f, 0.042f),
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
+        hand_socket.AddChild(_heldStone);
         FloorMaxAngle = (float)deg_to_rad(52.0);
         FloorSnapLength = 0.4f;
         CollisionMask = 1;
@@ -196,7 +214,13 @@ public partial class Player : CharacterBody3D
     {
         /// Hands control to the player (after the intro or when photo mode ends).
         enabled = true;
-        snap_to_ground();
+        // Resuming on a dock or other support must retain the physics position.
+        // The terrain height is only the initial spawn, not the current floor.
+        if (!_spawned)
+        {
+            snap_to_ground();
+            _spawned = true;
+        }
         camera.MakeCurrent();
         if (Game.Instance.world != null)
         {
@@ -219,6 +243,7 @@ public partial class Player : CharacterBody3D
     public void toggle_lantern()
     {
         lantern_on = !lantern_on;
+        if (lantern_on) Game.Instance.session?.UseLantern();
         if (hand_lantern != null)
         {
             hand_lantern.Visible = lantern_on;
@@ -233,6 +258,8 @@ public partial class Player : CharacterBody3D
     {
         enabled = false;
         Velocity = Vector3.Zero;
+        charging_stone = false;
+        stone_charge = 0;
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -251,6 +278,19 @@ public partial class Player : CharacterBody3D
         }
         if (!enabled || Game.Instance.mode != Game.Mode.PLAY)
         {
+            return;
+        }
+        if (held_item == "stone" && @event is InputEventMouseButton button && button.ButtonIndex == MouseButton.Left)
+        {
+            if (button.Pressed) { charging_stone = true; stone_charge = 0; }
+            else if (charging_stone) release_stone();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+        if (charging_stone && @event is InputEventMouseButton cancel && cancel.ButtonIndex == MouseButton.Right && cancel.Pressed)
+        {
+            charging_stone = false;
+            stone_charge = 0;
             return;
         }
         if (@event is InputEventMouseMotion)
@@ -283,13 +323,21 @@ public partial class Player : CharacterBody3D
         if (enabled && Game.Instance.mode == Game.Mode.PLAY)
         {
             input = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
-            crouching = Input.IsActionPressed("crouch");
+            if (input.LengthSquared() > 0.01) resting = false;
+            crouching = resting || Input.IsActionPressed("crouch");
             running = Input.IsActionPressed("sprint") && !crouching && input.Length() > 0.1;
+            if (charging_stone) stone_charge = Math.Min(1, stone_charge + delta / 1.15);
         }
         else
         {
             running = false;
+            charging_stone = false;
+            stone_charge = 0;
         }
+        bool holdingVisible = enabled && Game.Instance.mode == Game.Mode.PLAY;
+        _heldLog.Visible = holdingVisible && held_item == "log";
+        _heldStone.Visible = holdingVisible && held_item == "stone";
+        _heldStone.Position = new Vector3(0.02f, (float)(0.18 + stone_charge * 0.035), (float)(-0.1 + stone_charge * 0.025));
 
         double speed = crouching ? CROUCH_SPEED : running ? RUN_SPEED : WALK_SPEED;
         if (in_water)
@@ -497,6 +545,33 @@ public partial class Player : CharacterBody3D
     public Node focus()
     {
         return _focus;
+    }
+
+    public void take_stone()
+    {
+        if (held_item == "log")
+        {
+            Game.Instance.hud?.notify("Take the firewood to the fire first.");
+            return;
+        }
+        held_item = "stone";
+        Game.Instance.audio?.play_interact("pickup");
+        Game.Instance.hud?.notify("Aim low over the water. Hold the left mouse button, then release.");
+    }
+
+    public bool release_stone()
+    {
+        charging_stone = false;
+        if (held_item != "stone" || Game.Instance.camp?.pond == null) return false;
+        // A low sidearm release belongs to the player's actual position. The
+        // camera supplies aim; no teleport to the dock or preselected direction.
+        Vector3 origin = GlobalPosition + Vector3.Up * (float)(crouching ? 0.65 : 1.05)
+            - GlobalBasis.Z * 0.48f + GlobalBasis.X * 0.22f;
+        bool thrown = Game.Instance.camp.pond.throw_stone(origin, -camera.GlobalBasis.Z, stone_charge);
+        if (thrown) held_item = "";
+        else Game.Instance.hud?.notify("Let the first stone settle before throwing another.");
+        stone_charge = 0;
+        return thrown;
     }
 
     public Vector3 eye_position()

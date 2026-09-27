@@ -34,6 +34,8 @@ public partial class Forest : Node3D
     public Godot.Collections.Array<MultiMeshInstance3D> far_multimeshes = new Godot.Collections.Array<MultiMeshInstance3D>();
     public Godot.Collections.Dictionary ridge_leaf_variant_materials = new Godot.Collections.Dictionary();
     public Godot.Collections.Array<MultiMeshInstance3D> ridge_multimeshes = new Godot.Collections.Array<MultiMeshInstance3D>();
+    public readonly List<(TreeSpecies.Kind Kind, TreeGenerator.Result Mesh, string Key, Godot.Collections.Array<Transform3D> Transforms, int First)> ridge_groups = new();
+    public readonly List<(TreeSpecies.Kind Kind, TreeGenerator.Result Mesh, string Key, Godot.Collections.Array<Transform3D> Transforms, int First)> far_groups = new();
     public Godot.Collections.Dictionary _lod_bark = new Godot.Collections.Dictionary();
     public double _foliage_distance = 1.0;
     public Godot.Collections.Array<Godot.Collections.Dictionary> near_records = new Godot.Collections.Array<Godot.Collections.Dictionary>();
@@ -211,6 +213,7 @@ public partial class Forest : Node3D
                 transforms.Add(_tree_transform(entry2.As<ScenePlan.TreeEntry>()));
                 customs.Add(new Color((float)(result2.height / 40.0), (float)(result2.crown_center.Y / 40.0), (float)(result2.crown_radius / 20.0), (float)hash_unit(G.Index(entry2, "seed_value").AsInt64())));
             }
+            far_groups.Add((species.kind, result2, TreeImpostors.key_for(species.kind, group["index"].AsInt64()), transforms, far_multimeshes.Count));
             _add_far_multimesh(_bark_with_lods(result2.bark, G.format("far_%d_%d", new Godot.Collections.Array { G.to_int(group["kind"]), group["index"] })), far_bark_materials[species.bark_set].As<Material>(), transforms, customs, true);
             if (result2.leaves != null)
             {
@@ -231,6 +234,7 @@ public partial class Forest : Node3D
 
     public void add_ridge_group(TreeSpecies.Kind kind, TreeGenerator.Result result, string material_key, Godot.Collections.Array<Transform3D> transforms)
     {
+        ridge_groups.Add((kind, result, material_key, transforms, ridge_multimeshes.Count));
         /// The wooded ridges plant the forest's own generated variants out to 655 m:
         /// the same bark and leaf meshes, batched per 160 m cell, with bark mesh LODs
         /// and a leaf-card thinning that only starts once cards are below a pixel.
@@ -257,6 +261,74 @@ public partial class Forest : Node3D
         }
     }
 
+    public void attach_ridge_impostors(TreeImpostors impostors) => attach_group_impostors(impostors, ridge_groups, ridge_multimeshes, 90);
+
+    public void attach_far_impostors(TreeImpostors impostors) => attach_group_impostors(impostors, far_groups, far_multimeshes, 70);
+
+    private void attach_group_impostors(TreeImpostors impostors,
+        List<(TreeSpecies.Kind Kind, TreeGenerator.Result Mesh, string Key, Godot.Collections.Array<Transform3D> Transforms, int First)> groups,
+        Godot.Collections.Array<MultiMeshInstance3D> originals, float nearDistance)
+    {
+        foreach (var group in groups)
+        {
+            if (!impostors.baked.ContainsKey(group.Key)) return;
+        }
+        var materials = new Dictionary<string, (ShaderMaterial Color, ShaderMaterial Shadow)>();
+        foreach (var group in groups)
+        {
+            var baked = impostors.baked[group.Key].As<TreeImpostors.Baked>();
+            if (!materials.TryGetValue(group.Key, out var pair))
+            {
+                pair = ((ShaderMaterial)baked.material.Duplicate(), (ShaderMaterial)baked.shadow_material.Duplicate());
+                pair.Color.SetShaderParameter("use_instance_custom", true);
+                pair.Shadow.SetShaderParameter("use_instance_custom", true);
+                materials.Add(group.Key, pair);
+            }
+            var mm = new MultiMesh {
+                TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+                UseCustomData = true, Mesh = baked.quad, InstanceCount = group.Transforms.Count };
+            // A camera-facing card can turn through every azimuth. Its cull box
+            // must enclose that swept width, not just the rest-oriented quad.
+            Aabb localBounds = new(new Vector3(-baked.extent.X * 0.5f, (float)baked.base_y, -baked.extent.X * 0.5f),
+                new Vector3(baked.extent.X, baked.extent.Y, baked.extent.X));
+            localBounds = localBounds.Merge(group.Mesh.bark.GetAabb());
+            if (group.Mesh.leaves != null) localBounds = localBounds.Merge(leaf_bounds(group.Mesh));
+            Aabb bounds = group.Transforms[0] * localBounds;
+            for (int i = 0; i < group.Transforms.Count; i++)
+            {
+                Transform3D transform = group.Transforms[i];
+                mm.SetInstanceTransform(i, transform);
+                float yaw = MathF.Atan2(transform.Basis.Z.X, transform.Basis.Z.Z);
+                mm.SetInstanceCustomData(i, new Color(yaw, (float)hash_unit(i * 7919 + group.Key.Hash()), 0, 0));
+                bounds = bounds.Merge(transform * localBounds);
+            }
+            mm.CustomAabb = bounds.Grow(1.5f);
+            // Native range culling omits the full mesh draws entirely. Matching
+            // bounds give both representations the same distance reference;
+            // the nearest tree remains three-dimensional inside 90 metres.
+            float switchAt = nearDistance + new Vector2(bounds.Size.X, bounds.Size.Z).Length() * 0.5f;
+            AddChild(new MultiMeshInstance3D {
+                Name = "RidgeCanopy", Multimesh = mm, MaterialOverride = pair.Color,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                VisibilityRangeBegin = switchAt, VisibilityRangeBeginMargin = 8,
+                VisibilityRangeFadeMode = GeometryInstance3D.VisibilityRangeFadeModeEnum.Self,
+                GIMode = GeometryInstance3D.GIModeEnum.Disabled });
+            AddChild(new MultiMeshInstance3D {
+                Name = "RidgeCanopyShadow", Multimesh = mm, MaterialOverride = pair.Shadow,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly,
+                VisibilityRangeBegin = switchAt, VisibilityRangeBeginMargin = 0,
+                GIMode = GeometryInstance3D.GIModeEnum.Disabled });
+            for (int i = group.First; i < group.First + (group.Mesh.leaves == null ? 1 : 2); i++)
+            {
+                var original = originals[i];
+                original.CustomAabb = mm.CustomAabb;
+                original.VisibilityRangeEnd = switchAt;
+                original.VisibilityRangeEndMargin = 8;
+                original.VisibilityRangeFadeMode = GeometryInstance3D.VisibilityRangeFadeModeEnum.Self;
+            }
+        }
+    }
+
     public ArrayMesh _bark_with_lods(ArrayMesh source, string key)
     {
         /// Distant bark keeps its silhouette through generated mesh LODs (the
@@ -265,6 +337,25 @@ public partial class Forest : Node3D
         if (_lod_bark.ContainsKey(key))
         {
             return _lod_bark[key].As<ArrayMesh>();
+        }
+        // LOD generation is deterministic but expensive. Cache the native mesh
+        // by the actual source channels and engine build, so edits and upgrades
+        // invalidate it without maintaining a parallel asset manifest.
+        using var digest = new HashingContext();
+        digest.Start(HashingContext.HashType.Sha256);
+        digest.Update(System.Text.Encoding.UTF8.GetBytes("bark-lod-v1:25:60:" + Engine.GetVersionInfo()["hash"].AsString()));
+        for (int surface = 0; surface < source.GetSurfaceCount(); surface++)
+            digest.Update(GD.VarToBytes(source.SurfaceGetArrays(surface)));
+        string cacheDir = "user://cache/tree-lods";
+        string cachePath = cacheDir + "/" + Convert.ToHexString(digest.Finish()).ToLowerInvariant() + ".res";
+        if (FileAccess.FileExists(cachePath))
+        {
+            ArrayMesh cached = ResourceLoader.Load<ArrayMesh>(cachePath, "", ResourceLoader.CacheMode.Ignore);
+            if (cached != null && cached.GetSurfaceCount() == source.GetSurfaceCount())
+            {
+                _lod_bark[key] = cached;
+                return cached;
+            }
         }
         ImporterMesh importer = new ImporterMesh();
         for (long surface = 0, surface_end = source.GetSurfaceCount(); surface < surface_end; surface++)
@@ -278,6 +369,12 @@ public partial class Forest : Node3D
             mesh = source;
         }
         _lod_bark[key] = mesh;
+        if (DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(cacheDir)) == Error.Ok)
+        {
+            string temporary = cachePath + "." + Guid.NewGuid().ToString("N") + ".res";
+            if (ResourceSaver.Save(mesh, temporary, ResourceSaver.SaverFlags.Compress) == Error.Ok)
+                DirAccess.RenameAbsolute(temporary, cachePath);
+        }
         return mesh;
     }
 

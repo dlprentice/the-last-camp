@@ -96,7 +96,7 @@ public partial class Firepit : Node3D
         {
             return "The fire is dying";
         }
-        return "Warm your hands";
+        return "Rest by the fire";
     }
 
     public void interact(Player player)
@@ -105,15 +105,18 @@ public partial class Firepit : Node3D
         {
             player.held_item = "";
             feed();
+            Game.Instance.session?.TendFire();
+            Game.Instance.hud?.notify("Fire tended — the new log catches.");
             if (Game.Instance.audio != null)
             {
                 Game.Instance.audio.play_interact("log_added");
             }
             return;
         }
-        if (Game.Instance.audio != null)
+        if (player != null)
         {
-            Game.Instance.audio.play_interact("ui");
+            player.resting = !player.resting;
+            Game.Instance.hud?.notify(player.resting ? "Resting by the fire. Move to stand." : "Back on your feet.");
         }
     }
 

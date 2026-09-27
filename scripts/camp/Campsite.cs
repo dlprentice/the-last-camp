@@ -321,6 +321,7 @@ public partial class Campsite : Node3D
         if (player != null && player.held_item == "")
         {
             player.held_item = "log";
+            Game.Instance.hud?.notify("Carry the log to the fire.");
             if (Game.Instance.audio != null)
             {
                 Game.Instance.audio.play_interact("pickup");

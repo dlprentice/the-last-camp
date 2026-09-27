@@ -22,7 +22,7 @@ public partial class TreeImpostors : Node3D
 {
     public const long TILES = 6;
     public const long TILE_HEIGHT = 384;
-    public const double SWITCH_DISTANCE = 45.0;
+    public const double SWITCH_DISTANCE = 65.0;
     public const double SWITCH_MARGIN = 4.0;
 
     public partial class Baked : RefCounted
@@ -77,6 +77,33 @@ public partial class TreeImpostors : Node3D
         G.print(G.format("Tree impostors: %d variants baked in %.1f s", new Godot.Collections.Array { (long)baked.Count, bake_seconds }));
     }
 
+    public async Task bake_ridges(Forest forest)
+    {
+        if (DisplayServer.GetName() == "headless") return;
+        ulong start = Time.GetTicksMsec();
+        _setup_viewport();
+        RenderingServer.GlobalShaderParameterSet("wind_strength", 0.0);
+        try
+        {
+            foreach (var group in forest.ridge_groups)
+            {
+                if (baked.ContainsKey(group.Key)) continue;
+                await _bake_variant(forest, TreeSpecies.by_kind(group.Kind), 0, group.Mesh, group.Key);
+                var entry = baked[group.Key].As<Baked>();
+                entry.material.SetShaderParameter("use_instance_custom", true);
+                entry.shadow_material.SetShaderParameter("use_instance_custom", true);
+            }
+        }
+        finally
+        {
+            RenderingServer.GlobalShaderParameterSet("impostor_bake", 0);
+            RenderingServer.GlobalShaderParameterSet("wind_strength", 1.0);
+            _viewport.QueueFree();
+            _viewport = null;
+        }
+        GD.Print($"Ridge canopy atlases: {baked.Count} variants in {(Time.GetTicksMsec() - start) / 1000.0:F1}s");
+    }
+
     public void _setup_viewport()
     {
         _viewport = new SubViewport();
@@ -118,19 +145,24 @@ public partial class TreeImpostors : Node3D
         _camera.MakeCurrent();
     }
 
-    public async Task _bake_variant(Forest forest, TreeSpecies species, long index, TreeGenerator.Result result)
+    public async Task _bake_variant(Forest forest, TreeSpecies species, long index, TreeGenerator.Result result, string cacheKey = "")
     {
         Aabb bounds = result.bark.GetAabb();
         if (result.leaves != null)
         {
             bounds = bounds.Merge(forest.leaf_bounds(result));
         }
-        double width = clampf(maxf(bounds.Size.X, bounds.Size.Z) * 1.04, 0.5, 40.0);
+        Vector3 reach = bounds.Position.Abs().Max(bounds.End.Abs());
+        double width = clampf(new Vector2(reach.X, reach.Z).Length() * 2.08, 0.5, 60.0);
         double base_y = clampf(minf(bounds.Position.Y, 0.0), -2.0, 0.0);
         double height = clampf(bounds.End.Y + 0.2 - base_y, 1.0, 60.0);
         // Tiles are clamped so an odd variant cannot request a giant viewport.
         long tile_width = clampi((long)ceil(TILE_HEIGHT * width / height), 32, 512);
-        _viewport.Size = new Vector2I((int)(tile_width * TILES), (int)TILE_HEIGHT);
+        long tile_height = Math.Min(TILE_HEIGHT, Math.Max(32, (long)Math.Floor(tile_width * height / width)));
+        // Orthographic pixels and world-space tile centres must agree exactly.
+        // Otherwise rounding lets neighbouring views bleed across tile edges.
+        width = (double)tile_width / tile_height * height;
+        _viewport.Size = new Vector2I((int)(tile_width * TILES), (int)tile_height);
         foreach (Node child in _stage.GetChildren())
         {
             child.Free();
@@ -181,7 +213,7 @@ public partial class TreeImpostors : Node3D
         b.quad = _quad(width, height, base_y);
         b.material = _material(b, species, false);
         b.shadow_material = _material(b, species, true);
-        baked[key_for(species.kind, index)] = b;
+        baked[cacheKey == "" ? key_for(species.kind, index) : cacheKey] = b;
     }
 
     public async Task<Image> _render_pass(long mode)

@@ -96,7 +96,7 @@ public partial class Understory : Node3D
             apply_quality(Quality.Instance.current);
         }
         ArrayMesh blade = GrassPlanter.clump_mesh();
-        _upload_grass(planter.chunks, blade, grass_material, "Grass");
+        _upload_grass(GrassPlanter.merge_chunks(planter.chunks, 16), blade, grass_material, "Grass");
         if (distant_grass_material == null)
         {
             distant_grass_material = new ShaderMaterial();
@@ -131,7 +131,7 @@ public partial class Understory : Node3D
             mmi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             mmi.GIMode = GeometryInstance3D.GIModeEnum.Disabled;
             mmi.Layers = unchecked((uint)(Pond.GRASS_LAYER));
-            _set_range(mmi, _grass_distance);
+            _set_range(mmi, prefix == "HillGrass" ? 800 : _grass_distance);
             AddChild(mmi);
             grass_chunks.Add(mmi);
         }
@@ -761,7 +761,7 @@ public partial class Understory : Node3D
         }
         foreach (MultiMeshInstance3D node in grass_chunks)
         {
-            _set_range(node, p.grass_distance);
+            _set_range(node, node.Name.ToString().StartsWith("HillGrass_", StringComparison.Ordinal) ? 800 : p.grass_distance);
         }
         foreach (MultiMeshInstance3D node2 in meadow_cells)
         {

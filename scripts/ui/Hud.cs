@@ -17,7 +17,7 @@ namespace LastCamp;
 /// quality panel, performance stats, pause menu and cinematic letterbox.
 public partial class Hud : CanvasLayer
 {
-    public const string HINTS = "WASD move    SHIFT run    C crouch    E interact    L hand lantern    P photo mode    T day cycle    [ ] time    1-4 quality    F3 stats    ESC menu";
+    public const string HINTS = "WASD move    SHIFT run    C crouch    E interact    L lantern    J journal    P photo mode    ESC menu";
 
     public Control _root;
     public Label _title;
@@ -26,6 +26,14 @@ public partial class Hud : CanvasLayer
     /// the menu later must not bring it back over the game.
     public bool title_played = false;
     public Label _prompt;
+    private Label _notice;
+    private double _noticeTime;
+    private ProgressBar _throwPower;
+    private PanelContainer _journal;
+    public bool JournalVisible => _journal.Visible;
+    private Label _journalText;
+    private Label _journalHint;
+    private ColorRect _restFade;
     public Label _clock;
     public PanelContainer _quality_panel;
     public Label _quality_label;
@@ -81,6 +89,16 @@ public partial class Hud : CanvasLayer
         _place(_prompt, new Vector2(0.5f, 1.0f), new Vector2(-300, -120), new Vector2(300, -80));
         _root.AddChild(_prompt);
 
+        _notice = UiTheme.label("", 18, UiTheme.ACCENT);
+        _place(_notice, new Vector2(0.5f, 0.78f), new Vector2(-530, -28), new Vector2(530, 12));
+        _notice.Visible = false;
+        _root.AddChild(_notice);
+        _throwPower = new ProgressBar { ShowPercentage = false, MaxValue = 1, MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        _place(_throwPower, new Vector2(0.5f, 1), new Vector2(-110, -75), new Vector2(110, -68));
+        _throwPower.AddThemeStyleboxOverride("fill", new StyleBoxFlat { BgColor = UiTheme.ACCENT });
+        _throwPower.AddThemeStyleboxOverride("background", new StyleBoxFlat { BgColor = UiTheme.PANEL });
+        _root.AddChild(_throwPower);
+
         _clock = UiTheme.label("", 22, UiTheme.ACCENT);
         _place(_clock, new Vector2(0.5f, 0.0f), new Vector2(-120, 28), new Vector2(120, 60));
         Color _t3 = _clock.Modulate;
@@ -126,17 +144,45 @@ public partial class Hud : CanvasLayer
         _stats_panel.AddChild(_stats);
         _root.AddChild(_stats_panel);
 
-        _menu = UiTheme.panel(new Vector2(540, 0));
-        _place(_menu, new Vector2(0.5f, 0.5f), new Vector2(-270, -190), new Vector2(270, 190));
+        _menu = UiTheme.panel(new Vector2(680, 0));
+        _place(_menu, new Vector2(0.5f, 0.5f), new Vector2(-340, -210), new Vector2(340, 210));
         _menu.Visible = false;
         VBoxContainer mbox = new VBoxContainer();
         mbox.AddThemeConstantOverride("separation", 12);
         _menu.AddChild(mbox);
         mbox.AddChild(UiTheme.label("PAUSED", 30, UiTheme.ACCENT));
         mbox.AddChild(UiTheme.label("ESC resume        Q quit        F11 fullscreen", 16, UiTheme.TEXT));
-        Label controls = UiTheme.label("WASD  walk        SHIFT  run        C  crouch\n" + "E / click  take a log, feed the fire, light a lantern\n" + "L  hand lantern        P  photo mode (F12 saves a shot)\n" + "T  run the day cycle        [ ]  scrub time\n" + "TAB  quality panel        1-4  presets        F3  stats        H  hide HUD", 15, UiTheme.MUTED);
+        Label controls = UiTheme.label("WASD  walk        SHIFT  run        C  crouch\n" + "E / click  take firewood or a stone, tend the fire, rest\n" + "With a stone: hold left click, aim, release. Right click cancels.\n" + "L  hand lantern        J  camp journal        P  photo mode\n" + "T  run the day cycle        [ ]  scrub time\n" + "TAB  quality panel        1-4  presets        F3  stats        H  hide HUD", 15, UiTheme.MUTED);
         mbox.AddChild(controls);
         _root.AddChild(_menu);
+
+        _journal = UiTheme.panel(new Vector2(620, 0));
+        _place(_journal, new Vector2(0.5f, 0.5f), new Vector2(-310, -250), new Vector2(310, 250));
+        _journal.Visible = false;
+        var journalBox = new VBoxContainer();
+        journalBox.AddThemeConstantOverride("separation", 18);
+        _journal.AddChild(journalBox);
+        journalBox.AddChild(UiTheme.label("AN EVENING AT CAMP", 25, UiTheme.ACCENT));
+        _journalText = UiTheme.label("", 17, UiTheme.TEXT, HorizontalAlignment.Left);
+        _journalText.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        journalBox.AddChild(_journalText);
+        journalBox.AddChild(UiTheme.label("J  close journal", 15, UiTheme.MUTED));
+        _root.AddChild(_journal);
+        _journalHint = UiTheme.label("", 15, UiTheme.MUTED, HorizontalAlignment.Left);
+        _place(_journalHint, new Vector2(0, 0), new Vector2(30, 28), new Vector2(360, 58));
+        _root.AddChild(_journalHint);
+        _restFade = new ColorRect { Color = Colors.Black, Modulate = new Color(1, 1, 1, 0),
+            MouseFilter = Control.MouseFilterEnum.Ignore };
+        _restFade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        // Rest transitions remain visible when the player has hidden the HUD.
+        AddChild(_restFade);
+    }
+
+    public async Task FadeRest(bool dark)
+    {
+        Tween tween = CreateTween();
+        tween.TweenProperty(_restFade, "modulate:a", dark ? 1.0 : 0.0, 1.0);
+        await ToSignal(tween, Tween.SignalName.Finished);
     }
 
     public static void _place(Control c, Vector2 anchor, Vector2 top_left, Vector2 bottom_right)
@@ -153,7 +199,17 @@ public partial class Hud : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event.IsActionPressed("quality_menu"))
+        if (Game.Instance.session?.Resting == true) return;
+        if (@event.IsActionPressed("camp_journal") && Game.Instance.session != null
+            && (Game.Instance.mode == Game.Mode.PLAY || _journal.Visible))
+        {
+            bool opening = !_journal.Visible;
+            _toggle_pause();
+            _journal.Visible = opening;
+            if (opening) _menu.Visible = false;
+            GetViewport().SetInputAsHandled();
+        }
+        else if (@event.IsActionPressed("quality_menu"))
         {
             _quality_panel.Visible = !_quality_panel.Visible;
         }
@@ -171,13 +227,14 @@ public partial class Hud : CanvasLayer
             InputEventKey key = ((InputEventKey)@event);
             if (key.Keycode == Key.Q)
             {
-                GetTree().Quit();
+                Game.Instance.quit_cleanly();
             }
         }
     }
 
     public void _toggle_pause()
     {
+        _journal.Visible = false;
         if (Game.Instance.mode == Game.Mode.PAUSED)
         {
             GetTree().Paused = false;
@@ -197,6 +254,21 @@ public partial class Hud : CanvasLayer
 
     public override void _Process(double delta)
     {
+        bool playing = Game.Instance.mode == Game.Mode.PLAY;
+        CampSession session = Game.Instance.session;
+        _journalHint.Visible = playing && session != null && !_stats_visible;
+        if (session != null)
+        {
+            _journalHint.Text = $"J  Camp journal   {session.Completed}/4";
+            if (_journal.Visible) _journalText.Text = session.Journal();
+        }
+        if (!playing && Game.Instance.mode != Game.Mode.PAUSED) _journal.Visible = false;
+        if (playing) _noticeTime = Math.Max(0, _noticeTime - delta);
+        _notice.Visible = playing && _noticeTime > 0;
+        _notice.Modulate = new Color(1, 1, 1, (float)Math.Min(1, _noticeTime));
+        Player player = Game.Instance.player;
+        _throwPower.Visible = playing && player?.charging_stone == true;
+        if (player != null) _throwPower.Value = player.stone_charge;
         if (_stats_visible)
         {
             _update_stats();
@@ -218,13 +290,21 @@ public partial class Hud : CanvasLayer
         if (Game.Instance.player != null)
         {
             Node focus = Game.Instance.player.focus();
-            if (focus != null && focus.HasMethod("prompt") && Game.Instance.mode == Game.Mode.PLAY)
+            if (playing && player.held_item == "stone")
+            {
+                _prompt.Text = player.charging_stone ? "Release to throw  ·  Right click to cancel" : "Hold left click to aim and throw  ·  Aim low for more skips";
+            }
+            else if (player.held_item == "log" && playing && focus != Game.Instance.camp?.campsite?.firepit?.body)
+            {
+                _prompt.Text = "Carrying firewood  ·  Take it to the fire";
+            }
+            else if (focus != null && focus.HasMethod("prompt") && playing)
             {
                 _prompt.Text = "[E]  " + G.str(G.str(focus.Call("prompt")));
             }
             else if (Game.Instance.player.held_item == "log" && Game.Instance.mode == Game.Mode.PLAY)
             {
-                _prompt.Text = "Carrying a log";
+                _prompt.Text = "Carrying firewood  ·  Take it to the fire";
             }
             else
             {
@@ -232,6 +312,12 @@ public partial class Hud : CanvasLayer
             }
         }
         _update_letterbox(delta);
+    }
+
+    public void notify(string message)
+    {
+        _notice.Text = message;
+        _noticeTime = 5;
     }
 
     public void _update_letterbox(double delta)

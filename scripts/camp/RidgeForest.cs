@@ -15,18 +15,17 @@ namespace LastCamp;
 
 /// A continuation of the camp's temperate woodland on the surrounding hills:
 /// the same generated oak, alder, spruce and pine models the near forest
-/// uses, planted to a closed canopy out to 655 m. There are no simplified
-/// crowns or billboards out there; the forest thins leaf cards only once
-/// they are smaller than a pixel and the bark carries mesh LODs.
+/// uses, planted to a closed canopy out to 655 m. Lit, multi-view canopy
+/// atlases replace distant geometry; nearby stands retain native mesh LODs.
 public partial class RidgeForest : Node3D
 {
-    public const double CELL = 160.0;
+    public const double CELL = 128.0;
     public const double INNER = 140.0;
     public const double OUTER = 655.0;
     public const long TARGET = 30000;
     /// The same species and generator as the near woodland, built at a lower
     /// detail level per distance band: fewer tube sides and the most important
-    /// leaf cards grown to keep coverage. No billboards, no simplified crowns.
+    /// leaf cards grown to keep coverage. These also supply the canopy atlas.
     public static readonly Godot.Collections.Array BANDS = new Godot.Collections.Array { new Godot.Collections.Dictionary { { (StringName)"limit", 300.0 }, { (StringName)"detail", 0.50 }, { (StringName)"seed", 12000 }, { (StringName)"spacing", 1.0 } }, new Godot.Collections.Dictionary { { (StringName)"limit", 700.0 }, { (StringName)"detail", 0.25 }, { (StringName)"seed", 13000 }, { (StringName)"spacing", 1.22 } } };
     public const long VARIANTS = 6;
     public long tree_count = 0;

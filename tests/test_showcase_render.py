@@ -46,6 +46,7 @@ class CaptureContracts(unittest.TestCase):
         self.assertEqual(options.driver, "vulkan")
 
     def test_shot_names_trim_and_deduplicate(self):
+        self.assertEqual(render.shot_names("boat-bow,boat-stern"), "boat-bow,boat-stern")
         self.assertEqual(render.shot_names("pond, arrival,pond"), "pond,arrival")
 
     def test_shot_names_reject_paths_empty_values_and_shell_characters(self):

@@ -40,6 +40,7 @@ void vertex() {
 	v_tint = use_instance_custom ? vec3(0.9 + 0.2 * INSTANCE_CUSTOM.w) : tint;
 	vec3 base_world = MODEL_MATRIX[3].xyz;
 	vec2 wind = wind_field(base_world, wind_direction, wind_strength, TIME);
+	if (impostor_bake != 0) wind = vec2(0.0);
 	rel_height = clamp(VERTEX.y / max(th, 0.1), 0.0, 1.0);
 	VERTEX = mix(VERTEX, tree_bend(VERTEX, th, wind), wind_response);
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;

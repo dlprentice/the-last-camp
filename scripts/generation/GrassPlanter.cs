@@ -133,6 +133,28 @@ public partial class GrassPlanter
         }
     }
 
+    /// Combine neighbouring upload batches without moving, resampling or
+    /// thinning any plants. A 16 m render cell replaces four 8 m draw calls;
+    /// placement seeds and the original vertex data remain unchanged.
+    public static Godot.Collections.Array<Chunk> merge_chunks(Godot.Collections.Array<Chunk> input, int cellSize)
+    {
+        var groups = new Dictionary<Vector2I, Chunk>();
+        foreach (Chunk source in input)
+        {
+            if (source.count == 0) continue;
+            var key = new Vector2I((int)Math.Floor(source.origin.X / cellSize), (int)Math.Floor(source.origin.Y / cellSize));
+            if (!groups.TryGetValue(key, out Chunk target))
+            {
+                target = new Chunk { origin = new Vector2(key.X * cellSize, key.Y * cellSize), aabb = source.aabb };
+                groups.Add(key, target);
+            }
+            target.count += source.count;
+            target.buffer.AddRange(source.buffer);
+            target.aabb = target.aabb.Merge(source.aabb);
+        }
+        return new Godot.Collections.Array<Chunk>(groups.Values);
+    }
+
     public double _chunk_coverage(Vector2 origin)
     {
         /// Average suitability over the chunk decides how many candidates to try.

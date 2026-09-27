@@ -84,14 +84,10 @@ public partial class Dock : Node3D
         stones.Position = new Vector3(-0.38f, 0.06f, (float)(-total_length() + 1.15));
         stones.CollisionLayer = unchecked((uint)(1L << 1));
         stones.CollisionMask = unchecked((uint)(0));
-        stones.prompt_text = "Skip a stone across the pond";
+        stones.prompt_text = "Take a skipping stone";
         stones.on_interact = Callable.From((Node _player) =>
 {
-    if (Game.Instance.camp != null && Game.Instance.camp.pond != null)
-    {
-        Vector3 origin = ToGlobal(new Vector3(0.0f, 0.9f, (float)(-total_length() - 0.2)));
-        Game.Instance.camp.pond.skip_stone(origin, -GlobalBasis.Z);
-    }
+    if (_player is Player player) player.take_stone();
 });
         CollisionShape3D collider = new CollisionShape3D();
         SphereShape3D shape = new SphereShape3D();

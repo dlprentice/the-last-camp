@@ -22,23 +22,29 @@ uniform float roughness : hint_range(0.0, 1.0) = 0.62;
 uniform float translucency : hint_range(0.0, 1.0) = 0.22;
 uniform vec3 tint : source_color = vec3(1.0);
 uniform float ao : hint_range(0.0, 1.0) = 0.8;
+uniform bool use_instance_custom = false;
 instance uniform float yaw = 0.0;
 
 varying float v_azimuth;
 varying vec3 world_pos;
+varying float v_yaw;
+varying vec3 v_tint;
 
 void vertex() {
 	vec3 base = MODEL_MATRIX[3].xyz;
 	float s = length(MODEL_MATRIX[0].xyz);
+	float sy = length(MODEL_MATRIX[1].xyz);
+	v_yaw = use_instance_custom ? INSTANCE_CUSTOM.x : yaw;
+	v_tint = use_instance_custom ? mix(vec3(0.92, 0.98, 0.85), vec3(1.05, 1.0, 0.95), INSTANCE_CUSTOM.y) : tint;
 	vec3 towards = face_sun ? sun_direction : (CAMERA_POSITION_WORLD - base);
 	vec3 dir = normalize(vec3(towards.x, 0.0, towards.z) + vec3(1e-5, 0.0, 0.0));
 	vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), dir));
-	vec3 world = base + right * (VERTEX.x * s) + vec3(0.0, 1.0, 0.0) * (VERTEX.y * s);
+	vec3 world = base + right * (VERTEX.x * s) + vec3(0.0, 1.0, 0.0) * (VERTEX.y * sy);
 	world_pos = world;
 	VERTEX = (inverse(MODEL_MATRIX) * vec4(world, 1.0)).xyz;
 	NORMAL = normalize((inverse(MODEL_MATRIX) * vec4(dir, 0.0)).xyz);
 	// The baked view i looked at the tree from azimuth i * 360 / tiles.
-	v_azimuth = atan(dir.x, dir.z) - yaw;
+	v_azimuth = atan(dir.x, dir.z) - v_yaw;
 }
 
 void fragment() {
@@ -66,14 +72,14 @@ void fragment() {
 	// Baked normals are relative to the baking camera: x right, y up, z towards it.
 	vec3 nva = na.xyz * 2.0 - 1.0;
 	vec3 nvb = nb.xyz * 2.0 - 1.0;
-	float aza = ia / float(tiles) * 2.0 * PI + yaw;
-	float azb = ib / float(tiles) * 2.0 * PI + yaw;
+	float aza = ia / float(tiles) * 2.0 * PI + v_yaw;
+	float azb = ib / float(tiles) * 2.0 * PI + v_yaw;
 	vec3 wa_n = vec3(cos(aza) * nva.x + sin(aza) * nva.z, nva.y, -sin(aza) * nva.x + cos(aza) * nva.z);
 	vec3 wb_n = vec3(cos(azb) * nvb.x + sin(azb) * nvb.z, nvb.y, -sin(azb) * nvb.x + cos(azb) * nvb.z);
 	vec3 n_world = normalize(wa_n * wa + wb_n * wb + vec3(1e-4));
 	NORMAL = view_normal_from_world(VIEW_MATRIX, n_world);
 	float wet = clamp(scene_wetness, 0.0, 1.0);
-	ALBEDO = albedo * tint * (1.0 - wet * 0.08);
+	ALBEDO = albedo * v_tint * (1.0 - wet * 0.08);
 	ROUGHNESS = mix(roughness, 0.3, wet * 0.6);
 	SPECULAR = 0.3;
 	AO = ao;

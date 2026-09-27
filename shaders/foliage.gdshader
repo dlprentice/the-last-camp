@@ -18,7 +18,7 @@ global uniform float wind_strength;
 global uniform float water_level;
 global uniform float scene_wetness;
 // 1 = write unlit albedo, 2 = write the view-space normal, while the tree
-// impostor atlases are baked (see scripts/camp/tree_impostors.gd).
+// impostor atlases are baked (see scripts/camp/TreeImpostors.cs).
 global uniform int impostor_bake;
 
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic;
@@ -60,6 +60,7 @@ void vertex() {
 	}
 	vec3 base_world = MODEL_MATRIX[3].xyz;
 	vec2 wind = wind_field(base_world, wind_direction, wind_strength, TIME);
+	if (impostor_bake != 0) wind = vec2(0.0);
 	vec3 pivot = CUSTOM0.xyz;
 	float phase = CUSTOM0.w;
 	float importance = COLOR.b;
@@ -68,7 +69,9 @@ void vertex() {
 	// Continuous LOD: unimportant cards shrink to their pivot with distance
 	// while the survivors grow to keep the silhouette filled.
 	float cam_dist = length(CAMERA_POSITION_WORLD - base_world);
-	float lod = smoothstep(lod_start, lod_end, cam_dist);
+	// The atlas camera is distant and orthographic. Its distance must not
+	// collapse the crown or enlarge selected cards in the baked silhouette.
+	float lod = impostor_bake == 0 ? smoothstep(lod_start, lod_end, cam_dist) : 0.0;
 	vec3 reach = local - pivot;
 	float keep = smoothstep(lod * lod_keep - 0.10, lod * lod_keep, importance);
 	reach *= keep * (1.0 + lod * lod_grow);
@@ -80,6 +83,7 @@ void vertex() {
 	vec3 sway = vec3(wind.x, 0.0, wind.y) * (0.04 + 0.22 * rel * rel) * (0.55 + 0.45 * sway_wave);
 	float flut = sin(TIME * (3.5 + phase * 2.5) + phase * 19.0 + local.x * 1.7 + local.z * 1.3);
 	flut *= flutter * reach_len * clamp(wind_strength, 0.2, 1.5);
+	if (impostor_bake != 0) flut = 0.0;
 	local = pivot + reach + sway * reach_len + vec3(flut * 0.35, flut * 0.5, flut * 0.35);
 	local = tree_bend(local, th, wind);
 	VERTEX = local;

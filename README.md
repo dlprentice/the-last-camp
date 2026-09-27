@@ -1,8 +1,8 @@
 # The Last Camp
 
-A forest campsite you can walk through, and an evening-to-dawn film made in
-**Godot**. Explore the pond, tend the fire, skip stones, watch the weather
-change, or use the free camera to inspect the scene.
+A small first-person camping game made in **Godot**. Spend an evening in the
+woods: carry firewood, tend the fire, aim skipping stones across the pond,
+light your lantern and turn in at the tent. Stay to explore when morning comes.
 
 ![The camp and its wooded approach](docs/images/arrival.png)
 
@@ -20,9 +20,9 @@ the playable demo's frame rate.
 Install **Godot 4.8 dev6 .NET**, its matching .NET export templates, and the **.NET 8 SDK**. The engine is a development snapshot from
 [godotengine.org](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-6/). The project needs a Vulkan-capable
 GPU and Forward+; the Compatibility renderer and web/mobile exports are not
-supported. The current C# conversion is checked on Linux x86-64 with CPU-only tests.
-Rendered appearance, gameplay and GPU performance have not yet been revalidated.
-Other desktop platforms are not validated.
+supported. The C# source is tested on Linux x86-64, including offscreen GPU
+captures and scripted traversal with the actual player controller. Performance
+and visual polishing are ongoing; other desktop platforms are not validated.
 
 ```bash
 git clone https://github.com/dlprentice/the-last-camp.git
@@ -41,9 +41,15 @@ Space or a click skips the opening camera once loading is complete.
 
 The default preset starts at High and can adapt downward. Use
 `godot --path . --fullscreen -- --quality=medium` to select a fixed preset.
-This is a demanding visual showcase. The earlier release's performance figures
-do not establish the C# version's frame rate, and changing language alone does not
-make its rendering faster. See [validation and limits](docs/validation.md).
+The distant woodland uses lit canopy atlases, with full geometry returning near
+the player. Dense vegetation and shadows still make this a demanding scene.
+See [validation and limits](docs/validation.md) for measured results and the
+difference between interactive performance and offline movie output.
+
+Press **J** for the camp journal. There is no survival timer: the evening's
+activities introduce the interactions, and your best stone-skipping score is
+saved locally. Light and weather advance during normal play. Once the evening's
+activities are complete, the tent lets you rest until dusk and then sleep until dawn.
 
 ## Controls
 
@@ -52,7 +58,10 @@ make its rendering faster. See [validation and limits](docs/validation.md).
 | W A S D | Walk |
 | Shift / C | Run / crouch |
 | E or left click | Interact with logs, fire, lanterns and skipping stones |
+| Hold/release left click with a stone | Charge and throw; aim low over the water |
+| Right click while charging | Cancel the throw |
 | L | Hand lantern |
+| J | Camp journal; pauses the game while open |
 | P | Photo mode; mouse wheel changes flight speed |
 | F12 | Save a screenshot |
 | T / [ / ] | Run or scrub the time of day |
@@ -87,7 +96,7 @@ Download the full film, shorter reel and Linux package from the
 [release page](https://github.com/dlprentice/the-last-camp/releases/tag/v1.0.0).
 Those are the earlier Godot 4.7.2 release's artifacts, not captures or a binary of
 the current C# source. They are distributed with credits and SHA-256 checksums.
-Render the current source, once its visual checks are authorized, with:
+The existing offline rendering tool remains available with:
 
 ```bash
 tools/render1080.sh one_night

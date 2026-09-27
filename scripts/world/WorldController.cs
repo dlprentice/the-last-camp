@@ -68,6 +68,7 @@ public partial class WorldController : Node3D
     public double haze = 0.85;
     public double wind_scale = 1.0;
     public bool cycle_running = false;
+    public double cycle_hours_per_second = CYCLE_HOURS_PER_SECOND;
     public WorldController.Warm warm_stage = WorldController.Warm.NONE;
     private double _exposure_scale_value = 1.0;
     public double exposure_scale
@@ -154,7 +155,7 @@ public partial class WorldController : Node3D
             }
             else if (cycle_running)
             {
-                hour = hour + CYCLE_HOURS_PER_SECOND * delta;
+                hour = hour + cycle_hours_per_second * delta;
             }
         }
         _wind_time += delta;
