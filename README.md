@@ -46,6 +46,9 @@ Press **J** for the camp journal. There is no survival timer: the evening's
 activities introduce the interactions, and your best stone-skipping score is
 saved locally. Light and weather advance during normal play. Once the evening's
 activities are complete, the tent lets you rest until dusk and then sleep until dawn.
+Walking stays within a woodland area roughly 240 metres across around the camp
+and pond. The surrounding hills and forest continue as scenery. At the boundary,
+you can walk along it or turn back; a short hint points you toward the pond.
 
 ## Controls
 

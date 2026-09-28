@@ -51,6 +51,7 @@ public partial class Understory : Node3D
     public double _grass_density = 1.0;
     public double _grass_distance = 70.0;
     public double _foliage_distance = 1.0;
+    private float _grassLodBias = 1;
     public GodotThread _replant_thread;
     private double _preparedGrassDensity;
     private double _preparedGrassDistance;
@@ -135,6 +136,7 @@ public partial class Understory : Node3D
             mmi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             mmi.GIMode = GeometryInstance3D.GIModeEnum.Disabled;
             mmi.Layers = unchecked((uint)(Pond.GRASS_LAYER));
+            mmi.LodBias = _grassLodBias;
             _set_range(mmi, prefix == "HillGrass" ? 800 : _grass_distance);
             AddChild(mmi);
             grass_chunks.Add(mmi);
@@ -770,6 +772,9 @@ public partial class Understory : Node3D
     public void apply_quality(QualityPreset p)
     {
         _foliage_distance = p.foliage_distance;
+        // Native blade LOD removes curve segments, never plants or whole blades.
+        // Film/Ultra retain the finer setting; play presets simplify earlier.
+        _grassLodBias = (float)p.grass_lod_bias;
         foreach (Variant mat in new Godot.Collections.Array { grass_material, tussock_material })
         {
             if (mat.VariantType != Variant.Type.Nil)
@@ -788,10 +793,12 @@ public partial class Understory : Node3D
         }
         foreach (MultiMeshInstance3D node in grass_chunks)
         {
+            node.LodBias = _grassLodBias;
             _set_range(node, node.Name.ToString().StartsWith("HillGrass_", StringComparison.Ordinal) ? 800 : p.grass_distance);
         }
         foreach (MultiMeshInstance3D node2 in meadow_cells)
         {
+            if (node2.Name.ToString().StartsWith("MeadowTussocks_", StringComparison.Ordinal)) node2.LodBias = _grassLodBias;
             _set_range(node2, p.grass_distance);
         }
         foreach (MultiMeshInstance3D node3 in fern_cells)

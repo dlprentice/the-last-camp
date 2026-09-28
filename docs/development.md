@@ -67,6 +67,9 @@ godot-offscreen --timeout 600 -- -- --benchmark=high --out="$PWD/local-data/benc
 The traversal moves the controller through 15 waypoints and checks photo mode,
 the hand lantern, firewood pickup/feeding, charged stone throws, pause/resume on
 the dock, a quality change, distant terrain support and local trunk collision.
+It also sprints toward the walking boundary in four directions and injects one
+fall-through to exercise recovery. Any recovery during normal walking or
+interactions fails the run.
 With `--session-check`, it also opens the journal and completes rest/sleep through
 the tent's actual interaction ray. Benchmark without Movie
 Maker or fixed FPS, recording the GPU, driver, resolution, internal scale,

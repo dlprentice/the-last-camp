@@ -9,7 +9,7 @@ The conversion checks began on September 26, 2026 with
 | Check | Observed result |
 | --- | --- |
 | C# compilation and Godot import | Passed without errors or warnings |
-| C# regression suite | 106 passed, zero failed on September 27: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, terrain seams and cached-mesh lifetime included |
+| C# regression suite | 107 passed, zero failed on September 27: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, terrain seams, player-boundary motion and cached-mesh lifetime included |
 | Python tooling suite | 47 passed, zero failed |
 | Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
 | Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte |
@@ -62,6 +62,12 @@ including a real High/Medium/High preset round trip, the journal and sleep to a
 playable dawn. Extra physics probes found terrain support beyond the former
 210 m collision limit and active local ridge-trunk collisions. The distant
 collision pool stays bounded instead of constructing a body for every tree.
+Walking is now confined to the 120 m camping radius. The exported hardware
+traversal sprinted outward at four points on that boundary without leaving it
+or losing floor support. One deliberately injected fall-through recovered to
+the last supported position; the normal 15-waypoint route and all interactions
+needed no recovery. Full-size boundary frames were inspected. This is an
+artificial movement limit; the existing hills and forest remain scenery.
 
 Forest construction's spatial search changed from native Variant containers to
 managed collections. The placement digest remained
@@ -82,24 +88,28 @@ it does not establish a frame-rate improvement by itself.
 
 An exported High baseline before the canopy changes averaged **73.82 ms/frame
 (13.5 FPS)** over the 22-second benchmark route, with a 101.07 ms 99th percentile.
-The later exported build measured as follows at a fixed **1920×1080 output** on
+The current exported build, with normal preset defaults and no optional near-tree
+impostors, measured as follows at a fixed **1920×1080 output** on
 an RTX 4060 Laptop GPU, NVIDIA 610.57.04, with VSync disabled and
 `DOTNET_TieredCompilation=0`. Each preset follows the same 22-second route after
 warm-up; High, Medium and Low run sequentially after any grass rebuild finishes.
 
 | Preset | Internal resolution scale | Mean frame time | Mean FPS | 99th percentile |
 | --- | --- | --- | --- | --- |
-| High | 77%, FSR2 | 50.51 ms | 19.8 | 66.27 ms |
-| Medium | 67%, FSR2 | 40.30 ms | 24.8 | 53.09 ms |
-| Low | 50%, FSR2 | 24.91 ms | 40.1 | 28.90 ms |
+| High | 77%, FSR2 | 45.22 ms | 22.1 | 62.50 ms |
+| Medium | 67%, FSR2 | 38.71 ms | 25.8 | 48.79 ms |
+| Low | 50%, FSR2 | 23.72 ms | 42.2 | 27.36 ms |
 
-These numbers precede the SDFGI default change. All three
-runs had zero frame intervals over 100 ms. Renderer memory peaked at roughly
-2.38–2.59 GB; process peak working set reached 6.91 GB across the sequential
-runs, including preset rebuilds. Godot's static-memory and water-subview timing
-counters returned zero and are unavailable measurements, not zero cost.
-A manual grass-LOD experiment added hitches without improving mean frame rate
-and was removed. Vegetation and shadow rendering remain the largest costs.
+SDFGI is disabled, and playable grass LOD removes curve segments earlier while
+retaining the plant population. High and Low had zero frame intervals over
+100 ms; Medium had one. Renderer memory peaked at roughly 1.96–2.19 GB, and
+process peak working set reached 6.13 GB across the sequential presets.
+Godot's static-memory and water-subview timing counters returned zero and are
+unavailable measurements, not zero cost. A manual grass-LOD experiment added
+hitches without improving mean frame rate and was removed. A conservative
+terrain-occlusion candidate produced negligible savings in the tested camp
+views and was also left out. Vegetation and shadow rendering remain the largest
+costs. The walking-area limit does not itself cull the surrounding scenery.
 The opt-in near-tree impostor comparison measured 45.61 / 37.93 / 22.89 ms
 for High / Medium / Low on a later exported run. It remains optional pending
 visual acceptance; these are not default-preset numbers.
@@ -149,8 +159,9 @@ part of the playable build.
 
 Audio was measured and inspected as a spectrogram, but **not auditioned** in
 this validation pass. Those measurements cannot establish that the mix sounds
-natural. Full listening, longer gameplay/GC stress, the outer world boundary and
-other GPUs/operating systems still need coverage. No AAA quality grade is claimed.
+natural. Full listening, longer gameplay/GC stress, continuous exploration along
+the entire walking boundary and other GPUs/operating systems still need coverage.
+No AAA quality grade is claimed.
 Offline Movie Maker FPS is not interactive performance. Godot's .NET build cannot
 make a web export.
 

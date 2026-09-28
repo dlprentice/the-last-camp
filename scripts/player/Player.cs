@@ -13,7 +13,7 @@ using LastCamp.Construction;
 
 namespace LastCamp;
 
-/// First-person controller: capsule physics against the terrain heightmap and
+/// First-person controller: capsule physics against the terrain triangles and
 /// props, wading with a depth limit, crouch, sprint with a subtle FOV kick,
 /// procedural head motion, surface-aware footsteps and an interaction ray.
 public partial class Player : CharacterBody3D
@@ -43,6 +43,10 @@ public partial class Player : CharacterBody3D
     public const double INTERACT_RANGE = 3.2;
     public const double STEP_LENGTH_WALK = 1.75;
     public const double STEP_LENGTH_RUN = 2.3;
+    // The camp, pond and their surrounding woods are the game area. The much
+    // larger terrain and forest remain scenic background, not an empty hike.
+    public const float PLAY_AREA_RADIUS = 120;
+    public static readonly Vector2 PLAY_AREA_CENTRE = new(-10, 8);
 
     public Node3D head;
     public Camera3D camera;
@@ -55,6 +59,9 @@ public partial class Player : CharacterBody3D
 
     public bool enabled = false;
     private bool _spawned;
+    private Vector3 _lastSupportedPosition;
+    private double _boundaryNoticeCooldown;
+    public int RecoveryCount { get; private set; }
     public double yaw = 0.0;
     public double pitch = 0.0;
     public bool crouching = false;
@@ -219,6 +226,7 @@ public partial class Player : CharacterBody3D
         if (!_spawned)
         {
             snap_to_ground();
+            _lastSupportedPosition = GlobalPosition;
             _spawned = true;
         }
         camera.MakeCurrent();
@@ -314,10 +322,12 @@ public partial class Player : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
-        if (Game.Instance.camp == null)
+        if (Game.Instance.camp == null || !_spawned)
         {
             return;
         }
+        _boundaryNoticeCooldown = Math.Max(0, _boundaryNoticeCooldown - delta);
+        RecoverUnsupportedPosition();
         _update_water_state();
         Vector2 input = Vector2.Zero;
         if (enabled && Game.Instance.mode == Game.Mode.PLAY)
@@ -355,6 +365,13 @@ public partial class Player : CharacterBody3D
         double accel = on_floor ? (wish != Vector3.Zero ? ACCELERATION : FRICTION) : AIR_CONTROL;
         Vector3 horizontal = new Vector3(Velocity.X, 0.0f, Velocity.Z).MoveToward(desired, (float)(accel * delta));
         horizontal = _limit_wading(horizontal, delta);
+        Vector3 limited = LimitWorldTravel(GlobalPosition, horizontal, delta);
+        if (limited.DistanceSquaredTo(horizontal) > 0.01f && _boundaryNoticeCooldown <= 0)
+        {
+            Game.Instance.hud?.notify("Edge of the camping area. Head back toward the pond.");
+            _boundaryNoticeCooldown = 12;
+        }
+        horizontal = limited;
         Vector3 _t1 = Velocity;
         _t1.X = horizontal.X;
         Velocity = _t1;
@@ -375,6 +392,8 @@ public partial class Player : CharacterBody3D
             Velocity = _t4;
         }
         MoveAndSlide();
+        if (IsOnFloor() && InsidePlayArea(GlobalPosition))
+            _lastSupportedPosition = GlobalPosition;
 
         if (on_floor && !_was_on_floor && _fall_speed < -3.0)
         {
@@ -393,6 +412,39 @@ public partial class Player : CharacterBody3D
         Vector3 _t7 = head.Rotation;
         _t7.Z = (float)_lean;
         head.Rotation = _t7;
+    }
+
+    public static bool InsidePlayArea(Vector3 position, float margin = 0) =>
+        new Vector2(position.X, position.Z).DistanceSquaredTo(PLAY_AREA_CENTRE) <= MathF.Pow(PLAY_AREA_RADIUS + margin, 2);
+
+    /// Project an outward step onto the camp boundary. This also allows sliding
+    /// around its curve; returning toward camp keeps the normal movement speed.
+    public static Vector3 LimitWorldTravel(Vector3 position, Vector3 velocity, double delta)
+    {
+        if (delta <= 0) return Vector3.Zero;
+        float step = (float)delta;
+        Vector2 offset = new Vector2(position.X, position.Z) - PLAY_AREA_CENTRE;
+        Vector2 target = offset + new Vector2(velocity.X, velocity.Z) * step;
+        if (target.LengthSquared() <= PLAY_AREA_RADIUS * PLAY_AREA_RADIUS) return velocity;
+        Vector2 allowed = (target.LimitLength(PLAY_AREA_RADIUS) - offset) / step;
+        velocity.X = allowed.X;
+        velocity.Z = allowed.Y;
+        return velocity;
+    }
+
+    private void RecoverUnsupportedPosition()
+    {
+        Vector3 p = GlobalPosition;
+        bool outside = !p.IsFinite() || !InsidePlayArea(p, 2);
+        bool below = !outside && p.Y < Game.Instance.camp.field.surface_height(p.X, p.Z) - 3;
+        if (!outside && !below) return;
+        GlobalPosition = _lastSupportedPosition + Vector3.Up * 0.10f;
+        Velocity = Vector3.Zero;
+        _fall_speed = _land_dip = _step_distance = 0;
+        charging_stone = false;
+        stone_charge = 0;
+        RecoveryCount++;
+        Game.Instance.hud?.notify("Back on solid ground.");
     }
 
     public void _update_water_state()

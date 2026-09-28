@@ -78,6 +78,7 @@ public partial class QualityPreset : RefCounted
     public bool reflection_half_rate = false;
     public double grass_density = 0.9;
     public double grass_distance = 72.0;
+    public double grass_lod_bias = 1.0;
     public double foliage_distance = 1.0;
     public double particle_scale = 1.0;
     public double lod_bias = 1.0;
@@ -153,6 +154,7 @@ public partial class QualityPreset : RefCounted
         p.reflection_half_rate = true;
         p.grass_density = 0.7;
         p.grass_distance = 285.0;
+        p.grass_lod_bias = 0.25;
         p.parallax_steps = 10;
         p.ridge_detail = 0.75;
         return p;
@@ -184,6 +186,7 @@ public partial class QualityPreset : RefCounted
         p.reflection_half_rate = true;
         p.grass_density = 0.5;
         p.grass_distance = 260.0;
+        p.grass_lod_bias = 0.25;
         p.foliage_distance = 0.8;
         p.ridge_detail = 0.5;
         p.particle_scale = 0.7;
@@ -219,6 +222,7 @@ public partial class QualityPreset : RefCounted
         p.planar_reflections = false;
         p.grass_density = 0.3;
         p.grass_distance = 230.0;
+        p.grass_lod_bias = 0.25;
         p.foliage_distance = 0.65;
         p.particle_scale = 0.5;
         p.lod_bias = 0.75;

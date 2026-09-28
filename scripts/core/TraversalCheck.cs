@@ -65,8 +65,12 @@ public partial class TraversalCheck : Node
             G.print(G.format("TRAVERSAL waypoint=%s reached=%s pos=(%.2f %.2f %.2f) ground=%.2f floor=%s water=%.2f t=%.1f", new Godot.Collections.Array { wp["name"], ok, snap["x"], snap["y"], snap["z"], snap["ground"], snap["on_floor"], snap["water_depth"], snap["seconds"] }));
         }
         _release();
+        _check("the walking route needed no fall recovery", _player.RecoveryCount == 0);
         await _check_woodland_collision();
+        await _check_world_safety();
+        int expectedRecoveries = _player.RecoveryCount;
         await _interactions();
+        _check("interactions needed no fall recovery", _player.RecoveryCount == expectedRecoveries);
         bool passed = G.Call(_report["failures"], "is_empty").AsBool();
         _report["passed"] = passed;
         FileAccess file = FileAccess.Open(_out_dir.PathJoin("report.json"), FileAccess.ModeFlags.Write);
@@ -187,6 +191,37 @@ public partial class TraversalCheck : Node
         _check("ridge physics keeps a bounded local set instead of all trees", collision.ActiveBodies is > 0 and < 800);
         collision.Refresh(_player.GlobalPosition);
         collision.SetPhysicsProcess(true);
+    }
+
+    private async Task _check_world_safety()
+    {
+        Vector3 before = _player.GlobalPosition;
+        double beforeYaw = _player.yaw;
+        int recoveries = _player.RecoveryCount;
+        foreach (Vector2 direction in new[] { Vector2.Left, Vector2.Right, Vector2.Up, Vector2.Down })
+        {
+            Vector2 edge = Player.PLAY_AREA_CENTRE + direction * (Player.PLAY_AREA_RADIUS - 0.15f);
+            float height = (float)Game.Instance.camp.field.surface_height(edge.X, edge.Y);
+            _player.GlobalPosition = new Vector3(edge.X, height + 0.12f, edge.Y);
+            _player.Velocity = Vector3.Zero;
+            _player.yaw = Math.Atan2(-direction.X, -direction.Y);
+            Input.ActionPress("move_forward");
+            Input.ActionPress("sprint");
+            await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+            _release();
+            Vector3 p = _player.GlobalPosition;
+            _check($"sprinting toward woodland edge {direction} retains support", _player.IsOnFloor() &&
+                Player.InsidePlayArea(p, 0.03f) &&
+                _player.RecoveryCount == recoveries);
+        }
+        _player.GlobalPosition = before;
+        _player.Velocity = Vector3.Zero;
+        _player.yaw = beforeYaw;
+        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+        _player.GlobalPosition -= Vector3.Up * 5;
+        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+        _check("an injected fall-through recovers the last supported position", _player.RecoveryCount == recoveries + 1 &&
+            _player.IsOnFloor() && _player.GlobalPosition.DistanceTo(before) < 0.25);
     }
 
     public async Task _interactions()

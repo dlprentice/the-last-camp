@@ -30,6 +30,11 @@ Render chunks use the same triangle grid and border attributes, allowing camera
 and shadow passes to cull unseen sections. Static collision follows that grid
 across the complete landscape; distant trunks receive pooled collision bodies
 only in cells around the player.
+The player's walking area is a 120 m radius around `(-10, 8)` in the ground
+plane, enclosing the camp, pond and approach trail. Outward movement is limited
+at this boundary while tangential and return movement remain available. An
+unexpected fall below the terrain restores the last supported position; the
+traversal harness counts recoveries so this cannot conceal a broken normal route.
 Habitat fields use moisture, shade and foot traffic to distribute grass,
 flowers, ferns, deadwood and shoreline plants. Spatially grouped MultiMeshes
 and authored LODs reduce submission and distant geometry cost.
@@ -44,6 +49,9 @@ Grass buffers retain their prepared capacity when quality decreases. A stable,
 spatially distributed instance prefix lowers density without moving surviving
 plants; returning to the prepared tier reuses the buffers. Higher density or
 coverage than already prepared still requires a worker plan and upload.
+Playable presets select native grass mesh LOD earlier. These LODs retain every
+blade's root and tip, reducing the number of curve segments rather than removing
+plants. Ultra and Film keep the finer distance setting.
 
 The sky integrates an authored single-scattering atmosphere and volumetric
 clouds. The same day/night state drives sun, moon, fog, ambient light and
