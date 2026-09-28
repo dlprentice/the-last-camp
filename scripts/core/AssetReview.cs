@@ -132,7 +132,7 @@ public partial class AssetReview : Node3D
             TreeSpecies species = TreeSpecies.by_kind((TreeSpecies.Kind)kind);
             for (long variant = 0, variant_end = Forest.VARIANTS_PER_SPECIES; variant < variant_end; variant++)
             {
-                TreeGenerator.Result result = G.Index(camp.forest.variants[kind], variant).As<TreeGenerator.Result>();
+                TreeGenerator.Result result = camp.forest.variants[kind][(int)variant];
                 Node3D root = new Node3D();
                 sources.AddChild(root);
                 foreach (ScenePlan.TreeEntry t in camp.plan.trees)

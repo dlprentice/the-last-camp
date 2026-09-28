@@ -81,6 +81,25 @@ public partial class Main : Node3D
 
     public override async void _Ready()
     {
+        try
+        {
+            await StartWorld();
+        }
+        catch (Exception error)
+        {
+            // Keep a useful failure even if the engine's exception formatter
+            // cannot inspect a partially constructed native object.
+            Console.Error.WriteLine($"ERROR: World construction failed: {error}");
+            if (IsInsideTree())
+            {
+                if (Game.Instance.is_tool_run()) Game.Instance.quit_cleanly(1);
+                else loading?.show_failure();
+            }
+        }
+    }
+
+    private async Task StartWorld()
+    {
         if (Game.Instance.has_flag("package-check"))
         {
             GD.Print($"PACKAGE_MODE world_children={GetChildCount()}");
@@ -226,7 +245,7 @@ public partial class Main : Node3D
         loading.finish();
         if (!Game.Instance.is_tool_run() || Game.Instance.has_flag("session-check"))
             _sceneRoot.AddChild(new CampSession { Name = "Evening" });
-        if (Game.Instance.has_flag("skip-intro"))
+        if (!Game.Instance.has_flag("intro") || Game.Instance.has_flag("skip-intro"))
         {
             player.begin();
             if (Game.Instance.has_flag("traverse"))

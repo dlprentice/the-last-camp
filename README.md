@@ -10,11 +10,6 @@ The project combines procedural terrain, trees, grass and camp geometry with
 credited photoscanned materials and dressing. All game logic, diagnostics and scene construction use C#, native Jolt
 physics and Forward+ Vulkan. There are no addons or GDExtensions.
 
-The published film is **5:37 at 1920×1080, 60 FPS**, including credits. A **1:51 showcase
-reel** offers a shorter tour. Both use environmental sound and Foley with no
-background music. Movie Maker renders them offline; their output FPS is not
-the playable demo's frame rate.
-
 ## Start here
 
 Install **Godot 4.8 dev6 .NET**, its matching .NET export templates, and the **.NET 8 SDK**. The engine is a development snapshot from
@@ -36,8 +31,9 @@ The first import builds Godot's local asset cache. Rebuild the C# assembly with
 `dotnet build` after changing source. Everything is constructed in code; opening
 the editor is optional, and the one-node main scene is only a bootstrap. The converted
 textures, models and audio are included: no asset downloads, Python packages
-or account sign-in are needed to play. Allow the loading screen to finish;
-Space or a click skips the opening camera once loading is complete.
+or account sign-in are needed to play. After the loading screen, you start on
+the trail with control of the player. The optional `-- --intro` camera arrival
+can be skipped with Space or a click.
 
 The default preset starts at High and can adapt downward. Use
 `godot --path . --fullscreen -- --quality=medium` to select a fixed preset.
@@ -91,6 +87,11 @@ where they use approximations. [Development and rendering](docs/development.md)
 contains the build, test, capture and asset-tool commands.
 
 ## Films and Linux build
+
+The published film is **5:37 at 1920×1080, 60 FPS**, including credits. A **1:51 showcase
+reel** offers a shorter tour. Both use environmental sound and Foley with no
+background music. Movie Maker renders them offline; their output FPS is not
+the game's interactive frame rate.
 
 Download the full film, shorter reel and Linux package from the
 [release page](https://github.com/dlprentice/the-last-camp/releases/tag/v1.0.0).

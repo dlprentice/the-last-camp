@@ -27,7 +27,7 @@ public partial class Camp : Node3D
     public TerrainField field = new TerrainField();
     public ScenePlan plan;
     public ShaderMaterial terrain_material;
-    public MeshInstance3D terrain;
+    public Node3D terrain;
     public StaticBody3D terrain_body;
     public Forest forest;
     public RidgeForest ridge_forest;
@@ -91,7 +91,13 @@ public partial class Camp : Node3D
         terrain_material = _make_terrain_material();
         TerrainBuilder terrain_builder = new TerrainBuilder(field);
         _terrain_thread = new GodotThread();
-        _terrain_thread.Start(Callable.From(() => new Godot.Collections.Dictionary { { (StringName)"mesh", terrain_builder.build_mesh(terrain_material) }, { (StringName)"collision", terrain_builder.build_collision() }, { (StringName)"outer_collision", terrain_builder.build_outer_collision() } }));
+        _terrain_thread.Start(Callable.From(() =>
+        {
+            using ArrayMesh groundMesh = terrain_builder.build_mesh(terrain_material);
+            return new Godot.Collections.Dictionary {
+                { "chunks", TerrainBuilder.split_render_mesh(groundMesh) }, { "collision", new CollisionShape3D {
+                    Name = "TerrainCollision", Shape = groundMesh.CreateTrimeshShape() } } };
+        }));
         GrassPlanter planter = new GrassPlanter(field, Quality.Instance.current.grass_distance + GrassPlanter.CHUNK_SIZE, Quality.Instance.current.grass_density);
         _grass_thread = new GodotThread();
         _grass_thread.Start(Callable.From(() => planter.plan()));
@@ -107,6 +113,7 @@ public partial class Camp : Node3D
         ridge_forest = new RidgeForest(field, forest);
         AddChild(ridge_forest);
         ridge_forest.build();
+        AddChild(new WoodlandCollision(forest));
 
         await _stage("Shaping the land");
         Variant terrain_data = await _join(_terrain_thread);
@@ -115,7 +122,7 @@ public partial class Camp : Node3D
         {
             return;
         }
-        _place_terrain(G.Index(terrain_data, "mesh").As<ArrayMesh>(), G.Index(terrain_data, "collision").As<CollisionShape3D>(), G.Index(terrain_data, "outer_collision").As<CollisionShape3D>());
+        _place_terrain(G.Index(terrain_data, "chunks").AsGodotArray<ArrayMesh>(), G.Index(terrain_data, "collision").As<CollisionShape3D>());
 
         await _stage("Planting the understory");
         if (!IsInsideTree())
@@ -235,20 +242,19 @@ public partial class Camp : Node3D
         return mat;
     }
 
-    public void _place_terrain(ArrayMesh mesh, CollisionShape3D collision, CollisionShape3D outer_collision)
+    public void _place_terrain(Godot.Collections.Array<ArrayMesh> chunks, CollisionShape3D collision)
     {
-        terrain = new MeshInstance3D();
-        terrain.Name = "Terrain";
-        terrain.Mesh = mesh;
-        terrain.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
-        terrain.GIMode = GeometryInstance3D.GIModeEnum.Static;
+        terrain = new Node3D { Name = "Terrain" };
+        foreach (ArrayMesh chunk in chunks)
+            terrain.AddChild(new MeshInstance3D {
+                Mesh = chunk, CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+                GIMode = GeometryInstance3D.GIModeEnum.Static });
         AddChild(terrain);
 
         terrain_body = new StaticBody3D();
         terrain_body.Name = "TerrainBody";
         terrain_body.CollisionLayer = unchecked((uint)(1));
         terrain_body.AddChild(collision);
-        terrain_body.AddChild(outer_collision);
         AddChild(terrain_body);
         Quality.Instance.Connect(Quality.SignalName.preset_changed, new Callable(this, Camp.MethodName._on_quality));
         _on_quality(Quality.Instance.current);

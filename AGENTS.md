@@ -26,6 +26,10 @@ Read the documentation relevant to the task:
   forest coverage, the shared wind field and the no-music film direction.
 - Keep converted asset files and the corresponding SOURCES.md rows consistent. Default
   atlas rebaking must not replace the credited photoscan PBR sets.
+- Prefer original locally generated art and audio. Replace existing assets only after
+  inspecting the result in play and measuring its cost; keep credited originals
+  until the replacement is at least as good. Offline Blender generators are valid
+  code-built content and must be committed with their generated assets.
 - Third-party code and assets need redistribution permission and complete attribution.
   Include engine and component notices when distributing executable builds.
 - Avoid broad rewrites, unrequested runtime dependencies and performance claims based on

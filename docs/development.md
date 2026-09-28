@@ -21,6 +21,8 @@ Run from the repository root. `godot` below must resolve to the .NET build.
 dotnet build --nologo
 godot --headless --path . --import --quit-after 120 --max-fps 30
 godot --headless --path . --script res://tests/RunTests.cs
+# One focused C# test class:
+godot --headless --path . --script res://tests/RunTests.cs -- --test=TestTerrainChunks
 godot --headless --path . --script res://tests/SceneContractProbe.cs
 godot --headless --path . --script res://tests/FingerprintProbe.cs
 python3 -m unittest discover -s tests -p 'test_*.py'
@@ -63,10 +65,14 @@ godot-offscreen --timeout 600 -- -- --benchmark=high --out="$PWD/local-data/benc
 ```
 
 The traversal moves the controller through 15 waypoints and checks photo mode,
-the hand lantern, fire feeding and a quality change. Benchmark without Movie
+the hand lantern, firewood pickup/feeding, charged stone throws, pause/resume on
+the dock, a quality change, distant terrain support and local trunk collision.
+With `--session-check`, it also opens the journal and completes rest/sleep through
+the tent's actual interaction ray. Benchmark without Movie
 Maker or fixed FPS, recording the GPU, driver, resolution, internal scale,
 CPU/GPU frame times, memory and hitches. Measure the exported C# build; the
-editor host's JIT settings can differ. No current performance claim is made.
+editor host's JIT settings can differ. See [validation](validation.md) for the
+measured results and their limits.
 
 ## Rendering
 
@@ -135,6 +141,9 @@ sets. Experimental fallback materials need a separate output:
 ```bash
 python3 tools/bake_textures.py --only wood --out local-data/wood-study --check-tiling
 ```
+
+Prefer original content, but compare replacements in the complete scene and
+measure their runtime cost before retiring an existing asset and its credit.
 
 Blender repacks models with separate objects/LOD nodes, PNG PBR maps and optional
 Decimate reduction. It does not reproduce the earlier meshoptimizer topology;

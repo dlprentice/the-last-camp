@@ -65,6 +65,7 @@ public partial class TraversalCheck : Node
             G.print(G.format("TRAVERSAL waypoint=%s reached=%s pos=(%.2f %.2f %.2f) ground=%.2f floor=%s water=%.2f t=%.1f", new Godot.Collections.Array { wp["name"], ok, snap["x"], snap["y"], snap["z"], snap["ground"], snap["on_floor"], snap["water_depth"], snap["seconds"] }));
         }
         _release();
+        await _check_woodland_collision();
         await _interactions();
         bool passed = G.Call(_report["failures"], "is_empty").AsBool();
         _report["passed"] = passed;
@@ -160,6 +161,34 @@ public partial class TraversalCheck : Node
         }
     }
 
+    private async Task _check_woodland_collision()
+    {
+        var camp = Game.Instance.camp;
+        bool supported = true;
+        foreach (Vector2 p in new[] { new Vector2(240, 60), new Vector2(-320, 80), new Vector2(80, 450), new Vector2(-120, -620) })
+        {
+            float h = (float)camp.field.surface_height(p.X, p.Y);
+            using var query = PhysicsRayQueryParameters3D.Create(new Vector3(p.X, h + 0.3f, p.Y), new Vector3(p.X, h - 0.3f, p.Y), 1);
+            var hit = _player.GetWorld3D().DirectSpaceState.IntersectRay(query);
+            supported &= hit.Count > 0 && Math.Abs(hit["position"].AsVector3().Y - h) < 0.025;
+        }
+        _check("outer woodland collision matches rendered hills beyond the former 210 m limit", supported);
+
+        var collision = camp.GetNode<WoodlandCollision>("WoodlandCollision");
+        collision.SetPhysicsProcess(false);
+        var tree = camp.forest.ridge_groups[0].Transforms[0];
+        collision.Refresh(tree.Origin);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        using var trunkRay = PhysicsRayQueryParameters3D.Create(tree.Origin + new Vector3(3, 1, 0), tree.Origin + new Vector3(-3, 1, 0), 1);
+        var trunkHit = _player.GetWorld3D().DirectSpaceState.IntersectRay(trunkRay);
+        _check("ridge trunks receive pooled local collisions", trunkHit.Count > 0 &&
+            trunkHit["collider"].AsGodotObject() is StaticBody3D body && body.GetParent() == collision);
+        _check("ridge physics keeps a bounded local set instead of all trees", collision.ActiveBodies is > 0 and < 800);
+        collision.Refresh(_player.GlobalPosition);
+        collision.SetPhysicsProcess(true);
+    }
+
     public async Task _interactions()
     {
         /// Photo mode with focus lock and flight, the lantern, feeding the fire and a
@@ -240,19 +269,20 @@ public partial class TraversalCheck : Node
         await _screenshot("stone_result");
 
         QualityPreset.Tier start_tier = Quality.Instance.current.tier;
-        Quality.Instance.apply(QualityPreset.Tier.MEDIUM);
+        QualityPreset.Tier test_tier = start_tier == QualityPreset.Tier.MEDIUM ? QualityPreset.Tier.LOW : QualityPreset.Tier.MEDIUM;
+        Quality.Instance.apply(test_tier);
         while (Game.Instance.camp.understory._replant_thread != null)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
         await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
-        bool medium = Quality.Instance.current.tier == QualityPreset.Tier.MEDIUM;
+        bool changed = Quality.Instance.current.tier == test_tier && test_tier != start_tier;
         Quality.Instance.apply(start_tier);
         while (Game.Instance.camp.understory._replant_thread != null)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
-        _check("quality steps down to Medium and back without errors", medium && Quality.Instance.current.tier == start_tier);
+        _check("quality changes to a different preset and restores the original", changed && Quality.Instance.current.tier == start_tier);
         await _screenshot("after_quality_change");
         if (Game.Instance.session is CampSession evening)
         {

@@ -52,7 +52,9 @@ public partial class Understory : Node3D
     public double _grass_distance = 70.0;
     public double _foliage_distance = 1.0;
     public GodotThread _replant_thread;
-    public bool _replant_dirty = false;
+    private double _preparedGrassDensity;
+    private double _preparedGrassDistance;
+    private readonly List<(MultiMesh Mesh, bool Distant)> _grassBatches = new();
 
     public Understory(TerrainField p_field, ScenePlan p_plan)
     {
@@ -88,6 +90,9 @@ public partial class Understory : Node3D
             c.QueueFree();
         }
         grass_chunks.Clear();
+        _grassBatches.Clear();
+        _preparedGrassDensity = planter.density;
+        _preparedGrassDistance = planter.extent - GrassPlanter.CHUNK_SIZE;
         blade_count = 0;
         if (grass_material == null)
         {
@@ -107,8 +112,7 @@ public partial class Understory : Node3D
         }
         ArrayMesh distant_blade = GrassPlanter.clump_mesh(5, 1, 0.055, 901);
         _upload_grass(planter.distant_chunks, distant_blade, distant_grass_material, "HillGrass");
-        blade_count = planter.total_blades;
-        distant_clump_count = planter.distant_clumps;
+        ApplyGrassBudget();
         G.print(G.format("Groundcover hills: %d clumps in %d batches, %d shrubs, extent %.0f m", new Godot.Collections.Array { distant_clump_count, (long)planter.distant_chunks.Count, distant_shrub_count, GrassPlanter.DISTANT_EXTENT }));
     }
 
@@ -122,7 +126,7 @@ public partial class Understory : Node3D
             mm.UseCustomData = true;
             mm.Mesh = mesh;
             mm.InstanceCount = (int)chunk.count;
-            mm.Buffer = chunk.buffer.ToArray();
+            mm.Buffer = GrassPlanter.upload_buffer(chunk);
             mm.CustomAabb = chunk.aabb;
             MultiMeshInstance3D mmi = new MultiMeshInstance3D();
             mmi.Name = G.format("%s_%d_%d", new Godot.Collections.Array { prefix, (long)chunk.origin.X, (long)chunk.origin.Y });
@@ -134,7 +138,30 @@ public partial class Understory : Node3D
             _set_range(mmi, prefix == "HillGrass" ? 800 : _grass_distance);
             AddChild(mmi);
             grass_chunks.Add(mmi);
+            _grassBatches.Add((mm, prefix == "HillGrass"));
         }
+    }
+
+    private bool NeedsMoreGrass => _grass_density > _preparedGrassDensity + 0.0001 ||
+                                   _grass_distance > _preparedGrassDistance + 0.0001;
+
+    private void ApplyGrassBudget()
+    {
+        double nearRatio = Math.Clamp(_grass_density / Math.Max(_preparedGrassDensity, 0.001), 0, 1);
+        double farRatio = Math.Clamp((0.55 + 0.45 * Math.Clamp(_grass_density, 0, 1)) /
+                                    (0.55 + 0.45 * Math.Clamp(_preparedGrassDensity, 0, 1)), 0, 1);
+        blade_count = 0;
+        distant_clump_count = 0;
+        foreach (var batch in _grassBatches)
+        {
+            int visible = (int)Math.Round(batch.Mesh.InstanceCount * (batch.Distant ? farRatio : nearRatio));
+            batch.Mesh.VisibleInstanceCount = visible;
+            if (batch.Distant) distant_clump_count += visible;
+            else blade_count += visible;
+        }
+        // Distant planning widens clumps as density falls. Preserve that same
+        // coverage adjustment while reusing the already uploaded transforms.
+        distant_grass_material?.SetShaderParameter("population_width", 1.0 / Math.Sqrt(Math.Max(farRatio, 0.001)));
     }
 
     public void _build_distant_shrubs()
@@ -780,20 +807,22 @@ public partial class Understory : Node3D
         {
             _grass_density = p.grass_density;
             _grass_distance = p.grass_distance;
-            _replant_grass_async();
+            ApplyGrassBudget();
+            if (_grassBatches.Count > 0 && NeedsMoreGrass) _replant_grass_async();
         }
     }
 
     public async void _replant_grass_async()
     {
-        /// Quality changes re-plan the grass on a worker thread and swap it in. Only
-        /// one plan runs at a time; changes made meanwhile queue a single re-run.
+        /// Only an upgrade beyond the prepared density/range needs new buffers.
+        /// Downgrades and restoration reuse them without moving surviving plants.
         if (_replant_thread != null)
         {
-            _replant_dirty = true;
             return;
         }
-        GrassPlanter planter = new GrassPlanter(field, _grass_distance + GrassPlanter.CHUNK_SIZE, _grass_density);
+        GrassPlanter planter = new GrassPlanter(field,
+            Math.Max(_grass_distance, _preparedGrassDistance) + GrassPlanter.CHUNK_SIZE,
+            Math.Max(_grass_density, _preparedGrassDensity));
         _replant_thread = new GodotThread();
         _replant_thread.Start(Callable.From(() => planter.plan()));
         while (_replant_thread != null && _replant_thread.IsAlive())
@@ -807,11 +836,7 @@ public partial class Understory : Node3D
         _replant_thread.WaitToFinish();
         _replant_thread = null;
         add_grass(planter);
-        if (_replant_dirty)
-        {
-            _replant_dirty = false;
-            _replant_grass_async();
-        }
+        if (NeedsMoreGrass) _replant_grass_async();
     }
 
     public override void _ExitTree()

@@ -511,7 +511,10 @@ public partial class MeshBuilder : RefCounted
         /// routed through ImporterMesh so the renderer gets automatic discrete LODs.
         if (generate_lods)
         {
-            ImporterMesh importer = new ImporterMesh();
+            // Hold native ownership through GetMesh's return marshalling. The
+            // importer owns that mesh until the returned managed wrapper does.
+            // A finalizer running during the last ptrcall must not release it.
+            using ImporterMesh importer = new ImporterMesh();
             if (existing != null)
             {
                 for (long s = 0, s_end = existing.GetSurfaceCount(); s < s_end; s++)

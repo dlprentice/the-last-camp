@@ -21,7 +21,7 @@ namespace LastCamp;
 /// vertex attributes). Deterministic for a given species and seed.
 public partial class TreeGenerator
 {
-    public partial class Result : RefCounted
+    public sealed class Result
     {
         public ArrayMesh bark;
         public ArrayMesh leaves;

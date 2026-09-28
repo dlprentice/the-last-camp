@@ -9,10 +9,10 @@ The conversion checks began on September 26, 2026 with
 | Check | Observed result |
 | --- | --- |
 | C# compilation and Godot import | Passed without errors or warnings |
-| C# regression suite | 101 passed, zero failed on September 27: conversion contracts, runtime readback, prop geometry, stone flight and grass batching included |
+| C# regression suite | 106 passed, zero failed on September 27: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, terrain seams and cached-mesh lifetime included |
 | Python tooling suite | 47 passed, zero failed |
 | Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
-| Deterministic content and audio | All 1,065 SHA-256 fingerprints match the GDScript reference byte for byte |
+| Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte |
 | Capture dependency preflight and shell syntax | Passed |
 | Blender conversion fixture | Separate LOD object names and alpha preserved; 448 triangles reduced to 224, and a 64×64 texture resized to 32×32 |
 | Linux .NET release package | Exported successfully with its self-contained runtime and required license notices |
@@ -24,7 +24,9 @@ The scene comparison normalizes script identity and excludes script-defined
 fields. Content fingerprints cover sampled terrain, vegetation plans, generated
 mesh channels, dressing transforms, meadow/grass batches, camera routes, analytic
 waves and the generated audio bank. They also check the no-music film cues.
-These are sampled contracts, not proof of every runtime state.
+These are sampled contracts, not proof of every runtime state. Subsequent gameplay,
+terrain partitioning and asset improvements intentionally change parts of that
+checkpoint; the old hashes are not claimed as a fingerprint of the entire current game.
 
 An additional primary-checkout import exposed a shutdown abort with a null
 editor singleton. Its native worker stack is consistent with the engine's
@@ -55,23 +57,102 @@ lantern input, aimed stone throws, photo mode, pause/resume on the pier and qual
 changes. The evening journal and sleep sequence have additional traversal checks.
 The regression suite alone does not establish how these interactions feel.
 
-An exported High baseline averaged **73.82 ms/frame (13.5 FPS)** over the 22-second
-benchmark route, with a 101.07 ms 99th percentile. That predates the canopy
-optimization and is not the current build's performance claim. Controlled GPU
-profiles identified distant tree geometry, vegetation shading and shadows as the
-largest costs. Lit ridge atlases reduced the measured High pond view from about
-68 to 42 ms/frame in development builds. Final exported performance, long-run
-hitches and memory still need to be measured after the selected changes settle.
+The full exported High interaction route also completed with SDFGI disabled,
+including a real High/Medium/High preset round trip, the journal and sleep to a
+playable dawn. Extra physics probes found terrain support beyond the former
+210 m collision limit and active local ridge-trunk collisions. The distant
+collision pool stays bounded instead of constructing a body for every tree.
 
-Aggressive diagnostic tree-LOD settings triggered repeatable NVIDIA device-loss
-faults on this engine/driver combination. They are excluded from the default
-profiling sweep. Ordinary traversal and the selected canopy profiles exited
-cleanly; that does not prove other drivers or all play sessions are unaffected.
+Forest construction's spatial search changed from native Variant containers to
+managed collections. The placement digest remained
+`21c4d31d14e9a420e2836177bb08867560035abdb258f3b712c9621cacd7406a`:
+all 21,017 ridge trees retain their positions. Measured forest construction fell
+from about 34.7 seconds to 3.4–4.4 seconds in the subsequent runs. This is a loading
+improvement, separate from frame rate. Geometry returns near the player; a count
+of planned trees is not a claim that every tree renders at full resolution.
 
-Moving effects, full audio mixes and close prop views need fresh review after
-the final changes. No AAA quality grade or 60 FPS gameplay claim is established.
-Offline Movie Maker FPS is not interactive performance. Other operating systems
-and GPUs have not been tested; Godot's .NET build cannot make a web export.
+Grass quality reductions now retain the uploaded buffers and draw a spatially
+distributed subset. Returning to the prepared quality restores every instance;
+only an increase beyond the prepared density or extent starts a new plan.
+Focused checks verify unchanged native buffer identities, complete instance
+records and coverage across merged cells. This removes unnecessary rebuilding;
+it does not establish a frame-rate improvement by itself.
+
+### Measured performance
+
+An exported High baseline before the canopy changes averaged **73.82 ms/frame
+(13.5 FPS)** over the 22-second benchmark route, with a 101.07 ms 99th percentile.
+The later exported build measured as follows at a fixed **1920×1080 output** on
+an RTX 4060 Laptop GPU, NVIDIA 610.57.04, with VSync disabled and
+`DOTNET_TieredCompilation=0`. Each preset follows the same 22-second route after
+warm-up; High, Medium and Low run sequentially after any grass rebuild finishes.
+
+| Preset | Internal resolution scale | Mean frame time | Mean FPS | 99th percentile |
+| --- | --- | --- | --- | --- |
+| High | 77%, FSR2 | 50.51 ms | 19.8 | 66.27 ms |
+| Medium | 67%, FSR2 | 40.30 ms | 24.8 | 53.09 ms |
+| Low | 50%, FSR2 | 24.91 ms | 40.1 | 28.90 ms |
+
+These numbers precede the SDFGI default change. All three
+runs had zero frame intervals over 100 ms. Renderer memory peaked at roughly
+2.38–2.59 GB; process peak working set reached 6.91 GB across the sequential
+runs, including preset rebuilds. Godot's static-memory and water-subview timing
+counters returned zero and are unavailable measurements, not zero cost.
+A manual grass-LOD experiment added hitches without improving mean frame rate
+and was removed. Vegetation and shadow rendering remain the largest costs.
+The opt-in near-tree impostor comparison measured 45.61 / 37.93 / 22.89 ms
+for High / Medium / Low on a later exported run. It remains optional pending
+visual acceptance; these are not default-preset numbers.
+**Performance is unfinished; no 60 FPS gameplay claim is established.**
+
+### Stability and visual limits
+
+High startup repeatedly produced Vulkan device loss and an NVIDIA Xid 13 fault
+with SDFGI enabled. A separate aggressive tree-LOD experiment also triggered
+that fault. SDFGI is now disabled in normal presets; the same full exported
+interaction route passed with it disabled. That comparison supports the
+workaround for that startup case, not a proven engine/driver root cause or a
+promise for other hardware. A later SDFGI-disabled traversal failed during the
+quality-change section, with an Xid 13 illegal-instruction fault and a native
+driver segmentation fault. Its wrapper was interrupted; the record does not
+establish an ordinary timeout or prove that quality switching caused the crash.
+The build is not considered generally stable from the earlier passing route.
+The `--sdfgi` opt-in remains diagnostic and unvalidated.
+
+The first attempted Vulkan validation run lacked the layer. A subsequent run
+loaded the Khronos validation layer and completed a High/Medium/High round trip
+in the exported build without a validation error or new kernel GPU fault. Its
+instrumented timings are not performance measurements. This does not explain or
+invalidate the earlier failure. Native failure and validation logs were retained.
+
+A separate startup run failed while retrieving a cached tree mesh through the
+native Variant bridge. Tree-generation records now use strong, typed managed
+ownership; a regression exercises collections while those resources are cached.
+Subsequent exported loading and traversal passed. The original managed failure's
+exact cause remains unproven.
+
+Another exported startup stopped inside `ImporterMesh.GetMesh`, with invalid
+mesh-storage errors and a native bounds assertion. No new kernel GPU fault
+accompanied this case. Mesh generation now holds the importer in a `using` scope
+through return marshalling, so its finalizer cannot release its mesh during that
+last call. A focused test repeatedly creates LOD meshes while forcing concurrent
+collections; it passes headless and on hardware Vulkan. The subsequent full
+exported benchmark and complete 15-waypoint interaction route also completed
+without errors or a new core/kernel GPU fault. This fixes a lifetime risk at the observed
+call; it is not a claim that all earlier native failures share that cause.
+
+Full-size prop views were inspected for canoe ends/seats, pier stones, stacked
+wood, table joins, fire detail and the tent. Fresh daylight and dawn route views
+were also inspected. Grass still has visible fine-detail aliasing, and complete
+motion/lighting/weather acceptance remains open. A foreground glove prototype was rejected after close-up inspection and is not
+part of the playable build.
+
+Audio was measured and inspected as a spectrogram, but **not auditioned** in
+this validation pass. Those measurements cannot establish that the mix sounds
+natural. Full listening, longer gameplay/GC stress, the outer world boundary and
+other GPUs/operating systems still need coverage. No AAA quality grade is claimed.
+Offline Movie Maker FPS is not interactive performance. Godot's .NET build cannot
+make a web export.
 
 The [v1.0.0 release](https://github.com/dlprentice/the-last-camp/releases/tag/v1.0.0)
 movies, screenshots and executable were produced before the C# conversion using

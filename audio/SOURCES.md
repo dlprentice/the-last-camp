@@ -16,7 +16,7 @@ files. The originals are retained in ignored `local-data/`.
 Film credit: “Water and thunder: Mark DiAngelo and Mike Koenig, SoundBible.com, CC BY 3.0; edited and mixed. Rain: Ylmir. Fireplace: PagDev. OpenGameArt.org, CC0 1.0. Trees in Wind: naturenotesuk, Freesound.org, CC0 1.0; edited and filtered.”
 
 The current film has no music player or music cues. The original procedural
-score study is retained in `scripts/audio/camp_score.gd` for source history and
+score study is retained in `scripts/audio/CampScore.cs` for source history and
 standalone tests; it is not part of this film. Bird, insect, owl, footstep and
 other generated environmental sounds come from `scripts/audio/`; no external
 bird recording is used. Do not infer an individual composer's identity from the

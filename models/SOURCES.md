@@ -1,6 +1,6 @@
 # Model sources
 
-Photoscanned models used alongside the project's generated geometry. Every file in this folder is fetched and packed by `tools/import_models.py`; the originals stay in the ignored download cache. All are Poly Haven assets released under CC0 1.0; creator names come from Poly Haven's asset metadata and are credited here and in the film credits even though CC0 does not require it.
+The third-party table below covers photoscanned models used alongside the project's generated geometry. Those files were fetched and packed by `tools/import_models.py`; the originals stay in the ignored download cache. All are Poly Haven assets released under CC0 1.0; creator names come from Poly Haven's asset metadata and are credited here and in the film credits even though CC0 does not require it.
 
 | Folder | Asset | Creator credit | Provider | License | Retrieved | Size | Alterations |
 |---|---|---|---|---|---|---|---|

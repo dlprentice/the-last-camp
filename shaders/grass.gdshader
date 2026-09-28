@@ -24,6 +24,7 @@ uniform float fade_end = 80.0;
 uniform float trample_radius = 0.9;
 uniform float sheen : hint_range(0.0, 1.0) = 0.18;
 uniform float distance_widen : hint_range(0.0, 2.0) = 1.15;
+uniform float population_width = 1.0;
 
 varying float v_height;
 varying vec3 v_tint;
@@ -53,7 +54,7 @@ void vertex() {
 	float cam_dist = length(CAMERA_POSITION_WORLD - base);
 	float fade = smoothstep(fade_start, fade_end, cam_dist);
 	float keep = smoothstep(fade - 0.06, fade + 0.06, phase);
-	float widen = 1.0 + smoothstep(20.0, 110.0, cam_dist) * distance_widen;
+	float widen = (1.0 + smoothstep(20.0, 110.0, cam_dist) * distance_widen) * population_width;
 	vec3 local = VERTEX;
 	if (keep <= 0.001) {
 		local = vec3(0.0);

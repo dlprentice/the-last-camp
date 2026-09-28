@@ -44,7 +44,7 @@ public partial class LoadingScreen : CanvasLayer
         _title = UiTheme.label("THE LAST CAMP", 44, UiTheme.ACCENT);
         _title.AddThemeConstantOverride("outline_size", 0);
         box.AddChild(_title);
-        Label sub = UiTheme.label("A Godot 4.8 rendering study", 16, UiTheme.MUTED);
+        Label sub = UiTheme.label("A quiet evening in the woods", 16, UiTheme.MUTED);
         box.AddChild(sub);
 
         _bar = new ProgressBar();
@@ -80,5 +80,17 @@ public partial class LoadingScreen : CanvasLayer
         tween.TweenInterval(0.25);
         tween.TweenProperty(_backdrop, "modulate:a", 0.0, 1.2).SetTrans(Tween.TransitionType.Sine);
         tween.TweenCallback(new Callable(this, Node.MethodName.QueueFree));
+    }
+
+    public void show_failure()
+    {
+        _stage.Text = "The campsite could not load. Details are in the game log.";
+        _stage.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _bar.Visible = false;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        var close = new Button { Text = "Close game", CustomMinimumSize = new Vector2(180, 44) };
+        close.Pressed += () => Game.Instance.quit_cleanly(1);
+        _stage.GetParent().AddChild(close);
+        close.GrabFocus();
     }
 }

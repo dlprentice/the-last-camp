@@ -276,7 +276,7 @@ public partial class Hud : CanvasLayer
         if (Game.Instance.world != null)
         {
             double hour = Game.Instance.world.hour;
-            if (_prev_hour >= 0.0 && absf(hour - _prev_hour) > 0.0005)
+            if (_prev_hour >= 0.0 && (int)(hour * 60) != (int)(_prev_hour * 60))
             {
                 _clock_fade = 2.2;
                 _clock.Text = _format_hour(hour);

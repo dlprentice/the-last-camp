@@ -34,7 +34,7 @@ public partial class QualityPreset : RefCounted
     public double render_scale = 1.0;
     public Viewport.Scaling3DModeEnum upscaler = Viewport.Scaling3DModeEnum.Bilinear;
     public bool taa = true;
-    public double fsr_sharpness = 0.2;
+    public double fsr_sharpness = 1.0;
 
     // Shadows
     public long directional_shadow_size = 4096;
@@ -53,7 +53,10 @@ public partial class QualityPreset : RefCounted
     public bool ssil = true;
     public RenderingServer.EnvironmentSsilQuality ssil_quality = RenderingServer.EnvironmentSsilQuality.High;
     public bool screen_space_half_size = true;
-    public bool sdfgi = true;
+    // High startup repeatedly lost the device with SDFGI enabled on the tested
+    // 4.8 dev6/NVIDIA combination; disabling it allowed the route to complete.
+    // Normal play uses sky, direct light and screen-space indirect light.
+    public bool sdfgi = false;
     public long sdfgi_cascades = 6;
     public RenderingServer.EnvironmentSdfgiRayCount sdfgi_ray_count = RenderingServer.EnvironmentSdfgiRayCount.Count16;
     public bool ssr = true;
@@ -137,10 +140,9 @@ public partial class QualityPreset : RefCounted
         p.render_scale = 0.77;
         p.upscaler = Viewport.Scaling3DModeEnum.Fsr2;
         p.directional_shadow_size = 2048;
-        // Three cascades to 80 m: the near cascade gets half the atlas instead of a
-        // quarter, and the fourth cascade only ever covered the last ten metres.
+        // Two cascades to 80 m keep half the atlas for nearby contact shadows.
         p.directional_shadow_distance = 80.0;
-        p.directional_shadow_splits = 3;
+        p.directional_shadow_splits = 2;
         p.fire_shadow_casters = 0xFFFFF & ~Pond.GRASS_LAYER;
         p.soft_shadow_quality = RenderingServer.ShadowQuality.SoftMedium;
         p.sdfgi_cascades = 5;
@@ -165,7 +167,7 @@ public partial class QualityPreset : RefCounted
         p.upscaler = Viewport.Scaling3DModeEnum.Fsr2;
         p.directional_shadow_size = 2048;
         p.directional_shadow_distance = 80.0;
-        p.directional_shadow_splits = 3;
+        p.directional_shadow_splits = 2;
         p.fire_shadow_casters = 0xFFFFF & ~Pond.GRASS_LAYER;
         p.soft_shadow_quality = RenderingServer.ShadowQuality.SoftLow;
         p.positional_shadow_atlas = 2048;

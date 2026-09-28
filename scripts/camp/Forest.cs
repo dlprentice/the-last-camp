@@ -24,7 +24,9 @@ public partial class Forest : Node3D
 
     public TerrainField field;
     public ScenePlan plan;
-    public Godot.Collections.Dictionary variants = new Godot.Collections.Dictionary();
+    // These records belong to C#, not the native Variant/ref-count bridge.
+    // Keep their meshes strongly reachable for the forest lifetime.
+    public readonly Dictionary<long, List<TreeGenerator.Result>> variants = new();
     public Godot.Collections.Dictionary bark_materials = new Godot.Collections.Dictionary();
     public Godot.Collections.Dictionary leaf_materials = new Godot.Collections.Dictionary();
     public Godot.Collections.Dictionary far_bark_materials = new Godot.Collections.Dictionary();
@@ -36,7 +38,6 @@ public partial class Forest : Node3D
     public Godot.Collections.Array<MultiMeshInstance3D> ridge_multimeshes = new Godot.Collections.Array<MultiMeshInstance3D>();
     public readonly List<(TreeSpecies.Kind Kind, TreeGenerator.Result Mesh, string Key, Godot.Collections.Array<Transform3D> Transforms, int First)> ridge_groups = new();
     public readonly List<(TreeSpecies.Kind Kind, TreeGenerator.Result Mesh, string Key, Godot.Collections.Array<Transform3D> Transforms, int First)> far_groups = new();
-    public Godot.Collections.Dictionary _lod_bark = new Godot.Collections.Dictionary();
     public double _foliage_distance = 1.0;
     public Godot.Collections.Array<Godot.Collections.Dictionary> near_records = new Godot.Collections.Array<Godot.Collections.Dictionary>();
     public Godot.Collections.Array<Godot.Collections.Dictionary> impostor_nodes = new Godot.Collections.Array<Godot.Collections.Dictionary>();
@@ -66,7 +67,7 @@ public partial class Forest : Node3D
         foreach (long kind in G.enum_values<TreeSpecies.Kind>())
         {
             TreeSpecies species = TreeSpecies.by_kind((TreeSpecies.Kind)kind);
-            Godot.Collections.Array<TreeGenerator.Result> list = new Godot.Collections.Array<TreeGenerator.Result>();
+            var list = new List<TreeGenerator.Result>();
             for (long v = 0; v < VARIANTS_PER_SPECIES; v++)
             {
                 TreeGenerator gen = new TreeGenerator();
@@ -88,8 +89,8 @@ public partial class Forest : Node3D
 
     public TreeGenerator.Result _variant_for(ScenePlan.TreeEntry entry)
     {
-        Godot.Collections.Array list = variants[(long)entry.kind].AsGodotArray();
-        return list[(int)(absi(entry.seed_value) % (long)list.Count)].As<TreeGenerator.Result>();
+        var list = variants[(long)entry.kind];
+        return list[(int)(absi(entry.seed_value) % (long)list.Count)];
     }
 
     public Transform3D _tree_transform(ScenePlan.TreeEntry entry)
@@ -124,7 +125,7 @@ public partial class Forest : Node3D
             bark.SetInstanceShaderParameter("tint", new Color(tint.X, tint.Y, tint.Z));
             AddChild(bark);
             near_instances.Add(bark);
-            Godot.Collections.Dictionary record = new Godot.Collections.Dictionary { { "entry", entry }, { "result", result }, { "xform", xform }, { "bark", bark }, { "leaves", default(Variant) } };
+            Godot.Collections.Dictionary record = new Godot.Collections.Dictionary { { "entry", entry }, { "xform", xform }, { "bark", bark }, { "leaves", default(Variant) } };
             near_records.Add(record);
 
             if (result.leaves != null)
@@ -188,7 +189,7 @@ public partial class Forest : Node3D
         Godot.Collections.Dictionary groups = new Godot.Collections.Dictionary();
         foreach (ScenePlan.TreeEntry entry in plan.far_trees())
         {
-            Godot.Collections.Array list = variants[(long)entry.kind].AsGodotArray();
+            var list = variants[(long)entry.kind];
             long index = absi(entry.seed_value) % (long)list.Count;
             string key = G.format("%d_%d_%d_%d", new Godot.Collections.Array { (long)entry.kind, index, floori(entry.position.X / FAR_CELL_SIZE), floori(entry.position.Y / FAR_CELL_SIZE) });
             if (!groups.ContainsKey(key))
@@ -204,7 +205,7 @@ public partial class Forest : Node3D
         {
             Godot.Collections.Dictionary group = groups[key2].AsGodotDictionary();
             TreeSpecies species = TreeSpecies.by_kind((TreeSpecies.Kind)group["kind"].AsInt64());
-            TreeGenerator.Result result2 = G.Index(variants[group["kind"]], group["index"]).As<TreeGenerator.Result>();
+            TreeGenerator.Result result2 = variants[group["kind"].AsInt64()][group["index"].AsInt32()];
             Godot.Collections.Array entries = group["entries"].AsGodotArray();
             Godot.Collections.Array<Transform3D> transforms = new Godot.Collections.Array<Transform3D>();
             Godot.Collections.Array<Color> customs = new Godot.Collections.Array<Color>();
@@ -214,7 +215,7 @@ public partial class Forest : Node3D
                 customs.Add(new Color((float)(result2.height / 40.0), (float)(result2.crown_center.Y / 40.0), (float)(result2.crown_radius / 20.0), (float)hash_unit(G.Index(entry2, "seed_value").AsInt64())));
             }
             far_groups.Add((species.kind, result2, TreeImpostors.key_for(species.kind, group["index"].AsInt64()), transforms, far_multimeshes.Count));
-            _add_far_multimesh(_bark_with_lods(result2.bark, G.format("far_%d_%d", new Godot.Collections.Array { G.to_int(group["kind"]), group["index"] })), far_bark_materials[species.bark_set].As<Material>(), transforms, customs, true);
+            _add_far_multimesh(result2.bark, far_bark_materials[species.bark_set].As<Material>(), transforms, customs, true);
             if (result2.leaves != null)
             {
                 // Each batch uses one mesh, so its actual off-centre crown can be
@@ -222,7 +223,7 @@ public partial class Forest : Node3D
                 string material_key = G.format("%d_%d", new Godot.Collections.Array { G.to_int(group["kind"]), group["index"] });
                 if (!far_leaf_variant_materials.ContainsKey(material_key))
                 {
-                    ShaderMaterial variant_mat = G.Call(far_leaf_materials[species.leaf_atlas], "duplicate").Obj as ShaderMaterial;
+                    ShaderMaterial variant_mat = (ShaderMaterial)far_leaf_materials[species.leaf_atlas].As<ShaderMaterial>().Duplicate();
                     variant_mat.SetShaderParameter("crown_offset", new Vector2(result2.crown_center.X, result2.crown_center.Z));
                     far_leaf_variant_materials[material_key] = variant_mat;
                 }
@@ -236,7 +237,7 @@ public partial class Forest : Node3D
     {
         ridge_groups.Add((kind, result, material_key, transforms, ridge_multimeshes.Count));
         /// The wooded ridges plant the forest's own generated variants out to 655 m:
-        /// the same bark and leaf meshes, batched per 160 m cell, with bark mesh LODs
+        /// the same bark and leaf meshes, batched per 128 m cell, with bark mesh LODs
         /// and a leaf-card thinning that only starts once cards are below a pixel.
         TreeSpecies species = TreeSpecies.by_kind(kind);
         Godot.Collections.Array<Color> customs = new Godot.Collections.Array<Color>();
@@ -244,12 +245,12 @@ public partial class Forest : Node3D
         {
             customs.Add(new Color((float)(result.height / 40.0), (float)(result.crown_center.Y / 40.0), (float)(result.crown_radius / 20.0), (float)hash_unit(i * 7919 + (long)material_key.Hash() % 1000 + (long)kind * 17)));
         }
-        _add_far_multimesh(_bark_with_lods(result.bark, "ridge_" + material_key), far_bark_materials[species.bark_set].As<Material>(), transforms, customs, true, true);
+        _add_far_multimesh(result.bark, far_bark_materials[species.bark_set].As<Material>(), transforms, customs, true, true);
         if (result.leaves != null)
         {
             if (!ridge_leaf_variant_materials.ContainsKey(material_key))
             {
-                ShaderMaterial variant_mat = G.Call(far_leaf_materials[species.leaf_atlas], "duplicate").Obj as ShaderMaterial;
+                ShaderMaterial variant_mat = (ShaderMaterial)far_leaf_materials[species.leaf_atlas].As<ShaderMaterial>().Duplicate();
                 variant_mat.SetShaderParameter("crown_offset", new Vector2(result.crown_center.X, result.crown_center.Z));
                 variant_mat.SetShaderParameter("lod_start", RIDGE_LEAF_LOD[0]);
                 variant_mat.SetShaderParameter("lod_end", RIDGE_LEAF_LOD[1]);
@@ -276,7 +277,7 @@ public partial class Forest : Node3D
         var materials = new Dictionary<string, (ShaderMaterial Color, ShaderMaterial Shadow)>();
         foreach (var group in groups)
         {
-            var baked = impostors.baked[group.Key].As<TreeImpostors.Baked>();
+            var baked = impostors.baked[group.Key];
             if (!materials.TryGetValue(group.Key, out var pair))
             {
                 pair = ((ShaderMaterial)baked.material.Duplicate(), (ShaderMaterial)baked.shadow_material.Duplicate());
@@ -329,55 +330,8 @@ public partial class Forest : Node3D
         }
     }
 
-    public ArrayMesh _bark_with_lods(ArrayMesh source, string key)
-    {
-        /// Distant bark keeps its silhouette through generated mesh LODs (the
-        /// renderer picks a level by screen size); the tubes are two thirds of a
-        /// tree's triangles and never need them at three hundred metres.
-        if (_lod_bark.ContainsKey(key))
-        {
-            return _lod_bark[key].As<ArrayMesh>();
-        }
-        // LOD generation is deterministic but expensive. Cache the native mesh
-        // by the actual source channels and engine build, so edits and upgrades
-        // invalidate it without maintaining a parallel asset manifest.
-        using var digest = new HashingContext();
-        digest.Start(HashingContext.HashType.Sha256);
-        digest.Update(System.Text.Encoding.UTF8.GetBytes("bark-lod-v1:25:60:" + Engine.GetVersionInfo()["hash"].AsString()));
-        for (int surface = 0; surface < source.GetSurfaceCount(); surface++)
-            digest.Update(GD.VarToBytes(source.SurfaceGetArrays(surface)));
-        string cacheDir = "user://cache/tree-lods";
-        string cachePath = cacheDir + "/" + Convert.ToHexString(digest.Finish()).ToLowerInvariant() + ".res";
-        if (FileAccess.FileExists(cachePath))
-        {
-            ArrayMesh cached = ResourceLoader.Load<ArrayMesh>(cachePath, "", ResourceLoader.CacheMode.Ignore);
-            if (cached != null && cached.GetSurfaceCount() == source.GetSurfaceCount())
-            {
-                _lod_bark[key] = cached;
-                return cached;
-            }
-        }
-        ImporterMesh importer = new ImporterMesh();
-        for (long surface = 0, surface_end = source.GetSurfaceCount(); surface < surface_end; surface++)
-        {
-            importer.AddSurface(source.SurfaceGetPrimitiveType((int)surface), source.SurfaceGetArrays((int)surface), new Godot.Collections.Array<Godot.Collections.Array>(), new Godot.Collections.Dictionary(), null, "", (uint)source.Call("surface_get_format", surface).AsInt64());
-        }
-        importer.GenerateLods(25.0f, 60.0f, new Godot.Collections.Array());
-        ArrayMesh mesh = importer.GetMesh();
-        if (mesh == null || mesh.GetSurfaceCount() != source.GetSurfaceCount())
-        {
-            mesh = source;
-        }
-        _lod_bark[key] = mesh;
-        if (DirAccess.MakeDirRecursiveAbsolute(ProjectSettings.GlobalizePath(cacheDir)) == Error.Ok)
-        {
-            string temporary = cachePath + "." + Guid.NewGuid().ToString("N") + ".res";
-            if (ResourceSaver.Save(mesh, temporary, ResourceSaver.SaverFlags.Compress) == Error.Ok)
-                DirAccess.RenameAbsolute(temporary, cachePath);
-        }
-        return mesh;
-    }
-
+    // TreeGenerator already emits native bark LODs. Share those meshes in
+    // every distance band instead of rebuilding and caching a second copy.
     public void _add_far_multimesh(ArrayMesh mesh, Material material, Godot.Collections.Array<Transform3D> transforms, Godot.Collections.Array<Color> customs, bool is_bark, bool ridge = false)
     {
         MultiMesh mm = new MultiMesh();
@@ -485,10 +439,9 @@ public partial class Forest : Node3D
         foreach (Godot.Collections.Dictionary record in near_records)
         {
             ScenePlan.TreeEntry entry = record["entry"].As<ScenePlan.TreeEntry>();
-            Godot.Collections.Array list = variants[(long)entry.kind].AsGodotArray();
+            var list = variants[(long)entry.kind];
             long index = absi(entry.seed_value) % (long)list.Count;
-            TreeImpostors.Baked b = G.get(impostors.baked, TreeImpostors.key_for(entry.kind, index)).As<TreeImpostors.Baked>();
-            if (b == null)
+            if (!impostors.baked.TryGetValue(TreeImpostors.key_for(entry.kind, index), out TreeImpostors.Baked b))
             {
                 continue;
             }

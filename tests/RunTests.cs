@@ -12,8 +12,10 @@ public partial class RunTests : SceneTree
     {
         await ToSignal(this, SignalName.ProcessFrame);
         int passed = 0, failed = 0;
+        string? filter = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--test=", StringComparison.Ordinal))?[7..];
         var cases = typeof(TestCase).Assembly.GetTypes()
             .Where(t => t.IsSubclassOf(typeof(TestCase)) && !t.IsAbstract)
+            .Where(t => filter == null || t.Name == filter)
             .OrderBy(t => t.Name, StringComparer.Ordinal).ToArray();
         foreach (Type type in cases)
         {

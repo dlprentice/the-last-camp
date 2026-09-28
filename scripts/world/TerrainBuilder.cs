@@ -15,11 +15,11 @@ namespace LastCamp;
 
 /// Turns a `TerrainField` into renderable and collidable geometry.
 ///
-/// One mesh: a uniform 0.5 m lattice under the camp (its heights come straight
+/// One continuous grid: a uniform 0.5 m lattice under the camp (its heights come straight
 /// from the field's baked grid, so mesh, collision and scattered plants agree
 /// exactly) that grows geometrically towards the hills 700 m away with no LOD
-/// seams. Collision is the same grid as a HeightMapShape3D, plus a coarse
-/// outer heightfield so the walkable world does not end at the fine grid.
+/// seams. Render chunks retain the exact border attributes; one static triangle
+/// collision covers the same grid, including the distant hills.
 public partial class TerrainBuilder
 {
     public const double INNER_SPACING = 0.5;
@@ -29,8 +29,6 @@ public partial class TerrainBuilder
     /// leaving distant plants several metres above or below the visible hills.
     public const double OUTER_MAX_SPACING = 4.0;
     public const double COLLISION_HALF = 85.0;
-    public const double OUTER_COLLISION_HALF = 210.0;
-    public const double OUTER_COLLISION_SPACING = 2.0;
 
     public TerrainField field;
     public List<float> _axis = new List<float>();
@@ -170,54 +168,59 @@ public partial class TerrainBuilder
         return mesh;
     }
 
-    public CollisionShape3D build_collision()
+    /// Split the existing grid without resampling. Shared border vertices keep
+    /// identical normals, material weights and heights, while each render pass
+    /// can reject whole chunks outside its frustum and shadow cascades.
+    public static Godot.Collections.Array<ArrayMesh> split_render_mesh(ArrayMesh mesh, int cells = 64)
     {
-        /// Fine collision straight from the baked height grid.
-        G.assert(field.height_grid != null, "bake_height_grid() must run before build_collision()");
-        ScalarField grid = field.height_grid;
-        HeightMapShape3D shape = new HeightMapShape3D();
-        shape.MapWidth = (int)grid.resolution;
-        shape.MapDepth = (int)grid.resolution;
-        shape.MapData = grid.data.ToArray();
-        CollisionShape3D collider = new CollisionShape3D();
-        collider.Name = "TerrainCollision";
-        collider.Shape = shape;
-        double cell = grid.cell_size();
-        collider.Scale = new Vector3((float)cell, 1.0f, (float)cell);
-        return collider;
+        if (cells < 1) throw new ArgumentOutOfRangeException(nameof(cells));
+        using var source = mesh.SurfaceGetArrays(0);
+        Vector3[] positions = source[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+        Vector3[] normals = source[(int)Mesh.ArrayType.Normal].AsVector3Array();
+        Vector2[] uv = source[(int)Mesh.ArrayType.TexUV].AsVector2Array();
+        Color[] colors = source[(int)Mesh.ArrayType.Color].AsColorArray();
+        int n = (int)Math.Sqrt(positions.Length);
+        if (n * n != positions.Length || n < 2) throw new ArgumentException("Expected a square terrain grid", nameof(mesh));
+        var result = new Godot.Collections.Array<ArrayMesh>();
+        for (int z = 0; z < n - 1; z += cells)
+            for (int x = 0; x < n - 1; x += cells)
+            {
+                int width = Math.Min(cells, n - 1 - x) + 1;
+                int depth = Math.Min(cells, n - 1 - z) + 1;
+                var p = new Vector3[width * depth];
+                var normal = new Vector3[p.Length];
+                var tex = new Vector2[p.Length];
+                var color = new Color[p.Length];
+                for (int row = 0; row < depth; row++)
+                {
+                    int first = (z + row) * n + x, dest = row * width;
+                    Array.Copy(positions, first, p, dest, width);
+                    Array.Copy(normals, first, normal, dest, width);
+                    Array.Copy(uv, first, tex, dest, width);
+                    Array.Copy(colors, first, color, dest, width);
+                }
+                var indices = new int[(width - 1) * (depth - 1) * 6];
+                int k = 0;
+                for (int row = 0; row < depth - 1; row++)
+                    for (int col = 0; col < width - 1; col++)
+                    {
+                        int a = row * width + col, b = a + 1, c = a + width, d = c + 1;
+                        indices[k++] = a; indices[k++] = b; indices[k++] = d;
+                        indices[k++] = a; indices[k++] = d; indices[k++] = c;
+                    }
+                using var arrays = new Godot.Collections.Array();
+                arrays.Resize((int)Mesh.ArrayType.Max);
+                arrays[(int)Mesh.ArrayType.Vertex] = p;
+                arrays[(int)Mesh.ArrayType.Normal] = normal;
+                arrays[(int)Mesh.ArrayType.TexUV] = tex;
+                arrays[(int)Mesh.ArrayType.Color] = color;
+                arrays[(int)Mesh.ArrayType.Index] = indices;
+                var chunk = new ArrayMesh();
+                chunk.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+                chunk.SurfaceSetMaterial(0, mesh.SurfaceGetMaterial(0));
+                result.Add(chunk);
+            }
+        return result;
     }
 
-    public CollisionShape3D build_outer_collision()
-    {
-        /// Coarse collision for the forest beyond the fine grid. Inside the fine
-        /// grid it is sunk so it can never poke through the precise surface.
-        long cells = (long)(OUTER_COLLISION_HALF * 2.0 / OUTER_COLLISION_SPACING) + 1;
-        List<float> data = new List<float>();
-        G.resize(data, (int)(cells * cells));
-        double half = (double)(cells - 1) * OUTER_COLLISION_SPACING * 0.5;
-        double sink_inside = COLLISION_HALF - 6.0;
-        for (long iz = 0; iz < cells; iz++)
-        {
-            double z = -half + (double)iz * OUTER_COLLISION_SPACING;
-            for (long ix = 0; ix < cells; ix++)
-            {
-                double x = -half + (double)ix * OUTER_COLLISION_SPACING;
-                double h = field.height_fast(x, z);
-                if (absf(x) < sink_inside && absf(z) < sink_inside)
-                {
-                    h -= 1.0;
-                }
-                data[(int)(iz * cells + ix)] = (float)h;
-            }
-        }
-        HeightMapShape3D shape = new HeightMapShape3D();
-        shape.MapWidth = (int)cells;
-        shape.MapDepth = (int)cells;
-        shape.MapData = data.ToArray();
-        CollisionShape3D collider = new CollisionShape3D();
-        collider.Name = "OuterTerrainCollision";
-        collider.Shape = shape;
-        collider.Scale = new Vector3((float)OUTER_COLLISION_SPACING, 1.0f, (float)OUTER_COLLISION_SPACING);
-        return collider;
-    }
 }

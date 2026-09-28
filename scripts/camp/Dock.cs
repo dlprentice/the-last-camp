@@ -38,6 +38,8 @@ public partial class Dock : Node3D
     public Godot.Collections.Array<Vector3> _piles = new Godot.Collections.Array<Vector3>();
     public RandomNumberGenerator _rng = new RandomNumberGenerator();
     public double _rope_clock = 0.0;
+    private MeshInstance3D _mooring;
+    private ArrayMesh _mooringMesh;
 
     public Dock(TerrainField p_field)
     {
@@ -73,7 +75,9 @@ public partial class Dock : Node3D
         _add_collision();
         _add_lantern();
         _moor_canoe();
-        _add_mesh("Mooring", _mooring_mesh(), PropMaterials.rope());
+        _mooringMesh = _mooring_mesh();
+        _add_mesh("Mooring", _mooringMesh, PropMaterials.rope());
+        _mooring = GetNode<MeshInstance3D>("Mooring");
         _add_skipping_stones();
     }
 
@@ -346,13 +350,14 @@ public partial class Dock : Node3D
         canoe.build(new Color(1.0f, 0.7f, 0.44f));
     }
 
-    public ArrayMesh _mooring_mesh()
+    public ArrayMesh _mooring_mesh(ArrayMesh existing = null)
     {
-        MeshBuilder mb = new MeshBuilder();
+        using MeshBuilder mb = new MeshBuilder();
         Vector3 from = _cleat_position() + new Vector3(0.0f, 0.09f, 0.0f);
         Vector3 to = ToLocal(canoe.bow_point());
         PropMeshes.add_rope(mb, from, to, 0.22, 0.011, 14);
-        return mb.commit();
+        existing?.ClearSurfaces();
+        return mb.commit(existing: existing);
     }
 
     public override void _Process(double delta)
@@ -360,11 +365,13 @@ public partial class Dock : Node3D
         // A small rope mesh follows the physically moving bow; 12 Hz is ample
         // for this slow tether and avoids reallocating it every rendered frame.
         _rope_clock += delta;
-        if (_rope_clock < 1.0 / 12.0 || canoe == null || canoe.Freeze)
+        if (_rope_clock < 1.0 / 12.0 || canoe == null || canoe.Freeze || _mooring == null)
         {
             return;
         }
         _rope_clock = fmod(_rope_clock, 1.0 / 12.0);
-        ((MeshInstance3D)GetNode("Mooring")).Mesh = _mooring_mesh();
+        // Retain the native resource and its C# wrapper. The release host
+        // reported a handle error on the former replace-per-update path.
+        _mooring_mesh(_mooringMesh);
     }
 }

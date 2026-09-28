@@ -565,10 +565,13 @@ public partial class Player : CharacterBody3D
         if (held_item != "stone" || Game.Instance.camp?.pond == null) return false;
         // A low sidearm release belongs to the player's actual position. The
         // camera supplies aim; no teleport to the dock or preselected direction.
-        Vector3 origin = GlobalPosition + Vector3.Up * (float)(crouching ? 0.65 : 1.05)
-            - GlobalBasis.Z * 0.48f + GlobalBasis.X * 0.22f;
-        bool thrown = Game.Instance.camp.pond.throw_stone(origin, -camera.GlobalBasis.Z, stone_charge);
-        if (thrown) held_item = "";
+        bool thrown = Game.Instance.camp.pond.throw_stone(_heldStone.GlobalPosition, -camera.GlobalBasis.Z, stone_charge,
+            _heldStone.Mesh, _heldStone.MaterialOverride, _heldStone.GlobalBasis);
+        if (thrown)
+        {
+            held_item = "";
+            _heldStone.Visible = false;
+        }
         else Game.Instance.hud?.notify("Let the first stone settle before throwing another.");
         stone_charge = 0;
         return thrown;

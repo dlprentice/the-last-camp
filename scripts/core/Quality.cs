@@ -128,6 +128,9 @@ public partial class Quality : Node
     {
         bool movie = Game.Instance.has_flag("film-quality") || Game.Instance.has_flag("cinematic") && !Game.Instance.has_flag("capture-quality");
         current = movie && tier == QualityPreset.Tier.ULTRA ? QualityPreset.film() : QualityPreset.for_tier(tier);
+        // Explicit diagnostic overrides also survive in-game quality changes.
+        if (Game.Instance.has_flag("sdfgi")) current.sdfgi = true;
+        if (Game.Instance.has_flag("no-sdfgi")) current.sdfgi = false;
         _apply_viewport(Game.Instance.render_viewport ?? GetTree().Root, current);
         _apply_renderer(current);
         EmitSignal(SignalName.preset_changed, current);
@@ -139,6 +142,9 @@ public partial class Quality : Node
         viewport.Scaling3DMode = p.upscaler;
         viewport.Scaling3DScale = (float)p.render_scale;
         viewport.FsrSharpness = (float)p.fsr_sharpness;
+        // Compensate part of the upscaler's negative mip bias. Fine turf and
+        // litter should retain detail without turning into sparkling pixels.
+        viewport.TextureMipmapBias = p.upscaler == Viewport.Scaling3DModeEnum.Fsr2 ? 0.35f : 0.0f;
         viewport.UseTaa = p.taa && p.upscaler != Viewport.Scaling3DModeEnum.Fsr2;
         viewport.Msaa3D = Viewport.Msaa.Disabled;
         viewport.ScreenSpaceAA = Viewport.ScreenSpaceAAEnum.Disabled;

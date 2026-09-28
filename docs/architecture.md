@@ -16,7 +16,7 @@ order. There are no editor tools, authored resource files or GDScript components
 | `scripts/world/` | Terrain field and mesh, atmosphere, time of day, weather, rain contacts, underwater effects and post processing |
 | `scripts/generation/` | Mesh builders, tree species and branching, grass and meadow generation |
 | `scripts/camp/` | Scene plan, forest, ridge coverage, understory, pond, camp props, scanned dressing, wildlife and interactions |
-| `scripts/player/` | First-person movement and photo camera |
+| `scripts/player/` | First-person movement, carried items, stone flight, the evening activity loop and photo camera |
 | `scripts/props/` | Generated prop meshes and shared materials |
 | `scripts/audio/` | Environmental sound direction, recordings and synthesis |
 | `shaders/` | Materials, water, atmosphere, clouds, particles, compute shaders and post effects |
@@ -26,6 +26,10 @@ order. There are no editor tools, authored resource files or GDScript components
 
 A baked terrain height grid is shared by the rendered mesh, collision and
 plant placement. Its sampling is dense near camp and coarser on the hills.
+Render chunks use the same triangle grid and border attributes, allowing camera
+and shadow passes to cull unseen sections. Static collision follows that grid
+across the complete landscape; distant trunks receive pooled collision bodies
+only in cells around the player.
 Habitat fields use moisture, shade and foot traffic to distribute grass,
 flowers, ferns, deadwood and shoreline plants. Spatially grouped MultiMeshes
 and authored LODs reduce submission and distant geometry cost.
@@ -33,12 +37,20 @@ and authored LODs reduce submission and distant geometry cost.
 Trees use generated branching tubes and leaf/needle cards. The surrounding
 ridges reuse those species at lower generator detail; they are not a painted
 skyline. Wind uses a shared field so neighbouring materials respond coherently.
-Tree impostors are an optional experiment, disabled by default.
+Lit, six-view canopy atlases replace distant ridge geometry by default, with
+full trees returning near the player. Near-forest atlases remain an optional
+`--impostors` comparison; the camp's nearest trees keep their full geometry.
+Grass buffers retain their prepared capacity when quality decreases. A stable,
+spatially distributed instance prefix lowers density without moving surviving
+plants; returning to the prepared tier reuses the buffers. Higher density or
+coverage than already prepared still requires a worker plan and upload.
 
 The sky integrates an authored single-scattering atmosphere and volumetric
 clouds. The same day/night state drives sun, moon, fog, ambient light and
-material response. Godot provides shadow maps, SDFGI, SSIL, SSAO, volumetric
-fog, particles and antialiasing. These are raster rendering techniques, not
+material response. The normal presets use shadow maps, sky lighting, SSAO and
+(on High/Ultra) SSIL, with volumetric fog, particles and antialiasing. SDFGI is
+disabled after repeatable device loss on the tested engine/driver combination;
+its diagnostic opt-in is not a validated play configuration. These are raster rendering techniques, not
 hardware ray tracing or a path-traced final image.
 
 ## Pond and weather
@@ -71,6 +83,13 @@ complete ecological simulation. The audio director combines credited field
 recordings with generated wildlife calls and Foley, applying distance,
 shelter and underwater filtering. `CampScore.cs` is a retained synthesis
 study; the film does not construct its music player.
+
+Normal play starts directly on the trail. `CampSession` advances an unhurried
+evening around fire tending, lantern use and scored stone skipping, with a paused
+journal and sleep to a playable morning. Stone throws use fixed-step ballistic
+integration, incidence-dependent water contacts and energy loss on each skip.
+The held mesh becomes the flying stone at release. Scores persist locally;
+there is no resource countdown or survival failure condition.
 
 ## Cameras and output
 

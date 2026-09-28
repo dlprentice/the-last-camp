@@ -689,11 +689,14 @@ public partial class Pond : Node3D
         }
     }
 
-    public bool throw_stone(Vector3 origin, Vector3 direction, double charge)
+    public bool throw_stone(Vector3 origin, Vector3 direction, double charge, Mesh mesh = null, Material stoneMaterial = null, Basis? basis = null)
     {
         if (_skip_age >= 0 || _playerStone?.Active == true || direction.LengthSquared() < 0.01) return false;
         _playerStone = new StoneFlight(origin, direction, (float)charge);
         _stoneAccumulator = 0;
+        if (mesh != null) _stone.Mesh = mesh;
+        if (stoneMaterial != null) _stone.MaterialOverride = stoneMaterial;
+        if (basis.HasValue) _stone.GlobalBasis = basis.Value;
         _stone.GlobalPosition = origin;
         _stone.Visible = true;
         return true;
@@ -723,7 +726,8 @@ public partial class Pond : Node3D
             }
         }
         _stone.GlobalPosition = _playerStone.Position;
-        _stone.RotateZ((float)(delta * 18));
+        // Rotate around the stone's plane normal without shearing its flat scale.
+        _stone.GlobalRotate(_stone.GlobalBasis.Y.Normalized(), (float)(delta * 18));
         if (!_playerStone.Active)
         {
             last_skips = _playerStone.Skips;

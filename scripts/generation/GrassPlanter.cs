@@ -155,6 +155,29 @@ public partial class GrassPlanter
         return new Godot.Collections.Array<Chunk>(groups.Values);
     }
 
+    /// Keep every instance intact but distribute prefixes across the whole cell.
+    /// MultiMesh.VisibleInstanceCount can then lower density without reallocating
+    /// buffers or retaining just the first of four merged placement cells.
+    public static float[] upload_buffer(Chunk chunk)
+    {
+        float[] buffer = chunk.buffer.ToArray();
+        const int stride = (int)FLOATS_PER_INSTANCE;
+        uint state = unchecked((uint)(int)chunk.origin.X * 73856093u ^
+                               (uint)(int)chunk.origin.Y * 19349663u ^ 0x9e3779b9u);
+        if (state == 0) state = 1;
+        for (int i = (int)chunk.count - 1; i > 0; i--)
+        {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            int other = (int)(state % (uint)(i + 1));
+            for (int j = 0; j < stride; j++)
+                (buffer[i * stride + j], buffer[other * stride + j]) =
+                    (buffer[other * stride + j], buffer[i * stride + j]);
+        }
+        return buffer;
+    }
+
     public double _chunk_coverage(Vector2 origin)
     {
         /// Average suitability over the chunk decides how many candidates to try.

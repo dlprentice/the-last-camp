@@ -25,7 +25,7 @@ public partial class TreeImpostors : Node3D
     public const double SWITCH_DISTANCE = 65.0;
     public const double SWITCH_MARGIN = 4.0;
 
-    public partial class Baked : RefCounted
+    public sealed class Baked
     {
         public ImageTexture albedo;
         public ImageTexture normal;
@@ -36,7 +36,7 @@ public partial class TreeImpostors : Node3D
         public ArrayMesh quad;
     }
 
-    public Godot.Collections.Dictionary baked = new Godot.Collections.Dictionary();
+    public readonly Dictionary<string, Baked> baked = new();
     public double bake_seconds = 0.0;
     public SubViewport _viewport;
     public Camera3D _camera;
@@ -59,14 +59,14 @@ public partial class TreeImpostors : Node3D
         // Freeze the sway while baking; the world controller writes the real gust
         // back into the global every frame once the build continues.
         RenderingServer.GlobalShaderParameterSet("wind_strength", 0.0);
-        foreach (Variant kind_key in forest.variants.Keys)
+        foreach (long kind_key in forest.variants.Keys)
         {
-            TreeSpecies.Kind kind = (TreeSpecies.Kind)kind_key.AsInt64();
+            TreeSpecies.Kind kind = (TreeSpecies.Kind)kind_key;
             TreeSpecies species = TreeSpecies.by_kind(kind);
-            Godot.Collections.Array list = forest.variants[(long)kind].AsGodotArray();
+            var list = forest.variants[(long)kind];
             for (long index = 0, index_end = (long)list.Count; index < index_end; index++)
             {
-                await _bake_variant(forest, species, index, list[(int)index].As<TreeGenerator.Result>());
+                await _bake_variant(forest, species, index, list[(int)index]);
             }
         }
         RenderingServer.GlobalShaderParameterSet("impostor_bake", 0);
@@ -89,7 +89,7 @@ public partial class TreeImpostors : Node3D
             {
                 if (baked.ContainsKey(group.Key)) continue;
                 await _bake_variant(forest, TreeSpecies.by_kind(group.Kind), 0, group.Mesh, group.Key);
-                var entry = baked[group.Key].As<Baked>();
+                var entry = baked[group.Key];
                 entry.material.SetShaderParameter("use_instance_custom", true);
                 entry.shadow_material.SetShaderParameter("use_instance_custom", true);
             }

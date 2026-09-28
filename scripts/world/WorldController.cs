@@ -710,7 +710,9 @@ public partial class WorldController : Node3D
         post.set_param("grain", lerpf(0.005, 0.007, day));
         post.set_param("vignette", photo ? 0.16 : 0.12);
         post.set_param("chromatic", 0.025);
-        post.set_param("sharpen", 0.13);
+        // FSR already sharpens its output; another pass accentuates vegetation
+        // aliasing. Native TAA keeps a restrained compensation of its own.
+        post.set_param("sharpen", Quality.Instance.current.upscaler == Viewport.Scaling3DModeEnum.Fsr2 ? 0.0 : 0.10);
         post.set_param("entry_age", lens_entry_age);
         post.set_param("exit_age", lens_exit_age);
         _update_waterline();

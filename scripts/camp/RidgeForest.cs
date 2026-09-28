@@ -32,7 +32,7 @@ public partial class RidgeForest : Node3D
     public Godot.Collections.Dictionary species_counts = new Godot.Collections.Dictionary();
     public TerrainField field;
     public Forest forest;
-    public Godot.Collections.Dictionary _variants = new Godot.Collections.Dictionary();
+    public readonly Dictionary<string, TreeGenerator.Result> _variants = new();
     public double _detail_scale = 1.0;
     public bool _far_band = true;
 
@@ -79,7 +79,10 @@ public partial class RidgeForest : Node3D
         age_noise.Seed = 824;
         age_noise.Frequency = 0.010f;
         Godot.Collections.Dictionary groups = new Godot.Collections.Dictionary();
-        Godot.Collections.Dictionary occupied = new Godot.Collections.Dictionary();
+        // This search runs millions of times during construction. Keep its
+        // spatial index in managed memory, without allocating native Variant
+        // arrays for every empty neighbour. Placement and random draws stay exact.
+        var occupied = new Dictionary<Vector2I, List<Vector3>>();
         double SPACE_CELL = 3.0;
         // Random disc sampling with local spacing avoids visible planting rows
         // on distant slopes and in elevated camera views.
@@ -123,17 +126,18 @@ public partial class RidgeForest : Node3D
             Vector2I cell = new Vector2I((int)floori(p.X / SPACE_CELL), (int)floori(p.Y / SPACE_CELL));
             bool crowded = false;
             // Three cells cover the largest pair spacing, including mixed ages.
-            for (long z = -3; z < 4; z++)
+            for (long z = -3; z < 4 && !crowded; z++)
             {
-                for (long x = -3; x < 4; x++)
+                for (long x = -3; x < 4 && !crowded; x++)
                 {
-                    foreach (Variant other_item in G.Iter(G.get(occupied, cell + new Vector2I((int)x, (int)z), new Godot.Collections.Array())))
+                    if (!occupied.TryGetValue(cell + new Vector2I((int)x, (int)z), out var neighbours)) continue;
+                    foreach (Vector3 other in neighbours)
                     {
-                        Vector3 other = other_item.AsVector3();
                         double gap = (spacing + other.Z) * 0.5;
                         if (p.DistanceSquaredTo(new Vector2(other.X, other.Y)) < gap * gap)
                         {
                             crowded = true;
+                            break;
                         }
                     }
                 }
@@ -144,9 +148,9 @@ public partial class RidgeForest : Node3D
             }
             if (!occupied.ContainsKey(cell))
             {
-                occupied[cell] = new Godot.Collections.Array();
+                occupied[cell] = new List<Vector3>();
             }
-            G.Call(occupied[cell], "append", new Vector3(p.X, p.Y, (float)spacing));
+            occupied[cell].Add(new Vector3(p.X, p.Y, (float)spacing));
             double y = field.surface_height(p.X, p.Y);
             // The same mix as the woodland around the camp: a third conifers in
             // stands that follow the habitat noise, the rest oak-led broadleaf.
@@ -196,9 +200,13 @@ public partial class RidgeForest : Node3D
             species_counts[(long)kind] = G.op("+", G.get(species_counts, (long)kind, 0), 1);
             tree_count += 1;
         }
+        using var placementHash = new HashingContext();
+        placementHash.Start(HashingContext.HashType.Sha256);
         foreach (Variant key2 in groups.Keys)
         {
             Godot.Collections.Dictionary group = groups[key2].AsGodotDictionary();
+            placementHash.Update(GD.VarToBytes(key2));
+            placementHash.Update(GD.VarToBytes(group["transforms"]));
             string variant_key = G.format("%d_%d_%d", new Godot.Collections.Array { group["band"], G.to_int(group["kind"]), group["variant"] });
             forest.add_ridge_group((TreeSpecies.Kind)group["kind"].AsInt64(), _variant(group["band"].AsInt64(), (TreeSpecies.Kind)group["kind"].AsInt64(), group["variant"].AsInt64()), variant_key, group["transforms"].AsGodotArray<Transform3D>());
         }
@@ -208,6 +216,7 @@ public partial class RidgeForest : Node3D
             summary.Add(G.format("%s=%d", new Godot.Collections.Array { G.enum_keys<TreeSpecies.Kind>()[kind2.AsInt32()].ToLowerInvariant(), species_counts[kind2] }));
         }
         G.print(G.format("Wooded ridges: %d trees out to %.0f m (%s) in %d batches", new Godot.Collections.Array { tree_count, OUTER, string.Join(" ", summary), (long)groups.Count }));
+        GD.Print($"RIDGE_PLACEMENT sha256={Convert.ToHexString(placementHash.Finish()).ToLowerInvariant()}");
     }
 
     public TreeGenerator.Result _variant(long band, TreeSpecies.Kind kind, long index)
@@ -219,6 +228,6 @@ public partial class RidgeForest : Node3D
             TreeGenerator gen = new TreeGenerator();
             _variants[key] = gen.generate(TreeSpecies.variant(kind, index), G.to_int(spec["seed"]) + (long)kind * 100 + index * 17, G.to_float(spec["detail"]) * _detail_scale);
         }
-        return _variants[key].As<TreeGenerator.Result>();
+        return _variants[key];
     }
 }

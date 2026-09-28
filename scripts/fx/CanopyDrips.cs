@@ -107,12 +107,12 @@ public partial class CanopyDrips : Node3D
             {
                 continue;
             }
-            Godot.Collections.Array variants = _camp.forest.variants[(long)entry.kind].AsGodotArray();
+            var variants = _camp.forest.variants[(long)entry.kind];
             if ((variants.Count == 0))
             {
                 continue;
             }
-            TreeGenerator.Result result = variants[(int)(absi(entry.seed_value) % (long)variants.Count)].As<TreeGenerator.Result>();
+            TreeGenerator.Result result = variants[(int)(absi(entry.seed_value) % (long)variants.Count)];
             double scale = entry.scale;
             double base_y = _camp.field.surface_height(entry.position.X, entry.position.Y) - 0.12 * scale;
             double crown_radius = result.crown_radius * scale;
