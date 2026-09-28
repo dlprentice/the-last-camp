@@ -113,7 +113,9 @@ vec2 parallax(vec2 uv, vec3 view_ts, vec4 m, vec2 dx, vec2 dy, float depth_scale
 	// Linear interpolation between the last two samples.
 	float after = cur_h - cur_layer;
 	float before = prev_h - (cur_layer - layer_depth);
-	float t = clamp(after / max(after - before, 1e-4), 0.0, 1.0);
+	// At the crossing, after <= 0 and before >= 0. Keep the denominator
+	// negative; a positive epsilon would clamp every overshoot back to zero.
+	float t = clamp(after / min(after - before, -1e-4), 0.0, 1.0);
 	return cur + delta * t;
 }
 

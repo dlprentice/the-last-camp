@@ -151,6 +151,34 @@ exported benchmark and complete 15-waypoint interaction route also completed
 without errors or a new core/kernel GPU fault. This fixes a lifetime risk at the observed
 call; it is not a claim that all earlier native failures share that cause.
 
+A failed shader experiment was stopped with SIGTERM and then crashed in the
+NVIDIA native library. Another thread was in process-exit cleanup while a GPU
+compiler worker was still active; no new Xid or OOM kill accompanied that run.
+This is evidence of overlapping termination and rendering, not a proven driver
+or engine root cause. SIGTERM now requests the game's normal audio/engine cleanup
+from the main thread. A small Forward+ probe completed controlled termination
+with status 143 and no new core or kernel GPU fault. Full exported checks then
+exposed a separate shutdown hang, both with SIGTERM and ordinary capture
+completion. Native inspection found `exit_languages_threads()` waiting for
+worker acknowledgements: in one capture, both queues were empty and all 24
+workers were idle, but only eight had acknowledged the pre-exit state.
+
+Normal shutdown now stops drawing, unloads the scene, drains managed resource
+finalizers and flushes rendering commands while the main loop is still alive,
+then allows a short settling interval before quitting. The subsequent exported
+High 1080p ground capture exited normally with status zero and no engine error.
+This is a project-side mitigation for the observed shutdown case, not an engine
+patch. Exported SIGTERM and exit during loading still need retesting with this
+change. The separate earlier device-loss failures also remain unexplained.
+
+The terrain relief shader had a signed-denominator error that prevented
+interpolation between its last two height samples. An analytic GPU probe failed
+at four of five detail settings before the fix and passed all five afterward,
+within the HDR target's rounding tolerance. Full-size ground and camp views were
+inspected. An invisible-foliage-work experiment showed no material saving in
+three controlled views and was removed; its first-view apparent gain coincided
+with changed geometry counts and is not accepted as an optimization result.
+
 Full-size prop views were inspected for canoe ends/seats, pier stones, stacked
 wood, table joins, fire detail and the tent. Fresh daylight and dawn route views
 were also inspected. Grass still has visible fine-detail aliasing, and complete

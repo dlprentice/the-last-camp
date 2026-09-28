@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using GdRuntime;
@@ -76,6 +78,8 @@ public partial class Game : Node
     /// Parsed `--key=value` / `--flag` arguments passed after `--` on the command line.
     public Godot.Collections.Dictionary user_args = new Godot.Collections.Dictionary();
     public bool _quitting = false;
+    private PosixSignalRegistration _terminationSignal;
+    private int _terminationRequested;
 
     public async void quit_cleanly(long code = 0)
     {
@@ -88,6 +92,16 @@ public partial class Game : Node
         _quitting = true;
         GetTree().Paused = true;
         _stop_audio(GetTree().Root);
+        await ToSignal(GetTree().CreateTimer(0.25, true, false, true), SceneTreeTimer.SignalName.Timeout);
+        // Release scene resources while the main loop and renderer are alive.
+        // In 4.8 dev6, quitting with queued worker tasks can leave the
+        // worker pool asleep during exit_languages_threads(). Keep processing
+        // briefly after unloading, without submitting any new rendered frames.
+        RenderingServer.RenderLoopEnabled = false;
+        GetTree().UnloadCurrentScene();
+        ClearSceneReferences();
+        G.drain_finalizers();
+        RenderingServer.ForceSync();
         await ToSignal(GetTree().CreateTimer(0.25, true, false, true), SceneTreeTimer.SignalName.Timeout);
         GetTree().Quit((int)code);
     }
@@ -107,6 +121,17 @@ public partial class Game : Node
     public override void _Ready()
     {
         ProcessMode = Node.ProcessModeEnum.Always;
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            // Default runtime termination can tear the native graphics driver
+            // down while Godot still renders. Only set a managed flag here:
+            // engine and audio cleanup must run on the main thread.
+            _terminationSignal = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+            {
+                context.Cancel = true;
+                Interlocked.Exchange(ref _terminationRequested, 1);
+            });
+        }
         user_args = parse_user_args(new List<string>(OS.GetCmdlineUserArgs()));
         _apply_movie_size();
         _apply_mouse_mode();
@@ -114,6 +139,15 @@ public partial class Game : Node
         {
             InputMap.AddAction("camp_journal");
             InputMap.ActionAddEvent("camp_journal", new InputEventKey { PhysicalKeycode = Key.J });
+        }
+    }
+
+    public override void _Process(double _delta)
+    {
+        if (Interlocked.Exchange(ref _terminationRequested, 0) != 0)
+        {
+            GD.Print("PROCESS_STOP SIGTERM: shutting down through the engine");
+            quit_cleanly(143);
         }
     }
 
@@ -266,6 +300,15 @@ public partial class Game : Node
 
     public override void _ExitTree()
     {
+        _terminationSignal?.Dispose();
+        _terminationSignal = null;
+        ClearSceneReferences();
+        if (Instance == this) Instance = null;
+        G.drain_finalizers();
+    }
+
+    private void ClearSceneReferences()
+    {
         player = null;
         world = null;
         camp = null;
@@ -274,7 +317,5 @@ public partial class Game : Node
         photo_camera = null;
         render_viewport = null;
         session = null;
-        if (Instance == this) Instance = null;
-        G.drain_finalizers();
     }
 }

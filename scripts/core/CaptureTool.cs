@@ -601,6 +601,10 @@ public partial class CaptureTool : Node
             camera.GlobalPosition = ground_relative(vp["pos"].AsVector3());
             camera.LookAt(ground_relative(vp["look"].AsVector3()), Vector3.Up);
             G.print(G.format("PROFILE viewpoint %s", vp_name));
+            // The first view may introduce foliage, shadow and reflection
+            // pipelines that the loading camera did not render. Let it settle
+            // before measuring, just as the route benchmark does.
+            await _wait(6.0);
             Godot.Collections.Dictionary rows = new Godot.Collections.Dictionary();
             foreach (Godot.Collections.Dictionary c in cases)
             {
@@ -620,7 +624,7 @@ public partial class CaptureTool : Node
                 double cpu = 0.0;
                 double frame = 0.0;
                 long objects = 0, primitives = 0, draw_calls = 0;
-                long samples = 45;
+                long samples = 90;
                 for (long i = 0; i < samples; i++)
                 {
                     await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);

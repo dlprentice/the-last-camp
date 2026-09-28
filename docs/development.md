@@ -42,6 +42,18 @@ Their reference hashes and scope are documented in [tests/fixtures](../tests/fix
 A passing CPU check does not establish rendered appearance, audio mix, traversal
 or hardware performance.
 
+The terrain shader has a separate hardware check. It renders the production
+parallax function against an analytic height field at five detail settings:
+
+```bash
+godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-parallax --probe-out="$PWD/local-data/parallax-check"
+```
+
+Use a fresh output directory. This is a small shader probe, not the game world.
+Adding `--probe-termination` leaves it drawing after `TERMINATION_PROBE_READY`;
+sending SIGTERM to that printed PID exercises the production shutdown handler.
+A handled termination logs `PROCESS_STOP SIGTERM` and exits with status 143.
+
 ## Capture, traversal and performance
 
 See [validation](validation.md) for actual coverage. Capture named views with:

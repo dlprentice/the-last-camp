@@ -65,6 +65,11 @@ public partial class ShowcaseRenderProbe : SceneTree
             Quit(1);
             return;
         }
+        if (OS.GetCmdlineUserArgs().Contains("--probe-parallax"))
+        {
+            await CheckParallax();
+            return;
+        }
         view = new SubViewport();
         view.Size = new Vector2I(768, 512);
         view.OwnWorld3D = true;
@@ -162,6 +167,88 @@ public partial class ShowcaseRenderProbe : SceneTree
         await capture("hardware_wet");
         G.print("SHOWCASE_RENDER_PROBE_DONE output=", output, " frames_drawn=", Engine.GetFramesDrawn());
         Quit(0);
+    }
+
+    private async Task CheckParallax()
+    {
+        // Exercise the production function, not a C# translation of its march.
+        // A constant-height field has an analytic intersection, independent of
+        // step count. Render the resulting UVs into a linear HDR target.
+        foreach (string path in new[] { "res://shaders/terrain.gdshader", "res://shaders/foliage.gdshader", "res://shaders/grass.gdshader" })
+        {
+            Shader source = Content.Load<Shader>(path);
+            if (source.GetShaderUniformList().Count == 0)
+            {
+                GD.PushError("Shader did not compile: " + path);
+                Quit(1);
+                return;
+            }
+        }
+        string terrain = Godot.FileAccess.GetFileAsString("res://shaders/terrain.gdshader");
+        int start = terrain.IndexOf("vec4 sample_heights(", StringComparison.Ordinal);
+        int end = terrain.IndexOf("void fragment()", start, StringComparison.Ordinal);
+        string functions = terrain[start..end];
+        var shader = new Shader { Code = """
+            shader_type canvas_item;
+            render_mode unshaded;
+            uniform sampler2D grass_orm;
+            uniform sampler2D litter_orm;
+            uniform sampler2D mud_orm;
+            uniform sampler2D path_orm;
+            uniform int parallax_steps = 4;
+            uniform float tile_near = 0.5;
+            """ + functions + """
+            void fragment() {
+                vec3 ray = normalize(vec3(1.5, 0.45, 1.0));
+                vec2 hit = parallax(UV, ray, vec4(0.0, 0.0, 0.0, 1.0),
+                    dFdx(UV), dFdy(UV), 0.2);
+                COLOR = vec4(hit, 0.0, 1.0);
+            }
+            """ };
+        using var height = Image.CreateEmpty(1, 1, false, Image.Format.Rgbaf);
+        height.Fill(new Color(0, 0, 0.375f));
+        var texture = ImageTexture.CreateFromImage(height);
+        var material = new ShaderMaterial { Shader = shader };
+        foreach (string parameter in new[] { "grass_orm", "litter_orm", "mud_orm", "path_orm" })
+            material.SetShaderParameter(parameter, texture);
+        view = new SubViewport { Size = new Vector2I(192, 32), Disable3D = true,
+            UseHdr2D = true, UseDebanding = false, RenderTargetUpdateMode = SubViewport.UpdateMode.Always };
+        Root.AddChild(view);
+        view.AddChild(new ColorRect { Size = view.Size, Material = material });
+        var rows = new Godot.Collections.Array<Godot.Collections.Dictionary>();
+        bool passed = true;
+        Vector3 ray = new Vector3(1.5f, 0.45f, 1).Normalized();
+        Vector2 shift = new Vector2(ray.X, ray.Y) / Math.Max(ray.Z, 0.5f) * (0.2f * 0.5f * (1 - 0.375f));
+        foreach (int steps in new[] { 4, 8, 16, 24, 32 })
+        {
+            material.SetShaderParameter("parallax_steps", steps);
+            for (int frame = 0; frame < 12; frame++) await ToSignal(this, SignalName.ProcessFrame);
+            await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+            using Image pixels = view.GetTexture().GetImage();
+            float maxError = 0;
+            foreach (int x in new[] { 32, 96, 160 })
+            {
+                const int y = 16;
+                Vector2 expected = new Vector2((x + 0.5f) / view.Size.X, (y + 0.5f) / view.Size.Y) - shift;
+                Color actual = pixels.GetPixel(x, y);
+                maxError = Math.Max(maxError, new Vector2(actual.R, actual.G).DistanceTo(expected));
+            }
+            bool ok = maxError < 0.0008f; // Includes the target's float16 rounding.
+            passed &= ok;
+            rows.Add(new Godot.Collections.Dictionary { { "steps", steps }, { "max_uv_error", maxError }, { "passed", ok } });
+            GD.Print($"PARALLAX_PROBE steps={steps} max_uv_error={maxError:F7} passed={ok}");
+        }
+        using var reportFile = Godot.FileAccess.Open(output.PathJoin("parallax.json"), Godot.FileAccess.ModeFlags.Write);
+        reportFile.StoreString(Json.Stringify(new Godot.Collections.Dictionary { { "passed", passed }, { "samples", rows } }, "  "));
+        GD.Print($"PARALLAX_PROBE_DONE passed={passed}");
+        if (passed && OS.GetCmdlineUserArgs().Contains("--probe-termination"))
+        {
+            // The caller sends SIGTERM only after this marker. Keep drawing
+            // until the production Game handler takes the normal quit path.
+            GD.Print($"TERMINATION_PROBE_READY pid={OS.GetProcessId()}");
+            return;
+        }
+        Quit(passed ? 0 : 1);
     }
 
     public async Task capture(string label)
