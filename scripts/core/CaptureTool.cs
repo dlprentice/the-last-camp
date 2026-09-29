@@ -455,6 +455,14 @@ public partial class CaptureTool : Node
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "sun shadow off" }, { (StringName)"apply", Callable.From(() =>
 {
     world.sun.ShadowEnabled = false;
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "contact shadows off" }, { (StringName)"apply", Callable.From(() =>
+{
+    world.sun.ShadowContactShadowsAllow = false;
+    world.moon.ShadowContactShadowsAllow = false;
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "contact shadows on" }, { (StringName)"apply", Callable.From(() =>
+{
+    world.sun.ShadowContactShadowsAllow = true;
+    world.moon.ShadowContactShadowsAllow = true;
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "soft shadows low" }, { (StringName)"apply", Callable.From(() =>
 {
     RenderingServer.DirectionalSoftShadowFilterSetQuality(RenderingServer.ShadowQuality.SoftLow);
@@ -663,6 +671,8 @@ public partial class CaptureTool : Node
                 double frame = 0.0;
                 long objects = 0, primitives = 0, draw_calls = 0;
                 double visiblePrimitives = 0, shadowPrimitives = 0, reflectedPrimitives = 0;
+                double textureMemory = 0;
+                ulong streamedMemory = 0;
                 long samples = 90;
                 for (long i = 0; i < samples; i++)
                 {
@@ -673,6 +683,8 @@ public partial class CaptureTool : Node
                     objects += (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame);
                     primitives += (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalPrimitivesInFrame);
                     draw_calls += (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame);
+                    textureMemory = Math.Max(textureMemory, Performance.GetMonitor(Performance.Monitor.RenderTextureMemUsed));
+                    streamedMemory = Math.Max(streamedMemory, TextureStreaming.GetMemoryBudgetBytesUsed());
                     visiblePrimitives += RenderingServer.ViewportGetRenderInfo(rid, RenderingServer.ViewportRenderInfoType.Visible, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
                     shadowPrimitives += RenderingServer.ViewportGetRenderInfo(rid, RenderingServer.ViewportRenderInfoType.Shadow, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
                     reflectedPrimitives += RenderingServer.ViewportGetRenderInfo(camp.pond.reflection_viewport.GetViewportRid(), RenderingServer.ViewportRenderInfoType.Visible, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
@@ -697,6 +709,8 @@ public partial class CaptureTool : Node
                 measured["main_visible_primitives"] = Math.Round(visiblePrimitives / samples);
                 measured["main_shadow_primitives"] = Math.Round(shadowPrimitives / samples);
                 measured["reflection_visible_primitives_last_submitted"] = Math.Round(reflectedPrimitives / samples);
+                measured["peak_texture_memory_bytes"] = textureMemory;
+                measured["peak_streamed_texture_memory_bytes"] = streamedMemory;
                 G.print(G.format("PROFILE %-22s gpu %6.2f ms   cpu %6.2f ms   frame %6.2f ms   objects %6d   tris %9d   draws %5d", new Godot.Collections.Array { c["name"], gpu, cpu, frame, objects, primitives, draw_calls }));
                 // The baseline mutates nothing. Do not rebuild renderer state
                 // or invalidate GI between it and the first actual experiment.
@@ -742,7 +756,8 @@ public partial class CaptureTool : Node
                 if (geometry.MaterialOverride is ShaderMaterial mat) materials.Add(mat);
                 if (node is MultiMeshInstance3D batch) Read(batch.Multimesh, path, "visible_instance_count");
             }
-            if (node is Light3D) Read(node, path, "shadow_enabled", "shadow_caster_mask");
+            if (node is Light3D) Read(node, path, "shadow_enabled", "shadow_caster_mask", "shadow_contact_shadows_allow",
+                "shadow_contact_shadows_opacity", "shadow_contact_shadows_blur");
             if (node is OmniLight3D) Read(node, path, "omni_shadow_mode");
             foreach (Node child in node.GetChildren()) nodes.Push(child);
         }

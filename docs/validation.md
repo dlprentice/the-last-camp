@@ -10,7 +10,7 @@ The conversion checks began on September 26, 2026 with
 | --- | --- |
 | C# compilation and Godot import | Passed without errors or warnings |
 | C# regression suite | 109 passed, zero failed on September 29: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, canopy partitioning, terrain seams, player-boundary motion and cached-mesh lifetime included |
-| Python tooling suite | 47 passed, zero failed |
+| Python tooling suite | 49 passed, zero failed; includes import-metadata preservation and alpha-atlas importer checks |
 | Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
 | Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte |
 | Capture dependency preflight and shell syntax | Passed |
@@ -114,11 +114,33 @@ the native buffers. Complete High arrival, pond and night-fire views saved
 1.1–2.9 ms of GPU time beyond the tighter atlases, with full-size images inspected.
 `--unbatched-canopy` retains the previous grouping for comparison. Arrays trade
 additional texture memory for fewer draws; the route measurements below include
-both canopy changes.
+both canopy changes. After assembly, the array materials now release their
+unused individual atlas bindings and the forest retires the source atlases.
+A hardware check renders identically after source release and managed collection.
 The exported High gameplay route subsequently passed all 15 waypoints,
 interactions, preset changes and the evening-to-morning session with zero
 failures. A 96-second 1080p/24 diagnostic recording with native audio was
 retained; its offline frame rate is not a gameplay-performance measurement.
+
+The opaque PBR maps now use the native
+[4.8 mip-streaming importer](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-5/)
+with projection-aware shader feedback. Their pixels and attribution are unchanged.
+An isolated hardware check reduced one hidden texture from 5,592,432 to 87,408
+resident bytes, restored it in 98 ms, and matched both the initial full-source
+reference and restored image exactly. An initial failed probe exposed a dev6
+first-feedback/LOD-override ordering issue; baking now initializes feedback before
+pinning full detail. Complete exported High route comparisons measured 34.18 ms
+with streaming and 34.32 ms with full residency. Peak renderer texture memory
+fell by only 11.5 MB on that route: most of its shared materials remain visible.
+This is not evidence of a frame-rate improvement or large world-wide savings.
+
+High and Ultra also enable the short
+[dev6 directional contact-shadow pass](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-6/).
+A supported-object fixture shows localized darkening at contact edges. Full-size
+arrival/table comparisons were inspected; the effect is subtle. Exported table
+and pond on/off measurements differed by roughly 0.1–0.2 ms of main-view GPU time.
+Medium and Low leave the pass off. It supplements the shadow maps and does not
+resolve all foliage aliasing.
 
 The feature profiler now preserves the fire's original shadow projection,
 takes each view's lighting snapshot at its authored hour, and avoids reassigning
@@ -153,6 +175,20 @@ described above. All three presets had zero frame intervals over 100 ms.
 Renderer memory peaked at roughly 2.50–2.73 GB, and process peak working set
 reached 6.12 GB across the sequential presets. No generation-two managed
 collection occurred during these short measurements.
+
+A subsequent High-only export with streaming, contact shadows and temporary
+canopy-atlas release measured **34.63 ms mean / 46.02 ms p99 (28.9 FPS)**.
+Peak renderer memory fell from 2.715 GB in the preceding streaming-only export
+to **2.212 GB**, with peak texture memory falling from 2.011 GB to **1.508 GB**.
+The source-atlas release accounts for approximately 503 MB of net savings; no
+frame-rate gain is claimed. Startup was 44.4 seconds including warm-up, and the
+22-second route had no frame over 100 ms. Medium/Low figures above predate these
+three additions and have not been remeasured for this checkpoint.
+The same exported build then passed the complete 15-waypoint interaction,
+boundary, quality-switch, journal and sleep-to-dawn traversal with zero failures
+or ordinary fall recovery. Full-size trail, table, pond and dawn images were
+inspected. No Godot core or NVIDIA Xid accompanied these runs.
+
 Godot's static-memory and water-subview timing counters returned zero and are
 unavailable measurements, not zero cost. A manual grass-LOD experiment added
 hitches without improving mean frame rate and was removed. A conservative

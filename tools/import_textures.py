@@ -201,7 +201,24 @@ def pack_set(name: str, files: dict, size: int) -> None:
 # ------------------------------------------------------------------ godot import settings
 
 
+def is_streamed(png: pathlib.Path) -> bool:
+    # Only opaque PBR maps. Alpha-cutout atlases keep the ordinary importer
+    # and its alpha-border handling; generated runtime atlases are separate.
+    return any(png.name == f"{name}_{channel}.png"
+               for name in MANIFEST for channel in ("albedo", "normal", "orm"))
+
+
 def import_params(png: pathlib.Path) -> str:
+    if is_streamed(png):
+        return """compress/high_quality=true
+compress/hdr_compression=1
+compress/normal_map=2
+compress/channel_pack=0
+roughness/mode=0
+roughness/src_normal=""
+streaming/min_lod_override=0
+streaming/max_lod_override=0
+"""
     lossless = png.name.startswith("noise_")
     mode = 0 if lossless else 2
     return f"""compress/mode={mode}
@@ -239,12 +256,16 @@ def write_import(png: pathlib.Path) -> None:
             uid = match.group(1)
     source = f"res://textures/{png.name}"
     digest = hashlib.md5(source.encode()).hexdigest()
-    dest = f"res://.godot/imported/{png.name}-{digest}.ctex"
+    streamed = is_streamed(png)
+    extension = "stex" if streamed else "ctex"
+    importer = "streamed_texture_2d" if streamed else "texture"
+    resource_type = "StreamedTexture2D" if streamed else "CompressedTexture2D"
+    dest = f"res://.godot/imported/{png.name}-{digest}.{extension}"
     uid_line = f'uid="{uid}"\n' if uid else ""
     import_path.write_text(
         "[remap]\n\n"
-        'importer="texture"\n'
-        'type="CompressedTexture2D"\n'
+        f'importer="{importer}"\n'
+        f'type="{resource_type}"\n'
         f"{uid_line}"
         f'path="{dest}"\n'
         "metadata={\n"
@@ -267,11 +288,19 @@ def main() -> None:
     parser.add_argument("--res", default="2k", help="source resolution to download (1k, 2k, 4k)")
     parser.add_argument("--skip-import-files", action="store_true")
     parser.add_argument("--credits-only", action="store_true", help="refresh complete credits without downloading or changing textures")
+    parser.add_argument("--imports-only", action="store_true", help="refresh import settings for shipped textures without repacking or changing credits")
     args = parser.parse_args()
     if args.credits_only:
         write_sources()
         return
     only = {s for s in args.only.split(",") if s}
+    if args.imports_only:
+        selected = [png for png in sorted(TEX.glob("*.png"))
+                    if not only or any(png.stem == name or png.stem.startswith(name + "_") for name in only)]
+        for png in selected:
+            write_import(png)
+        print(f"wrote import settings for {len(selected)} shipped textures")
+        return
     for name, (source, asset) in MANIFEST.items():
         if only and name not in only:
             continue

@@ -21,6 +21,45 @@ BAKE_SPEC = importlib.util.spec_from_file_location("asset_test_baker", ROOT / "t
 baker = importlib.util.module_from_spec(BAKE_SPEC)
 sys.modules[BAKE_SPEC.name] = baker  # dataclass type resolution needs the module registered.
 BAKE_SPEC.loader.exec_module(baker)
+TEXTURE_SPEC = importlib.util.spec_from_file_location("asset_test_textures", ROOT / "tools/import_textures.py")
+textures = importlib.util.module_from_spec(TEXTURE_SPEC)
+TEXTURE_SPEC.loader.exec_module(textures)
+
+
+class TextureImports(unittest.TestCase):
+    def test_imports_only_preserves_images_credits_uids_and_unselected_maps(self):
+        base = ROOT / "local-data" / "asset-tool-tests"
+        base.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=base) as directory:
+            folder = Path(directory)
+            image = folder / "bark_oak_albedo.png"
+            image.write_bytes(b"retained opaque image")
+            sidecar = image.with_suffix(".png.import")
+            sidecar.write_text('[remap]\nuid="uid://retained"\n')
+            leaf = folder / "leaves_oak.png"
+            leaf.write_bytes(b"retained alpha cutout")
+            leaf.with_suffix(".png.import").write_text("retained cutout options")
+            credits = folder / "SOURCES.md"
+            credits.write_text("retained credits")
+            with mock.patch.object(textures, "TEX", folder), \
+                 mock.patch.object(textures, "pack_set") as repack, \
+                 mock.patch.object(sys, "argv", ["import_textures.py", "--imports-only", "--only=bark_oak"]), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                textures.main()
+            repack.assert_not_called()
+            self.assertEqual(image.read_bytes(), b"retained opaque image")
+            self.assertEqual(credits.read_text(), "retained credits")
+            self.assertEqual(leaf.with_suffix(".png.import").read_text(), "retained cutout options")
+            metadata = sidecar.read_text()
+            self.assertIn('uid="uid://retained"', metadata)
+            self.assertIn('type="StreamedTexture2D"', metadata)
+            self.assertIn('source_file="res://textures/bark_oak_albedo.png"', metadata)
+            self.assertIn("compress/normal_map=2", metadata)
+
+    def test_alpha_atlases_and_utility_maps_keep_the_ordinary_importer(self):
+        for name in ("leaves_oak.png", "fern.png", "flowers.png", "noise_rgba.png", "detail_normal.png"):
+            self.assertFalse(textures.is_streamed(Path(name)), name)
+            self.assertIn("process/fix_alpha_border=true", textures.import_params(Path(name)))
 
 
 def credit_row(name: str, creator: str = "Original Creator", date: str = "2026-09-10") -> str:

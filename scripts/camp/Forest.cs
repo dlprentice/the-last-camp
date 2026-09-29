@@ -334,6 +334,9 @@ public partial class Forest : Node3D
             trees += instance;
         }
         GD.Print($"Batched canopy: {trees} trees in {cells} spatial families (previously {ridge_groups.Count} variant groups)");
+        // Every cell now holds the independent array material. The temporary
+        // individual atlases no longer need to occupy another copy of VRAM.
+        impostors.baked.Clear();
     }
 
     public void attach_far_impostors(TreeImpostors impostors) => attach_group_impostors(impostors, far_groups, far_multimeshes, 70);

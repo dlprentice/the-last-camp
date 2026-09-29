@@ -96,6 +96,10 @@ public partial class TreeImpostors : Node3D
                 material.Shader = Content.Load<Shader>("res://shaders/tree_impostor_multimesh.gdshader");
                 material.SetShaderParameter("use_instance_custom", true);
                 material.SetShaderParameter("use_atlas_array", true);
+                // The array owns its copied pixels. Do not retain the first
+                // source's unused 2D atlas through the duplicated material.
+                material.SetShaderParameter("albedo_atlas", default(Variant));
+                material.SetShaderParameter("normal_atlas", default(Variant));
                 material.SetShaderParameter("albedo_layers", albedo);
                 material.SetShaderParameter("normal_layers", normals);
                 material.SetShaderParameter("quad_geometry", sizes);
@@ -127,24 +131,30 @@ public partial class TreeImpostors : Node3D
             return;
         }
         long t0 = (long)Time.GetTicksMsec();
+        int streamingLimit = await pin_bake_textures();
         _setup_viewport();
         // Freeze the sway while baking; the world controller writes the real gust
         // back into the global every frame once the build continues.
         RenderingServer.GlobalShaderParameterSet("wind_strength", 0.0);
-        foreach (long kind_key in forest.variants.Keys)
+        try
         {
-            TreeSpecies.Kind kind = (TreeSpecies.Kind)kind_key;
-            TreeSpecies species = TreeSpecies.by_kind(kind);
-            var list = forest.variants[(long)kind];
-            for (long index = 0, index_end = (long)list.Count; index < index_end; index++)
+            foreach (long kind_key in forest.variants.Keys)
             {
-                await _bake_variant(forest, species, index, list[(int)index]);
+                TreeSpecies.Kind kind = (TreeSpecies.Kind)kind_key;
+                TreeSpecies species = TreeSpecies.by_kind(kind);
+                var list = forest.variants[(long)kind];
+                for (long index = 0, index_end = (long)list.Count; index < index_end; index++)
+                    await _bake_variant(forest, species, index, list[(int)index]);
             }
         }
-        RenderingServer.GlobalShaderParameterSet("impostor_bake", 0);
-        RenderingServer.GlobalShaderParameterSet("wind_strength", 1.0);
-        _viewport.QueueFree();
-        _viewport = null;
+        finally
+        {
+            TextureStreaming.MaxLodOverride = streamingLimit;
+            RenderingServer.GlobalShaderParameterSet("impostor_bake", 0);
+            RenderingServer.GlobalShaderParameterSet("wind_strength", 1.0);
+            _viewport.QueueFree();
+            _viewport = null;
+        }
         bake_seconds = ((long)Time.GetTicksMsec() - t0) / 1000.0;
         G.print(G.format("Tree impostors: %d variants baked in %.1f s", new Godot.Collections.Array { (long)baked.Count, bake_seconds }));
     }
@@ -153,6 +163,7 @@ public partial class TreeImpostors : Node3D
     {
         if (DisplayServer.GetName() == "headless") return;
         ulong start = Time.GetTicksMsec();
+        int streamingLimit = await pin_bake_textures();
         _setup_viewport();
         RenderingServer.GlobalShaderParameterSet("wind_strength", 0.0);
         try
@@ -168,12 +179,32 @@ public partial class TreeImpostors : Node3D
         }
         finally
         {
+            TextureStreaming.MaxLodOverride = streamingLimit;
             RenderingServer.GlobalShaderParameterSet("impostor_bake", 0);
             RenderingServer.GlobalShaderParameterSet("wind_strength", 1.0);
             _viewport.QueueFree();
             _viewport = null;
         }
         GD.Print($"Ridge canopy atlases: {baked.Count} variants in {(Time.GetTicksMsec() - start) / 1000.0:F1}s");
+    }
+
+    private async Task<int> pin_bake_textures()
+    {
+        // A one-frame bake has no time to request missing mips through feedback.
+        // Pin the source textures while baking, then return to the user's policy.
+        int previous = TextureStreaming.MaxLodOverride;
+        // dev6 initializes its tracked mip from the active limit on first
+        // feedback. Initialize it before changing that limit, or a coarse
+        // freshly loaded texture can be misreported as fully resident.
+        var initial = ToSignal(TextureStreaming.Singleton, TextureStreaming.SignalName.FlushCompleted);
+        TextureStreaming.FlushTextureStreaming();
+        await initial;
+        TextureStreaming.MaxLodOverride = 0;
+        var completion = ToSignal(TextureStreaming.Singleton, TextureStreaming.SignalName.FlushCompleted);
+        TextureStreaming.FlushTextureStreaming();
+        await completion;
+        RenderingServer.ForceSync();
+        return previous;
     }
 
     public void _setup_viewport()

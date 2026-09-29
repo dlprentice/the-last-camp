@@ -117,6 +117,16 @@ public partial class ShowcaseRenderProbe : SceneTree
         camera.Fov = 42;
         view.AddChild(camera);
         camera.MakeCurrent();
+        if (OS.GetCmdlineUserArgs().Contains("--probe-contact-shadows"))
+        {
+            await CheckContactShadows(sun);
+            return;
+        }
+        if (OS.GetCmdlineUserArgs().Contains("--probe-texture-streaming"))
+        {
+            await CheckTextureStreaming();
+            return;
+        }
         if (OS.GetCmdlineUserArgs().Contains("--probe-canopy-batches"))
         {
             await CheckCanopyBatches();
@@ -177,6 +187,127 @@ public partial class ShowcaseRenderProbe : SceneTree
         await capture("hardware_wet");
         G.print("SHOWCASE_RENDER_PROBE_DONE output=", output, " frames_drawn=", Engine.GetFramesDrawn());
         Quit(0);
+    }
+
+    private async Task CheckContactShadows(DirectionalLight3D sun)
+    {
+        sun.ShadowBias = 0.025f;
+        sun.ShadowNormalBias = 1.6f;
+        sun.ShadowContactShadowsOpacity = 0.85f;
+        sun.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel2Splits;
+        sun.DirectionalShadowMaxDistance = 80;
+        RenderingServer.DirectionalShadowAtlasSetSize(2048, true);
+        RenderingServer.DirectionalSoftShadowFilterSetQuality(RenderingServer.ShadowQuality.SoftMedium);
+        var surface = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.5f, 0.42f), Roughness = 0.9f };
+        view.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(6, 0.1f, 6) },
+            Position = new Vector3(0, -0.05f, 0), MaterialOverride = surface });
+        foreach (float x in new[] { -1.0f, 0, 1 })
+            view.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.3f, 0.35f, 0.3f) },
+                Position = new Vector3(x, 0.175f, 0), MaterialOverride = surface });
+        camera.Position = new Vector3(2, 1.1f, 3.8f);
+        camera.LookAt(new Vector3(0, 0.1f, 0));
+        var images = new List<Image>();
+        foreach (bool enabled in new[] { false, true })
+        {
+            sun.ShadowContactShadowsAllow = enabled;
+            for (int frame = 0; frame < 24; frame++) await ToSignal(this, SignalName.ProcessFrame);
+            await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+            Image image = view.GetTexture().GetImage();
+            image.SavePng(output.PathJoin($"contact_shadows_{(enabled ? "on" : "off")}.png"));
+            images.Add(image);
+        }
+        byte[] before = images[0].GetData(), after = images[1].GetData();
+        double error = before.Zip(after).Average(pair => Math.Abs((int)pair.First - pair.Second));
+        int darkened = before.Zip(after).Count(pair => pair.First > pair.Second + 2);
+        bool passed = error > 0.01 && error < 10 && darkened > 100;
+        using (var file = Godot.FileAccess.Open(output.PathJoin("contact-shadows.json"), Godot.FileAccess.ModeFlags.Write))
+            file.StoreString(Json.Stringify(new Godot.Collections.Dictionary { { "mean_byte_difference", error },
+                { "darkened_channels", darkened }, { "passed", passed } }, "  "));
+        GD.Print($"CONTACT_SHADOW_PROBE difference={error:F5}, darkened={darkened}: {(passed ? "PASS" : "FAIL")}");
+        foreach (Image image in images) image.Dispose();
+        view.Free();
+        G.drain_finalizers();
+        await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        Quit(passed ? 0 : 1);
+    }
+
+    private async Task CheckTextureStreaming()
+    {
+        var source = Content.Load<Texture2D>("res://textures/bark_oak_albedo.png");
+        if (source is not StreamedTexture2D || !ProjectSettings.GetSetting("rendering/textures/streaming/enabled").AsBool())
+        {
+            GD.PushError("Streaming probe requires the streamed importer and project setting");
+            Quit(1);
+            return;
+        }
+        var shader = new Shader { Code = """
+            shader_type spatial;
+            render_mode unshaded, fog_disabled;
+            uniform sampler2D surface : source_color, filter_linear_mipmap_anisotropic;
+            void fragment() {
+                // Non-default UVs exercise the dev6 feedback override.
+                STREAMING_UV = UV * 0.125;
+                ALBEDO = texture(surface, STREAMING_UV).rgb;
+            }
+            """ };
+        var material = new ShaderMaterial { Shader = shader };
+        material.SetShaderParameter("surface", source);
+        var panel = new MeshInstance3D { Mesh = new QuadMesh { Size = new Vector2(4, 3) }, MaterialOverride = material };
+        view.AddChild(panel);
+        camera.Position = new Vector3(0, 0, 5);
+        camera.LookAt(Vector3.Zero);
+        var initialized = ToSignal(TextureStreaming.Singleton, TextureStreaming.SignalName.FlushCompleted);
+        TextureStreaming.FlushTextureStreaming();
+        await initialized;
+        TextureStreaming.MaxLodOverride = 0;
+        var flushed = ToSignal(TextureStreaming.Singleton, TextureStreaming.SignalName.FlushCompleted);
+        TextureStreaming.FlushTextureStreaming();
+        await flushed;
+        for (int i = 0; i < 12; i++) await ToSignal(this, SignalName.ProcessFrame);
+        await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+        using Image reference = view.GetTexture().GetImage();
+        reference.SavePng(output.PathJoin("streaming_reference.png"));
+        ulong resident = TextureStreaming.GetMemoryBudgetBytesUsed();
+        // Compare the pinned GPU texture with a full-size imported source,
+        // independently of the streamer's counters or current mip state.
+        using Image sourceImage = source.GetImage();
+        using ImageTexture fullTexture = ImageTexture.CreateFromImage(sourceImage);
+        material.SetShaderParameter("surface", fullTexture);
+        for (int i = 0; i < 8; i++) await ToSignal(this, SignalName.ProcessFrame);
+        await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+        using Image full = view.GetTexture().GetImage();
+        double initialError = reference.GetData().Zip(full.GetData()).Average(pair => Math.Abs((int)pair.First - pair.Second));
+        full.SavePng(output.PathJoin("streaming_full_source.png"));
+        material.SetShaderParameter("surface", source);
+
+        TextureStreaming.MaxLodOverride = -1;
+        panel.Visible = false;
+        // Default inactivity decay is five seconds per mip. No budget pressure
+        // or forced low LOD: exercise the production retirement policy itself.
+        await ToSignal(CreateTimer(17), SceneTreeTimer.SignalName.Timeout);
+        ulong inactive = TextureStreaming.GetMemoryBudgetBytesUsed();
+        panel.Visible = true;
+        ulong start = Time.GetTicksMsec();
+        while (Time.GetTicksMsec() - start < 2000 && TextureStreaming.GetMemoryBudgetBytesUsed() < resident)
+            await ToSignal(this, SignalName.ProcessFrame);
+        ulong restorationMs = Time.GetTicksMsec() - start;
+        for (int i = 0; i < 8; i++) await ToSignal(this, SignalName.ProcessFrame);
+        await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+        using Image actual = view.GetTexture().GetImage();
+        actual.SavePng(output.PathJoin("streaming_restored.png"));
+        double error = reference.GetData().Zip(actual.GetData()).Average(pair => Math.Abs((int)pair.First - pair.Second));
+        ulong restored = TextureStreaming.GetMemoryBudgetBytesUsed();
+        bool passed = resident > 1000000 && inactive < resident / 4 && restored >= resident && restorationMs < 1500 && error < 0.1 && initialError < 0.1;
+        var report = new Godot.Collections.Dictionary { { "resident_bytes", resident }, { "inactive_bytes", inactive },
+            { "restored_bytes", restored }, { "restoration_ms", restorationMs }, { "mean_byte_error", error },
+            { "initial_full_source_error", initialError }, { "passed", passed } };
+        using (var file = Godot.FileAccess.Open(output.PathJoin("texture-streaming.json"), Godot.FileAccess.ModeFlags.Write))
+            file.StoreString(Json.Stringify(report, "  "));
+        GD.Print($"TEXTURE_STREAMING_PROBE {resident}->{inactive}->{restored} bytes, restored {restorationMs}ms, error {error:F5}, initial {initialError:F5}: {(passed ? "PASS" : "FAIL")}");
+        view.Free();
+        G.drain_finalizers();
+        await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        Quit(passed ? 0 : 1);
     }
 
     private async Task CheckCanopyBatches()
@@ -255,6 +386,7 @@ public partial class ShowcaseRenderProbe : SceneTree
         var batched = new MultiMeshInstance3D { Multimesh = all, MaterialOverride = family.Color,
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
         view.AddChild(batched);
+        byte[] lastBatch = null;
         foreach (int angle in new[] { 0, 1, 2 })
         {
             camera.Position = new Vector3((angle - 1) * 5, 4, 27);
@@ -270,6 +402,7 @@ public partial class ShowcaseRenderProbe : SceneTree
             using Image actual = view.GetTexture().GetImage();
             actual.SavePng(output.PathJoin($"canopy_{angle}_batched.png"));
             byte[] expected = reference.GetData(), observed = actual.GetData();
+            lastBatch = observed;
             double error = expected.Zip(observed).Average(pair => Math.Abs((int)pair.First - pair.Second));
             int changed = expected.Zip(observed).Count(pair => Math.Abs((int)pair.First - pair.Second) > 2);
             var centers = new HashSet<Color>();
@@ -290,9 +423,23 @@ public partial class ShowcaseRenderProbe : SceneTree
             rows.Add(new Godot.Collections.Dictionary { { "angle", angle }, { "mean_byte_error", error }, { "changed_bytes", changed }, { "passed", ok } });
             GD.Print($"CANOPY_BATCH_PROBE {angle}: error={error:F5}, changed={changed}, {(ok ? "PASS" : "FAIL")}");
         }
+        individual.Free();
+        maker.baked.Clear();
+        maker.Free();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        for (int frame = 0; frame < 8; frame++) await ToSignal(this, SignalName.ProcessFrame);
+        await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+        using (Image retained = view.GetTexture().GetImage())
+        {
+            double error = lastBatch.Zip(retained.GetData()).Average(pair => Math.Abs((int)pair.First - pair.Second));
+            passed &= error < 0.05;
+            rows.Add(new Godot.Collections.Dictionary { { "after_source_release_error", error }, { "passed", error < 0.05 } });
+            GD.Print($"CANOPY_RELEASE_PROBE error={error:F5}: {(error < 0.05 ? "PASS" : "FAIL")}");
+        }
         using var file = Godot.FileAccess.Open(output.PathJoin("canopy-batches.json"), Godot.FileAccess.ModeFlags.Write);
         file.StoreString(Json.Stringify(rows, "  "));
-        view.Free(); maker.Free();
+        view.Free();
         G.drain_finalizers();
         await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
         Quit(passed ? 0 : 1);

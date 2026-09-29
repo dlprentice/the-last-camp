@@ -326,6 +326,7 @@ public partial class WorldController : Node3D
         sun.ShadowNormalBias = 1.6f;
         sun.ShadowBlur = 1.0f;
         sun.ShadowOpacity = 1.0f;
+        sun.ShadowContactShadowsOpacity = 0.85f;
         sun.LightVolumetricFogEnergy = 1.0f;
         sun.SkyMode = DirectionalLight3D.SkyModeEnum.LightOnly;
         AddChild(sun);
@@ -337,6 +338,7 @@ public partial class WorldController : Node3D
         moon.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel2Splits;
         moon.DirectionalShadowMaxDistance = 90.0f;
         moon.ShadowBlur = 2.0f;
+        moon.ShadowContactShadowsOpacity = 0.85f;
         moon.LightVolumetricFogEnergy = 0.6f;
         moon.SkyMode = DirectionalLight3D.SkyModeEnum.LightOnly;
         moon.LightColor = Atmosphere.MOON_COLOR;
@@ -778,6 +780,9 @@ public partial class WorldController : Node3D
         // ------------------------------------------------------------------ quality
         _preset = p;
         _apply_features();
+        bool contacts = p.contact_shadows && !Game.Instance.has_flag("no-contact-shadows");
+        if (sun.ShadowContactShadowsAllow != contacts) sun.ShadowContactShadowsAllow = contacts;
+        if (moon.ShadowContactShadowsAllow != contacts) moon.ShadowContactShadowsAllow = contacts;
         sun.DirectionalShadowMaxDistance = (float)p.directional_shadow_distance;
         switch (p.directional_shadow_splits)
         {

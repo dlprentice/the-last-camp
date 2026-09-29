@@ -15,8 +15,8 @@ namespace LastCamp;
 
 /// One complete, immutable rendering configuration. Presets are data; the
 /// `Quality` autoload applies them. Budgets were set from the built-in
-/// profiler (`--profile`) on an RTX 4060 Laptop at 1080p: shadow-casting
-/// point lights and the planar mirror dominate, so those scale first.
+/// profiler (`--profile`) on an RTX 4060 Laptop at 1080p. Vegetation geometry,
+/// coverage and shading dominate; resolution and shadow work also scale.
 public partial class QualityPreset : RefCounted
 {
     public enum Tier
@@ -46,6 +46,7 @@ public partial class QualityPreset : RefCounted
     /// Layers the fire's omni shadow rasterises; presets drop the small-plant layer.
     public long fire_shadow_casters = 0xFFFFF;
     public bool lantern_shadows = false;
+    public bool contact_shadows = false;
 
     // Screen-space and GI
     public bool ssao = true;
@@ -96,6 +97,7 @@ public partial class QualityPreset : RefCounted
         QualityPreset p = new QualityPreset();
         p.tier = QualityPreset.Tier.ULTRA;
         p.display_name = "Ultra";
+        p.contact_shadows = true;
         // Sun shadows reach the wooded ridges, so the distant canopy shades
         // itself instead of turning into a pale, flat mass past the near forest.
         p.directional_shadow_distance = 480.0;
@@ -135,6 +137,7 @@ public partial class QualityPreset : RefCounted
         QualityPreset p = new QualityPreset();
         p.tier = QualityPreset.Tier.HIGH;
         p.display_name = "High";
+        p.contact_shadows = true;
         // Measured on the RTX 4060 Laptop (2026-09-10): the frame is fragment-bound
         // in vegetation, so the atlas and internal resolution are the levers that
         // pay without changing the layout. Ultra keeps the full-size settings.

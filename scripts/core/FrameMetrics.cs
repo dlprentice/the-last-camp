@@ -18,7 +18,8 @@ public sealed class FrameMetrics
     private readonly double[] _waterGpu = new double[3];
     private ulong _previous;
     private double _gpu, _renderCpu, _process, _physics, _draws, _triangles;
-    private double _vram, _engineMemory;
+    private double _vram, _engineMemory, _textureMemory;
+    private ulong _streamedMemory;
     private long _managedPeak;
 
     public FrameMetrics(Viewport viewport, Pond pond)
@@ -44,6 +45,8 @@ public sealed class FrameMetrics
         _draws += RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame);
         _triangles += RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalPrimitivesInFrame);
         _vram = Math.Max(_vram, Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed));
+        _textureMemory = Math.Max(_textureMemory, Performance.GetMonitor(Performance.Monitor.RenderTextureMemUsed));
+        _streamedMemory = Math.Max(_streamedMemory, TextureStreaming.GetMemoryBudgetBytesUsed());
         _engineMemory = Math.Max(_engineMemory, Performance.GetMonitor(Performance.Monitor.MemoryStatic));
         _managedPeak = Math.Max(_managedPeak, GC.GetTotalMemory(false));
     }
@@ -62,6 +65,8 @@ public sealed class FrameMetrics
         result["underwater_gpu_ms_last_submitted"] = _waterGpu[1] / n;
         result["transmission_gpu_ms_last_submitted"] = _waterGpu[2] / n;
         result["peak_render_memory_bytes"] = _vram;
+        result["peak_texture_memory_bytes"] = _textureMemory;
+        result["peak_streamed_texture_memory_bytes"] = _streamedMemory;
         result["peak_engine_static_memory_bytes"] = _engineMemory;
         result["peak_managed_memory_bytes"] = _managedPeak;
         result["managed_allocated_bytes_per_frame"] = (GC.GetTotalAllocatedBytes(false) - _allocated) / n;

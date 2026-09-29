@@ -54,6 +54,7 @@ void vertex() {
 }
 
 void fragment() {
+	STREAMING_UV = UV * 0.5; // Keep one mip of detail in reserve for upscaling.
 	if (reflection_clips(CAMERA_VISIBLE_LAYERS, world_pos.y, water_level, 0.05)) {
 		discard;
 	}

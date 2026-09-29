@@ -177,6 +177,10 @@ public partial class Main : Node3D
         }
         long t_built = (long)Time.GetTicksMsec();
         loading.set_progress("Warming up the renderer", 0.96);
+        // Retire temporary mesh/image wrappers while the loading screen is up.
+        // Native materials keep the resources still used by the live scene.
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
         renderer.Disable3D = restore_3d;
         await world.warm_up();
         if (!IsInsideTree())

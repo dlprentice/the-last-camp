@@ -133,6 +133,14 @@ public partial class Game : Node
             });
         }
         user_args = parse_user_args(new List<string>(OS.GetCmdlineUserArgs()));
+        // A fully resident reference for controlled texture-streaming comparisons.
+        if (has_flag("resident-textures"))
+        {
+            // dev6's loader reads the setting for its initial mip, while the
+            // streamer reads the override. Both must start at the same level.
+            ProjectSettings.SetSetting("rendering/textures/streaming/max_lod", 0);
+            TextureStreaming.MaxLodOverride = 0;
+        }
         _apply_movie_size();
         _apply_mouse_mode();
         if (!InputMap.HasAction("camp_journal"))

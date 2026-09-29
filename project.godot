@@ -179,7 +179,10 @@ limits/global_shader_variables/buffer_size=262144
 
 renderer/rendering_method.mobile="forward_plus"
 textures/vram_compression/import_s3tc_bptc=true
+textures/streaming/enabled=true
 lights_and_shadows/directional_shadow/soft_shadow_filter_quality=4
+lights_and_shadows/contact_shadow/enabled=true
+lights_and_shadows/contact_shadow/shadow_length=0
 lights_and_shadows/positional_shadow/soft_shadow_filter_quality=3
 reflections/sky_reflections/ggx_samples=64
 reflections/sky_reflections/fast_filter_high_quality=true

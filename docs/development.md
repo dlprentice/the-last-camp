@@ -57,12 +57,26 @@ godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- -
 ```
 
 The canopy check compares individually textured cards with the array batch,
-verifies native tree transforms/tints after spatial partitioning, and checks
-that MultiMesh shaders do not allocate unused per-object uniform blocks:
+verifies native tree transforms/tints after spatial partitioning, checks that
+MultiMesh shaders do not allocate unused per-object uniform blocks, and releases
+the source atlases before checking the retained array again:
 
 ```bash
 godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-canopy-batches --probe-out="$PWD/local-data/canopy-check"
 ```
+
+Two probes exercise the native dev6 rendering additions:
+
+```bash
+godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-texture-streaming --probe-out="$PWD/local-data/streaming-check"
+godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-contact-shadows --probe-out="$PWD/local-data/contact-shadow-check"
+```
+
+The streaming check compares a resident texture with its full-resolution source,
+lets hidden mips retire under the default inactivity policy, and verifies their
+return against the reference image. The contact-shadow check renders supported
+objects with and without the directional screen-space effect. Neither fixture
+establishes complete-scene quality or performance.
 
 Use fresh output directories. These are small shader probes, not the game world.
 Adding `--probe-termination` leaves it drawing after `TERMINATION_PROBE_READY`;
@@ -103,6 +117,9 @@ exits nonzero on a mismatch. It checks settings, not the renderer's internal
 caches; the repeated controls still need comparable timing and geometry counts.
 `--full-grass-density` disables the distance budget for a reference capture.
 `--unbatched-canopy` retains the old per-variant ridge groups for comparison.
+`--resident-textures` loads all streamed maps at full detail for comparison.
+`--no-contact-shadows` disables the High/Ultra directional contact pass; the
+profiler also has `contact shadows off` and `contact shadows on` cases.
 Each view uses its authored hour and FOV. Avoid interpreting a changed control
 as a feature optimization, or the main-view GPU counter as total frame cost.
 
@@ -169,6 +186,22 @@ is not needed by players. Export success does not substitute for a subsequent
 rendered and interactive check.
 
 ## Asset preparation
+
+The nine opaque PBR sets use Godot's `StreamedTexture2D` importer. Their custom
+shaders provide `STREAMING_UV` from the actual projected texture coordinates,
+with a conservative mip reserve for upscaling. Alpha-cutout atlases and utility
+maps retain the ordinary importer. Runtime-generated canopy arrays are separate
+and do not stream. Refresh metadata without repacking images or changing credits:
+
+```bash
+python3 tools/import_textures.py --imports-only
+```
+
+The dev6 loader and streaming override must agree about the initial mip. Atlas
+baking first initializes streaming feedback, then pins full detail and flushes
+again before drawing; otherwise a newly loaded coarse mip can be reported as
+fully resident. The prior override is restored after baking. The hardware probe
+checks actual pixels independently of the streamer's memory counter.
 
 Shipped textures, models and recordings are ready to import. Build new content
 locally using committed generators. The historical photoscan conversion tools

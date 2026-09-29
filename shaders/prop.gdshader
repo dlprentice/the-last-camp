@@ -85,6 +85,16 @@ void fragment() {
 	vec3 n = normalize(world_nrm);
 	vec3 w = triplanar_weights(n);
 	vec3 tex_pos = world_pos + tex_offset;
+	// Pick the finest footprint of the projections contributing to this pixel.
+	// Using mesh UVs for a triplanar material can evict visible surface detail.
+	vec3 px = dFdx(tex_pos * tile);
+	vec3 py = dFdy(tex_pos * tile);
+	vec3 footprint = min(vec3(dot(px.zy, px.zy), dot(px.xz, px.xz), dot(px.xy, px.xy)),
+		vec3(dot(py.zy, py.zy), dot(py.xz, py.xz), dot(py.xy, py.xy)));
+	footprint += vec3(lessThan(w, vec3(0.002))) * 1e6;
+	vec2 streaming_uv = footprint.x <= footprint.y && footprint.x <= footprint.z ? tex_pos.zy :
+		(footprint.y <= footprint.z ? tex_pos.xz : tex_pos.xy);
+	STREAMING_UV = streaming_uv * tile * 0.5;
 	vec3 albedo = sample_albedo(tex_pos, w) * tint;
 	vec3 orm = sample_orm(tex_pos, w);
 	vec3 n_world = sample_normal(tex_pos, n, w);
