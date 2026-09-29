@@ -96,6 +96,14 @@ complete exported 15-waypoint interaction, preset-switch and sleep route passed
 again with no ordinary fall recovery or new core/kernel GPU fault.
 `--full-grass-density` retains the old population for comparisons.
 
+Distant canopy atlases now frame the actual rest meshes, because their baking
+passes freeze wind and bypass leaf LOD. The former animated cull bounds left
+excessive empty texture space and enlarged both billboard footprints and their
+native transition ranges. Separate exported High runs saved 1.8–2.5 ms of
+main-view GPU time at the arrival, pond and night-fire views. Full-size arrival,
+pond, elevated woodland and dawn comparisons retained forest coverage. This
+later change is not included in the three-preset route table below.
+
 The feature profiler now preserves the fire's original shadow projection,
 takes each view's lighting snapshot at its authored hour, and avoids reassigning
 unchanged geometry shadow flags. The old reset changed native shadow workload,

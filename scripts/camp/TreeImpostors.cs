@@ -150,7 +150,9 @@ public partial class TreeImpostors : Node3D
         Aabb bounds = result.bark.GetAabb();
         if (result.leaves != null)
         {
-            bounds = bounds.Merge(forest.leaf_bounds(result));
+            // Atlas passes freeze wind and bypass leaf LOD. They need only
+            // enclose the actual rest mesh, not its broad animated cull box.
+            bounds = bounds.Merge(result.leaves.GetAabb());
         }
         Vector3 reach = bounds.Position.Abs().Max(bounds.End.Abs());
         double width = clampf(new Vector2(reach.X, reach.Z).Length() * 2.08, 0.5, 60.0);
