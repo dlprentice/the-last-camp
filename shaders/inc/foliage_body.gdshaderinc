@@ -73,7 +73,9 @@ void vertex() {
 
 	// Continuous LOD: unimportant cards shrink to their pivot with distance
 	// while the survivors grow to keep the silhouette filled.
-	float cam_dist = length(CAMERA_POSITION_WORLD - base_world);
+	// Shadow passes must select the same cards as the scene camera, not the
+	// light's temporary camera, so the canopy and its shadow stay consistent.
+	float cam_dist = length(MAIN_CAM_INV_VIEW_MATRIX[3].xyz - base_world);
 	// The atlas camera is distant and orthographic. Its distance must not
 	// collapse the crown or enlarge selected cards in the baked silhouette.
 	float lod = impostor_bake == 0 ? smoothstep(lod_start, lod_end, cam_dist) : 0.0;

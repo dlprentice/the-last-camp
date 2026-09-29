@@ -42,11 +42,13 @@ Their reference hashes and scope are documented in [tests/fixtures](../tests/fix
 A passing CPU check does not establish rendered appearance, audio mix, traversal
 or hardware performance.
 
-The terrain shader has a separate hardware check. It renders the production
-parallax function against an analytic height field at five detail settings:
+The terrain shader has separate hardware checks. They render the production
+parallax function against an analytic height field at five detail settings,
+and verify that height blending preserves excluded layers and small mask weights:
 
 ```bash
 godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-parallax --probe-out="$PWD/local-data/parallax-check"
+godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-terrain-weights --probe-out="$PWD/local-data/terrain-weight-check"
 ```
 
 The grass draw-prefix check compares the production shader with every instance

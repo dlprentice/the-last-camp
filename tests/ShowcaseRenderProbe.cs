@@ -70,6 +70,11 @@ public partial class ShowcaseRenderProbe : SceneTree
             await CheckParallax();
             return;
         }
+        if (OS.GetCmdlineUserArgs().Contains("--probe-terrain-weights"))
+        {
+            await CheckTerrainWeights();
+            return;
+        }
         view = new SubViewport();
         view.Size = new Vector2I(768, 512);
         view.OwnWorld3D = true;
@@ -505,6 +510,55 @@ public partial class ShowcaseRenderProbe : SceneTree
         }
         using var file = Godot.FileAccess.Open(output.PathJoin("grass-density.json"), Godot.FileAccess.ModeFlags.Write);
         file.StoreString(Json.Stringify(report, "  "));
+        view.Free();
+        G.drain_finalizers();
+        await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        Quit(passed ? 0 : 1);
+    }
+
+    private async Task CheckTerrainWeights()
+    {
+        string terrain = Godot.FileAccess.GetFileAsString("res://shaders/terrain.gdshader");
+        string function = terrain[terrain.IndexOf("vec4 height_weights(", StringComparison.Ordinal)..terrain.IndexOf("vec4 sample_heights(", StringComparison.Ordinal)];
+        var material = new ShaderMaterial { Shader = new Shader { Code = """
+            shader_type canvas_item;
+            render_mode unshaded, blend_disabled;
+            uniform float blend_depth = 0.28;
+            uniform vec4 weights;
+            uniform vec4 heights;
+            """ + function + """
+            void fragment() { COLOR = height_weights(weights, heights); }
+            """ } };
+        view = new SubViewport { Size = new Vector2I(4, 4), Disable3D = true,
+            UseHdr2D = true, TransparentBg = true, UseDebanding = false, RenderTargetUpdateMode = SubViewport.UpdateMode.Always };
+        Root.AddChild(view);
+        view.AddChild(new ColorRect { Size = view.Size, Material = material });
+        var report = new Godot.Collections.Array<Godot.Collections.Dictionary>();
+        bool passed = true;
+        foreach (Vector4 mask in new[] { new Vector4(1, 0, 0, 0), new Vector4(0, 1, 0, 0),
+            new Vector4(0, 0, 1, 0), new Vector4(0, 0, 0, 1), new Vector4(0.5f, 0.5f, 0, 0),
+            new Vector4(0.34f, 0.33f, 0, 0.33f), new Vector4(0.1f, 0.2f, 0.3f, 0.4f),
+            new Vector4(0.001f, 0.998f, 0.001f, 0) })
+        foreach (Vector4 heights in new[] { Vector4.Zero, Vector4.One, new Vector4(0.2f, 0.8f, 0.35f, 0.65f) })
+        {
+            material.SetShaderParameter("weights", mask);
+            material.SetShaderParameter("heights", heights);
+            for (int f = 0; f < 3; f++) await ToSignal(this, SignalName.ProcessFrame);
+            await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+            using Image pixels = view.GetTexture().GetImage();
+            Color c = pixels.GetPixel(2, 2);
+            Vector4 actual = new(c.R, c.G, c.B, c.A);
+            bool ok = Math.Abs(c.R + c.G + c.B + c.A - 1) < 0.0015f;
+            for (int channel = 0; channel < 4; channel++)
+                ok &= float.IsFinite(actual[channel]) && actual[channel] >= 0 && actual[channel] <= 1
+                    && (mask[channel] > 0 || actual[channel] == 0)
+                    && (mask[channel] > 0.002f || actual[channel] < 0.01f);
+            passed &= ok;
+            report.Add(new Godot.Collections.Dictionary { { "mask", mask }, { "heights", heights }, { "weights", actual }, { "passed", ok } });
+        }
+        using var file = Godot.FileAccess.Open(output.PathJoin("terrain-weights.json"), Godot.FileAccess.ModeFlags.Write);
+        file.StoreString(Json.Stringify(report, "  "));
+        GD.Print($"TERRAIN_WEIGHTS_PROBE cases={report.Count} passed={passed}");
         view.Free();
         G.drain_finalizers();
         await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);

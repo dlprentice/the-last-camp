@@ -66,7 +66,9 @@ void vertex() {
 vec4 height_weights(vec4 m, vec4 h) {
 	vec4 w = m * (h * 0.8 + 0.2);
 	float peak = max(max(w.x, w.y), max(w.z, w.w));
-	w = max(w - (peak - blend_depth), vec4(0.0));
+	// A low peak must not resurrect materials excluded by the terrain mask.
+	// Besides bleeding mud/path into turf, that forced their texture reads.
+	w = max(w - (peak - blend_depth), vec4(0.0)) * m;
 	return w / max(w.x + w.y + w.z + w.w, 1e-4);
 }
 
@@ -147,10 +149,11 @@ void fragment() {
 	vec3 view_ts = vec3(dot(view_dir, t), dot(view_dir, b), dot(view_dir, n));
 	uv_near = parallax(uv_near, view_ts, m, dx_n, dy_n, parallax_amount);
 
-	vec4 orm_g = textureGrad(grass_orm, uv_near, dx_n, dy_n);
-	vec4 orm_l = textureGrad(litter_orm, uv_near, dx_n, dy_n);
-	vec4 orm_m = textureGrad(mud_orm, uv_near, dx_n, dy_n);
-	vec4 orm_p = textureGrad(path_orm, uv_near, dx_n, dy_n);
+	vec4 orm_g = vec4(0.0), orm_l = vec4(0.0), orm_m = vec4(0.0), orm_p = vec4(0.0);
+	if (m.x > 0.0) orm_g = textureGrad(grass_orm, uv_near, dx_n, dy_n);
+	if (m.y > 0.0) orm_l = textureGrad(litter_orm, uv_near, dx_n, dy_n);
+	if (m.z > 0.0) orm_m = textureGrad(mud_orm, uv_near, dx_n, dy_n);
+	if (m.w > 0.0) orm_p = textureGrad(path_orm, uv_near, dx_n, dy_n);
 	vec4 w = height_weights(m, vec4(orm_g.b, orm_l.b, orm_m.b, orm_p.b));
 
 	// The large-scale tiling only matters at distance and the per-layer
@@ -231,8 +234,12 @@ void fragment() {
 
 	// Detail normal for close-up crispness.
 	float detail_w = 1.0 - smoothstep(3.0, 14.0, dist);
-	vec3 dn = texture(detail_normal, world_pos.xz * 3.1).rgb * 2.0 - 1.0;
-	nrm_ts.xy += dn.xy * 0.20 * detail_w;
+	vec2 detail_uv = world_pos.xz * 3.1;
+	vec2 detail_dx = dFdx(detail_uv), detail_dy = dFdy(detail_uv);
+	if (detail_w > 0.0) {
+		vec3 dn = textureGrad(detail_normal, detail_uv, detail_dx, detail_dy).rgb * 2.0 - 1.0;
+		nrm_ts.xy += dn.xy * 0.20 * detail_w;
+	}
 	nrm_ts.xy *= 1.0 - far_mix * 0.6;
 	nrm_ts = normalize(vec3(nrm_ts.xy, max(nrm_ts.z, 0.2)));
 
