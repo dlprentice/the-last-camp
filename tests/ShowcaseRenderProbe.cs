@@ -117,6 +117,11 @@ public partial class ShowcaseRenderProbe : SceneTree
         camera.Fov = 42;
         view.AddChild(camera);
         camera.MakeCurrent();
+        if (OS.GetCmdlineUserArgs().Contains("--probe-grass-density"))
+        {
+            await CheckGrassDensity();
+            return;
+        }
         for (long form = 0; form < 4; form++)
         {
             stage = new Node3D();
@@ -167,6 +172,72 @@ public partial class ShowcaseRenderProbe : SceneTree
         await capture("hardware_wet");
         G.print("SHOWCASE_RENDER_PROBE_DONE output=", output, " frames_drawn=", Engine.GetFramesDrawn());
         Quit(0);
+    }
+
+    private async Task CheckGrassDensity()
+    {
+        RenderingServer.GlobalShaderParameterSet("wind_strength", 0.0f);
+        RenderingServer.GlobalShaderParameterSet("player_position", new Vector3(10000, 0, 0));
+        var material = new ShaderMaterial { Shader = Content.Load<Shader>("res://shaders/grass.gdshader") };
+        material.SetShaderParameter("density_lod", new Vector4(Understory.GrassDensityStart,
+            Understory.GrassDensityTransition, Understory.GrassDensityMinimum, Understory.GrassDensityBlend));
+        var planter = new GrassPlanter(new TerrainField(), 32, 0.15);
+        planter.plan();
+        var mesh = GrassPlanter.clump_mesh();
+        var batches = new List<(MultiMesh Mesh, Aabb Bounds)>();
+        foreach (var chunk in planter.chunks)
+        {
+            var batch = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+                UseColors = true, UseCustomData = true, Mesh = mesh, InstanceCount = (int)chunk.count };
+            batch.Buffer = GrassPlanter.upload_buffer(chunk);
+            batch.CustomAabb = chunk.aabb;
+            var node = new MultiMeshInstance3D { Multimesh = batch, MaterialOverride = material,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            node.SetInstanceShaderParameter("grass_population", (float)chunk.count);
+            view.AddChild(node);
+            batches.Add((batch, chunk.aabb));
+        }
+        bool passed = true;
+        var report = new Godot.Collections.Dictionary();
+        var positions = new[] { new Vector3(10, 2, 30), new Vector3(20, 2, 45), new Vector3(-38, 1.7f, 15) };
+        for (int shot = 0; shot < positions.Length; shot++)
+        {
+            camera.Position = positions[shot];
+            camera.LookAt(new Vector3(0, 0.4f, 0));
+            long full = 0, reduced = 0;
+            foreach (var batch in batches) { batch.Mesh.VisibleInstanceCount = -1; full += batch.Mesh.InstanceCount; }
+            for (int frame = 0; frame < 8; frame++) await ToSignal(this, SignalName.ProcessFrame);
+            await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+            using var reference = view.GetTexture().GetImage();
+            reference.SavePng(output.PathJoin($"grass_{shot}_shader_only.png"));
+            foreach (var batch in batches)
+            {
+                int count = Understory.grass_draw_count(batch.Bounds, camera.Position, batch.Mesh.InstanceCount);
+                batch.Mesh.VisibleInstanceCount = count;
+                reduced += count;
+            }
+            for (int frame = 0; frame < 8; frame++) await ToSignal(this, SignalName.ProcessFrame);
+            await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+            using var actual = view.GetTexture().GetImage();
+            actual.SavePng(output.PathJoin($"grass_{shot}_native_prefix.png"));
+            byte[] expected = reference.GetData(), observed = actual.GetData();
+            long differences = expected.Length == observed.Length ? expected.Zip(observed).Count(pair => pair.First != pair.Second) : expected.Length;
+            int stride = expected.Length / (reference.GetWidth() * reference.GetHeight());
+            var colors = new HashSet<(byte, byte, byte)>();
+            for (int pixel = 0; pixel + 2 < expected.Length; pixel += stride * 7)
+                colors.Add((expected[pixel], expected[pixel + 1], expected[pixel + 2]));
+            bool ok = differences == 0 && reduced < full && colors.Count > 64;
+            passed &= ok;
+            report[shot] = new Godot.Collections.Dictionary { { "full_instances", full }, { "submitted_instances", reduced },
+                { "different_bytes", differences }, { "sampled_colors", colors.Count }, { "passed", ok } };
+            GD.Print($"GRASS_DENSITY_PROBE {shot}: {full}->{reduced}, changed bytes={differences}, {(ok ? "PASS" : "FAIL")}");
+        }
+        using var file = Godot.FileAccess.Open(output.PathJoin("grass-density.json"), Godot.FileAccess.ModeFlags.Write);
+        file.StoreString(Json.Stringify(report, "  "));
+        view.Free();
+        G.drain_finalizers();
+        await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        Quit(passed ? 0 : 1);
     }
 
     private async Task CheckParallax()

@@ -6,6 +6,32 @@ namespace LastCamp.Tests;
 
 public partial class TestGrassBatching : TestCase
 {
+    public void test_distance_budget_keeps_foreground_and_covers_the_shader_blend()
+    {
+        var bounds = new Aabb(new Vector3(-16, -2, -16), new Vector3(16, 9, 16));
+        const int population = 137;
+        assert_eq(Understory.grass_draw_count(bounds, new Vector3(-8, 1, -8), population), population,
+            "a camera inside the cell retains its entire prepared population");
+        assert_eq(Understory.grass_draw_count(bounds, Vector3.Zero, 0), 0, "empty cells remain empty");
+        int far = Understory.grass_draw_count(bounds, new Vector3(120, 1, 120), population);
+        assert_true(far > 0 && far < population / 4, "far cells keep cover with fewer native instances");
+        for (int direction = 0; direction < 16; direction++)
+        for (int distance = 0; distance <= 160; distance += 4)
+        {
+            float angle = direction * MathF.Tau / 16;
+            Vector3 camera = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle)) * distance + new Vector3(-8, 2, -8);
+            int draw = Understory.grass_draw_count(bounds, camera, population);
+            for (int x = 0; x <= 4; x++)
+            for (int z = 0; z <= 4; z++)
+            {
+                Vector3 plant = bounds.Position + new Vector3(x * 4, 1, z * 4);
+                float survivorLimit = Math.Min(1, Understory.grass_density_at(plant.DistanceTo(camera)) + Understory.GrassDensityBlend);
+                assert_true(draw >= Math.Ceiling(population * (double)survivorLimit),
+                    "native prefix includes every plant that can survive the shader's transition, even at cell corners");
+            }
+        }
+    }
+
     public void test_quality_round_trip_retains_uploaded_instances()
     {
         var field = new TerrainField();

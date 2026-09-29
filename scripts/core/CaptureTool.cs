@@ -403,11 +403,35 @@ public partial class CaptureTool : Node
         _profile_refl_lod = camp.pond.reflection_viewport.MeshLodThreshold;
         _profile_refl_far = camp.pond.reflection_camera.Far;
         _profile_fire_casters = (long)camp.campsite.firepit.light.ShadowCasterMask;
+        _profile_fire_shadow_mode = camp.campsite.firepit.light.OmniShadowMode;
         _profile_sun_casters = (long)world.sun.ShadowCasterMask;
+        _profile_distance_grass = camp.understory.distance_grass_enabled;
+        _profile_sun_splits = new Vector3(world.sun.DirectionalShadowSplit1, world.sun.DirectionalShadowSplit2, world.sun.DirectionalShadowSplit3);
+        if (Game.Instance.has_flag("profile-check-state"))
+        {
+            var before = ReadProfileState(scene);
+            _restore_profile_state();
+            var after = ReadProfileState(scene);
+            var changes = new Godot.Collections.Dictionary();
+            foreach (var entry in before)
+                if (after.TryGetValue(entry.Key, out string value) && value != entry.Value)
+                    changes[entry.Key] = new Godot.Collections.Array { entry.Value, value };
+            using var stateFile = FileAccess.Open(out_path, FileAccess.ModeFlags.Write);
+            stateFile.StoreString(Json.Stringify(changes, "  "));
+            GD.Print($"PROFILE_STATE_CHANGED {changes.Count}: {out_path}");
+            Game.Instance.quit_cleanly(changes.Count == 0 ? 0 : 1);
+            return;
+        }
         Godot.Collections.Array<Godot.Collections.Dictionary> cases = new Godot.Collections.Array<Godot.Collections.Dictionary> { new Godot.Collections.Dictionary { { (StringName)"name", "all on" }, { (StringName)"apply", Callable.From(() =>
 {
 
-}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "sdfgi off" }, { (StringName)"apply", Callable.From(() =>
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "control before restore" }, { (StringName)"apply", Callable.From(() =>
+{
+
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "control after restore" }, { (StringName)"apply", Callable.From(() =>
+{
+
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "grass distance density" }, { (StringName)"apply", Callable.From(() => camp.understory.set_distance_grass(true)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "full grass density" }, { (StringName)"apply", Callable.From(() => camp.understory.set_distance_grass(false)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "sdfgi off" }, { (StringName)"apply", Callable.From(() =>
 {
     world.environment.SdfgiEnabled = false;
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "ssil off" }, { (StringName)"apply", Callable.From(() =>
@@ -542,6 +566,9 @@ public partial class CaptureTool : Node
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "fire shadow parab" }, { (StringName)"apply", Callable.From(() =>
 {
     camp.campsite.firepit.light.OmniShadowMode = OmniLight3D.ShadowMode.DualParaboloid;
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "fire shadow cube" }, { (StringName)"apply", Callable.From(() =>
+{
+    camp.campsite.firepit.light.OmniShadowMode = OmniLight3D.ShadowMode.Cube;
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "fire casters no grass" }, { (StringName)"apply", Callable.From(() =>
 {
     camp.campsite.firepit.light.ShadowCasterMask = unchecked((uint)(0xFFFFF & ~Pond.GRASS_LAYER));
@@ -589,6 +616,7 @@ public partial class CaptureTool : Node
         Godot.Collections.Dictionary report = new Godot.Collections.Dictionary();
         List<string> wanted = G.split(Game.Instance.arg_value("profile-cases", ""), ",", false);
         List<string> views = G.split(Game.Instance.arg_value("profile-views", "fire,pond"), ",", false);
+        double initialHour = world.hour;
         foreach (string vp_name in views)
         {
             Godot.Collections.Array<Godot.Collections.Dictionary> matches = G.filter(VIEWPOINTS, (Godot.Collections.Dictionary v) => G.eq(v["name"], vp_name));
@@ -598,16 +626,26 @@ public partial class CaptureTool : Node
                 continue;
             }
             Godot.Collections.Dictionary vp = matches[0];
-            camera.GlobalPosition = ground_relative(vp["pos"].AsVector3());
-            camera.LookAt(ground_relative(vp["look"].AsVector3()), Vector3.Up);
+            bool absolute = vp.ContainsKey("absolute") && vp["absolute"].AsBool();
+            camera.GlobalPosition = absolute ? vp["pos"].AsVector3() : ground_relative(vp["pos"].AsVector3());
+            camera.LookAt(absolute ? vp["look"].AsVector3() : ground_relative(vp["look"].AsVector3()), Vector3.Up);
+            camera.Fov = vp.ContainsKey("fov") ? vp["fov"].AsSingle() : 68.0f;
+            world.hour = vp.ContainsKey("hour") ? vp["hour"].AsDouble() : initialHour;
             G.print(G.format("PROFILE viewpoint %s", vp_name));
             // The first view may introduce foliage, shadow and reflection
             // pipelines that the loading camera did not render. Let it settle
             // before measuring, just as the route benchmark does.
             await _wait(6.0);
+            // Snapshot the current hour's lights after the view has settled.
+            // Reusing the loading snapshot hid the moon in later night views.
+            _profile_snapshot(scene);
             Godot.Collections.Dictionary rows = new Godot.Collections.Dictionary();
             foreach (Godot.Collections.Dictionary c in cases)
             {
+                // Repeated no-op controls are opt-in when checking restoration
+                // or warm-up; ordinary feature sweeps need only one baseline.
+                if (wanted.Count == 0 && c["name"].AsString().StartsWith("control ", StringComparison.Ordinal))
+                    continue;
                 if (!(wanted.Count == 0) && !wanted.Contains(c["name"].AsString()))
                 {
                     continue;
@@ -624,6 +662,7 @@ public partial class CaptureTool : Node
                 double cpu = 0.0;
                 double frame = 0.0;
                 long objects = 0, primitives = 0, draw_calls = 0;
+                double visiblePrimitives = 0, shadowPrimitives = 0, reflectedPrimitives = 0;
                 long samples = 90;
                 for (long i = 0; i < samples; i++)
                 {
@@ -634,6 +673,9 @@ public partial class CaptureTool : Node
                     objects += (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalObjectsInFrame);
                     primitives += (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalPrimitivesInFrame);
                     draw_calls += (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.TotalDrawCallsInFrame);
+                    visiblePrimitives += RenderingServer.ViewportGetRenderInfo(rid, RenderingServer.ViewportRenderInfoType.Visible, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
+                    shadowPrimitives += RenderingServer.ViewportGetRenderInfo(rid, RenderingServer.ViewportRenderInfoType.Shadow, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
+                    reflectedPrimitives += RenderingServer.ViewportGetRenderInfo(camp.pond.reflection_viewport.GetViewportRid(), RenderingServer.ViewportRenderInfoType.Visible, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
                 }
                 gpu /= (double)samples;
                 cpu /= (double)samples;
@@ -651,6 +693,10 @@ public partial class CaptureTool : Node
                     GetViewport().GetTexture().GetImage().SavePng(imageDir.PathJoin(G.format("%s_%s.png", new Godot.Collections.Array { vp_name, c["name"].AsString().Replace(" ", "_") })));
                 }
                 rows[c["name"]] = new Godot.Collections.Dictionary { { (StringName)"gpu_ms", snappedf(gpu, 0.01) }, { (StringName)"cpu_ms", snappedf(cpu, 0.01) }, { (StringName)"frame_ms", snappedf(frame, 0.01) }, { (StringName)"objects", objects }, { (StringName)"primitives", primitives }, { (StringName)"draw_calls", draw_calls } };
+                var measured = rows[c["name"]].AsGodotDictionary();
+                measured["main_visible_primitives"] = Math.Round(visiblePrimitives / samples);
+                measured["main_shadow_primitives"] = Math.Round(shadowPrimitives / samples);
+                measured["reflection_visible_primitives_last_submitted"] = Math.Round(reflectedPrimitives / samples);
                 G.print(G.format("PROFILE %-22s gpu %6.2f ms   cpu %6.2f ms   frame %6.2f ms   objects %6d   tris %9d   draws %5d", new Godot.Collections.Array { c["name"], gpu, cpu, frame, objects, primitives, draw_calls }));
                 // The baseline mutates nothing. Do not rebuild renderer state
                 // or invalidate GI between it and the first actual experiment.
@@ -674,10 +720,51 @@ public partial class CaptureTool : Node
     }
 
     public Godot.Collections.Dictionary _profile_state = new Godot.Collections.Dictionary();
+
+    private Dictionary<string, string> ReadProfileState(Node root)
+    {
+        var state = new Dictionary<string, string>();
+        var nodes = new Stack<Node>();
+        var materials = new HashSet<ShaderMaterial>();
+        nodes.Push(root);
+        void Read(GodotObject obj, string path, params string[] properties)
+        {
+            foreach (string property in properties) state[path + ":" + property] = obj.Get(property).ToString();
+        }
+        while (nodes.TryPop(out Node node))
+        {
+            string path = root.GetPathTo(node).ToString();
+            if (node is Node3D) Read(node, path, "visible");
+            if (node is GeometryInstance3D geometry)
+            {
+                Read(node, path, "cast_shadow", "lod_bias", "visibility_range_begin", "visibility_range_end",
+                    "visibility_range_begin_margin", "visibility_range_end_margin", "visibility_range_fade_mode");
+                if (geometry.MaterialOverride is ShaderMaterial mat) materials.Add(mat);
+                if (node is MultiMeshInstance3D batch) Read(batch.Multimesh, path, "visible_instance_count");
+            }
+            if (node is Light3D) Read(node, path, "shadow_enabled", "shadow_caster_mask");
+            if (node is OmniLight3D) Read(node, path, "omni_shadow_mode");
+            foreach (Node child in node.GetChildren()) nodes.Push(child);
+        }
+        foreach (var mat in materials)
+            foreach (Godot.Collections.Dictionary uniform in mat.Shader.GetShaderUniformList())
+            {
+                string name = uniform["name"].AsString();
+                state[$"material/{mat.GetInstanceId()}/{mat.Shader.ResourcePath}:{name}"] = mat.GetShaderParameter(name).ToString();
+            }
+        Read(GetViewport(), "viewport", "mesh_lod_threshold", "scaling_3d_scale", "scaling_3d_mode", "use_taa");
+        Read(Game.Instance.world.sun, "sun", "directional_shadow_max_distance", "directional_shadow_mode",
+            "directional_shadow_split_1", "directional_shadow_split_2", "directional_shadow_split_3");
+        return state;
+    }
+
     public double _profile_refl_lod = 1.0;
     public double _profile_refl_far = 700.0;
     public long _profile_fire_casters = 0xFFFFF;
+    private OmniLight3D.ShadowMode _profile_fire_shadow_mode;
     public long _profile_sun_casters = 0xFFFFF;
+    private Vector3 _profile_sun_splits;
+    private bool _profile_distance_grass;
 
     public void _profile_snapshot(Node root)
     {
@@ -775,15 +862,20 @@ public partial class CaptureTool : Node
             (n as Node3D).Visible = entry["visible"].AsBool();
             if (entry.ContainsKey("cast_shadow"))
             {
-                (n as GeometryInstance3D).CastShadow = (GeometryInstance3D.ShadowCastingSetting)entry["cast_shadow"].AsInt64();
-                (n as GeometryInstance3D).LodBias = entry["lod_bias"].AsSingle();
+                var geometry = (GeometryInstance3D)n;
+                var casting = (GeometryInstance3D.ShadowCastingSetting)entry["cast_shadow"].AsInt64();
+                float lod = entry["lod_bias"].AsSingle();
+                // Even an unchanged shadow assignment queues a native material/
+                // shadow-cache rebuild. Restore only fields the case changed.
+                if (geometry.CastShadow != casting) geometry.CastShadow = casting;
+                if (geometry.LodBias != lod) geometry.LodBias = lod;
             }
         }
         Camp camp = Game.Instance.camp;
         if (camp.campsite != null && camp.campsite.firepit != null)
         {
             camp.campsite.firepit.light.ShadowEnabled = true;
-            camp.campsite.firepit.light.OmniShadowMode = OmniLight3D.ShadowMode.Cube;
+            camp.campsite.firepit.light.OmniShadowMode = _profile_fire_shadow_mode;
             foreach (CampLantern l in camp.campsite.lanterns)
             {
                 l.light.ShadowEnabled = Quality.Instance.current.lantern_shadows;
@@ -798,6 +890,11 @@ public partial class CaptureTool : Node
         Game.Instance.world.sun.ShadowCasterMask = unchecked((uint)(_profile_sun_casters));
         GetViewport().DebugDraw = Viewport.DebugDrawEnum.Disabled;
         Quality.Instance.apply(Quality.Instance.current.tier);
+        camp.understory.set_distance_grass(_profile_distance_grass);
+        var sun = Game.Instance.world.sun;
+        sun.DirectionalShadowSplit1 = _profile_sun_splits.X;
+        sun.DirectionalShadowSplit2 = _profile_sun_splits.Y;
+        sun.DirectionalShadowSplit3 = _profile_sun_splits.Z;
     }
 
     public static Vector3 ground_relative(Vector3 p)

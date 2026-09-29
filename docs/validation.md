@@ -9,7 +9,7 @@ The conversion checks began on September 26, 2026 with
 | Check | Observed result |
 | --- | --- |
 | C# compilation and Godot import | Passed without errors or warnings |
-| C# regression suite | 107 passed, zero failed on September 27: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, terrain seams, player-boundary motion and cached-mesh lifetime included |
+| C# regression suite | 108 passed, zero failed on September 29: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, terrain seams, player-boundary motion and cached-mesh lifetime included |
 | Python tooling suite | 47 passed, zero failed |
 | Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
 | Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte |
@@ -84,11 +84,31 @@ Focused checks verify unchanged native buffer identities, complete instance
 records and coverage across merged cells. This removes unnecessary rebuilding;
 it does not establish a frame-rate improvement by itself.
 
+Nearby grass now retains its full prepared population within ten metres, then
+smoothly reduces clump density and widens survivors with distance. A conservative
+cell budget omits only instances whose shader geometry has fully disappeared.
+Three small hardware views submitted 46–67% fewer instances and were pixel-identical
+to the same density shader with all instances submitted. That verifies native
+culling against the shader, not equivalence to the older full-density scene.
+Four complete High 1080p views then saved 4.1–4.8 ms of main-view GPU time.
+Full-size before/after images and sequential walking frames were inspected; the
+complete exported 15-waypoint interaction, preset-switch and sleep route passed
+again with no ordinary fall recovery or new core/kernel GPU fault.
+`--full-grass-density` retains the old population for comparisons.
+
+The feature profiler now preserves the fire's original shadow projection,
+takes each view's lighting snapshot at its authored hour, and avoids reassigning
+unchanged geometry shadow flags. The old reset changed native shadow workload,
+so apparent savings after that reset are not valid optimization evidence.
+A readback check caught the projection mismatch before the fix. Subsequent day,
+pond and night no-op controls retained comparable geometry counts and GPU times;
+moonlit background vegetation also remained visible after restoration.
+
 ### Measured performance
 
 An exported High baseline before the canopy changes averaged **73.82 ms/frame
 (13.5 FPS)** over the 22-second benchmark route, with a 101.07 ms 99th percentile.
-The current exported build, with normal preset defaults and no optional near-tree
+The September 29 exported build, with normal preset defaults and no optional near-tree
 impostors, measured as follows at a fixed **1920×1080 output** on
 an RTX 4060 Laptop GPU, NVIDIA 610.57.04, with VSync disabled and
 `DOTNET_TieredCompilation=0`. Each preset follows the same 22-second route after
@@ -96,14 +116,18 @@ warm-up; High, Medium and Low run sequentially after any grass rebuild finishes.
 
 | Preset | Internal resolution scale | Mean frame time | Mean FPS | 99th percentile |
 | --- | --- | --- | --- | --- |
-| High | 77%, FSR2 | 45.22 ms | 22.1 | 62.50 ms |
-| Medium | 67%, FSR2 | 38.71 ms | 25.8 | 48.79 ms |
-| Low | 50%, FSR2 | 23.72 ms | 42.2 | 27.36 ms |
+| High | 77%, FSR2 | 41.84 ms | 23.9 | 54.57 ms |
+| Medium | 67%, FSR2 | 36.97 ms | 27.0 | 51.26 ms |
+| Low | 50%, FSR2 | 22.39 ms | 44.7 | 27.51 ms |
 
-SDFGI is disabled, and playable grass LOD removes curve segments earlier while
-retaining the plant population. High and Low had zero frame intervals over
-100 ms; Medium had one. Renderer memory peaked at roughly 1.96–2.19 GB, and
-process peak working set reached 6.13 GB across the sequential presets.
+The preceding full-density-grass build measured 45.22 / 38.71 / 23.72 ms for
+High / Medium / Low. These are separate route runs, not matched frame pairs;
+the fixed-view comparison above isolates the grass change more closely.
+SDFGI is disabled. Grass uses native curve LOD and the gradual density reduction
+described above. All three presets had zero frame intervals over 100 ms.
+Renderer memory peaked at roughly 1.96–2.19 GB, and process peak working set
+reached 5.78 GB across the sequential presets. No generation-two managed
+collection occurred during these short measurements.
 Godot's static-memory and water-subview timing counters returned zero and are
 unavailable measurements, not zero cost. A manual grass-LOD experiment added
 hitches without improving mean frame rate and was removed. A conservative
@@ -168,8 +192,12 @@ finalizers and flushes rendering commands while the main loop is still alive,
 then allows a short settling interval before quitting. The subsequent exported
 High 1080p ground capture exited normally with status zero and no engine error.
 This is a project-side mitigation for the observed shutdown case, not an engine
-patch. Exported SIGTERM and exit during loading still need retesting with this
-change. The separate earlier device-loss failures also remain unexplained.
+patch. Follow-up checks on the same exported build handled SIGTERM both after
+the complete scene was ready and during forest construction. Both logged the
+termination handler, exited with status 143, and produced no new core or kernel
+GPU fault. Shutdown took approximately eight seconds in the ready scene and
+two seconds during loading. The separate earlier device-loss failures remain
+unexplained.
 
 The terrain relief shader had a signed-denominator error that prevented
 interpolation between its last two height samples. An analytic GPU probe failed

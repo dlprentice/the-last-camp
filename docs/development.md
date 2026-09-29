@@ -49,7 +49,14 @@ parallax function against an analytic height field at five detail settings:
 godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-parallax --probe-out="$PWD/local-data/parallax-check"
 ```
 
-Use a fresh output directory. This is a small shader probe, not the game world.
+The grass draw-prefix check compares the production shader with every instance
+submitted against the conservative native draw count at three camera positions:
+
+```bash
+godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-grass-density --probe-out="$PWD/local-data/grass-density-check"
+```
+
+Use fresh output directories. These are small shader probes, not the game world.
 Adding `--probe-termination` leaves it drawing after `TERMINATION_PROBE_READY`;
 sending SIGTERM to that printed PID exercises the production shutdown handler.
 A handled termination logs `PROCESS_STOP SIGTERM` and exits with status 143.
@@ -75,6 +82,20 @@ On machines providing the offscreen wrapper, direct checks use fresh paths:
 godot-offscreen --timeout 600 -- -- --skip-intro --quality=high --session-check --traverse="$PWD/local-data/traversal/run-1"
 godot-offscreen --timeout 600 -- -- --benchmark=high --out="$PWD/local-data/benchmark-high.json"
 ```
+
+For a controlled feature comparison, `--profile` supports named views and cases:
+
+```bash
+godot-offscreen --timeout 300 -- -- --quality=high --profile --profile-views=arrival,night_fire --profile-cases="all on,control before restore,control after restore" --out="$PWD/local-data/profile-controls.json"
+```
+
+`--profile-images` also saves full-size stills. `--profile-check-state` compares
+native render settings before and immediately after a no-op restoration and
+exits nonzero on a mismatch. It checks settings, not the renderer's internal
+caches; the repeated controls still need comparable timing and geometry counts.
+`--full-grass-density` disables the distance budget for a reference capture.
+Each view uses its authored hour and FOV. Avoid interpreting a changed control
+as a feature optimization, or the main-view GPU counter as total frame cost.
 
 The traversal moves the controller through 15 waypoints and checks photo mode,
 the hand lantern, firewood pickup/feeding, charged stone throws, pause/resume on

@@ -25,6 +25,10 @@ uniform float trample_radius = 0.9;
 uniform float sheen : hint_range(0.0, 1.0) = 0.18;
 uniform float distance_widen : hint_range(0.0, 2.0) = 1.15;
 uniform float population_width = 1.0;
+// Native draw prefixes omit distant instances before vertex shading. The
+// per-plant blend below keeps the density change continuous within each cell.
+uniform vec4 density_lod = vec4(10.0, 14.0, 0.18, 0.035);
+instance uniform float grass_population = 0.0;
 
 varying float v_height;
 varying vec3 v_tint;
@@ -47,14 +51,20 @@ void vertex() {
 	v_side = UV.x;
 	v_blade = blade_random;
 
-	// Far dissolve only: the stand stays at full density everywhere it is
-	// planted, and clumps at the planted edge shrink away in random order
-	// over a band of thresholds rather than popping. Survivors widen so the
-	// cover holds to the last metre.
+	// The planted edge dissolves over staggered thresholds. Playable near
+	// grass can also shed individual clumps with camera distance below; both
+	// transitions widen the survivors to retain ground coverage.
 	float cam_dist = length(CAMERA_POSITION_WORLD - base);
 	float fade = smoothstep(fade_start, fade_end, cam_dist);
 	float keep = smoothstep(fade - 0.06, fade + 0.06, phase);
 	float widen = (1.0 + smoothstep(20.0, 110.0, cam_dist) * distance_widen) * population_width;
+	if (grass_population > 0.0) {
+		float t = max(0.0, (cam_dist - density_lod.x) / density_lod.y);
+		float density = max(density_lod.z, 1.0 / (1.0 + t * t));
+		float rank = float(INSTANCE_ID) / grass_population;
+		keep *= 1.0 - smoothstep(density, density + density_lod.w, rank);
+		widen *= inversesqrt(min(1.0, density + density_lod.w * 0.5));
+	}
 	vec3 local = VERTEX;
 	if (keep <= 0.001) {
 		local = vec3(0.0);
