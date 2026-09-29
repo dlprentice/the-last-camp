@@ -37,6 +37,78 @@ public partial class TreeImpostors : Node3D
     }
 
     public readonly Dictionary<string, Baked> baked = new();
+
+    public sealed class Family
+    {
+        public readonly Dictionary<string, int> Layers = new();
+        public ShaderMaterial Color;
+        public ShaderMaterial Shadow;
+        public ArrayMesh Quad;
+    }
+
+    // Shape variants share a draw while retaining separate albedo, normals,
+    // world dimensions and surface response. The complete ridge has 48 layers.
+    public Family family(IReadOnlyList<string> keys)
+    {
+        if (keys.Count == 0 || keys.Count > 64) throw new ArgumentOutOfRangeException(nameof(keys));
+        var result = new Family { Quad = _quad(1, 1, 0) };
+        var sizes = new Vector3[64];
+        var response = new Vector2[64];
+        var color = new Godot.Collections.Array<Image>();
+        var normal = new Godot.Collections.Array<Image>();
+        int width = 0, height = 0;
+        foreach (string key in keys)
+        {
+            width = Math.Max(width, baked[key].albedo.GetWidth());
+            height = Math.Max(height, baked[key].albedo.GetHeight());
+        }
+        try
+        {
+            for (int i = 0; i < keys.Count; i++)
+            {
+                Baked b = baked[keys[i]];
+                result.Layers.Add(keys[i], i);
+                sizes[i] = new Vector3(b.extent.X, b.extent.Y, (float)b.base_y);
+                response[i] = new Vector2(b.material.GetShaderParameter("roughness").AsSingle(),
+                    b.material.GetShaderParameter("translucency").AsSingle());
+                foreach (var item in new[] { (b.albedo, color), (b.normal, normal) })
+                {
+                    Image image = item.Item1.GetImage();
+                    image.ClearMipmaps();
+                    // Arrays require equal dimensions. Only enlarge smaller
+                    // layers: never discard the source atlas's pixel detail.
+                    if (image.GetWidth() != width || image.GetHeight() != height)
+                        image.Resize(width, height, Image.Interpolation.Lanczos);
+                    image.GenerateMipmaps();
+                    item.Item2.Add(image);
+                }
+            }
+            var albedo = new Texture2DArray();
+            var normals = new Texture2DArray();
+            Error albedoError = albedo.CreateFromImages(color), normalError = normals.CreateFromImages(normal);
+            if (albedoError != Error.Ok || normalError != Error.Ok)
+                throw new InvalidOperationException($"Canopy arrays: {albedoError}, {normalError}");
+            Baked first = baked[keys[0]];
+            result.Color = (ShaderMaterial)first.material.Duplicate();
+            result.Shadow = (ShaderMaterial)first.shadow_material.Duplicate();
+            foreach (ShaderMaterial material in new[] { result.Color, result.Shadow })
+            {
+                material.Shader = Content.Load<Shader>("res://shaders/tree_impostor_multimesh.gdshader");
+                material.SetShaderParameter("use_instance_custom", true);
+                material.SetShaderParameter("use_atlas_array", true);
+                material.SetShaderParameter("albedo_layers", albedo);
+                material.SetShaderParameter("normal_layers", normals);
+                material.SetShaderParameter("quad_geometry", sizes);
+                material.SetShaderParameter("surface_response", response);
+            }
+        }
+        finally
+        {
+            foreach (Image image in color) image.Dispose();
+            foreach (Image image in normal) image.Dispose();
+        }
+        return result;
+    }
     public double bake_seconds = 0.0;
     public SubViewport _viewport;
     public Camera3D _camera;

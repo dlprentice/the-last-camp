@@ -235,16 +235,28 @@ public partial class Forest : Node3D
 
     public void add_ridge_group(TreeSpecies.Kind kind, TreeGenerator.Result result, string material_key, Godot.Collections.Array<Transform3D> transforms)
     {
-        ridge_groups.Add((kind, result, material_key, transforms, ridge_multimeshes.Count));
-        /// The wooded ridges plant the forest's own generated variants out to 655 m:
-        /// the same bark and leaf meshes, batched per 128 m cell, with bark mesh LODs
-        /// and a leaf-card thinning that only starts once cards are below a pixel.
-        TreeSpecies species = TreeSpecies.by_kind(kind);
         Godot.Collections.Array<Color> customs = new Godot.Collections.Array<Color>();
         for (long i = 0, i_end = (long)transforms.Count; i < i_end; i++)
         {
             customs.Add(new Color((float)(result.height / 40.0), (float)(result.crown_center.Y / 40.0), (float)(result.crown_radius / 20.0), (float)hash_unit(i * 7919 + (long)material_key.Hash() % 1000 + (long)kind * 17)));
         }
+        if (Game.Instance?.has_flag("unbatched-canopy") != true)
+        {
+            foreach (var cell in Enumerable.Range(0, transforms.Count).GroupBy(i => canopy_cell(transforms[i].Origin)))
+                add_ridge_cell(kind, result, material_key,
+                    new Godot.Collections.Array<Transform3D>(cell.Select(i => transforms[i])),
+                    new Godot.Collections.Array<Color>(cell.Select(i => customs[i])));
+        }
+        else add_ridge_cell(kind, result, material_key, transforms, customs);
+    }
+
+    public static Vector2I canopy_cell(Vector3 position) => new((int)Math.Floor(position.X / 64), (int)Math.Floor(position.Z / 64));
+
+    private void add_ridge_cell(TreeSpecies.Kind kind, TreeGenerator.Result result, string material_key,
+        Godot.Collections.Array<Transform3D> transforms, Godot.Collections.Array<Color> customs)
+    {
+        ridge_groups.Add((kind, result, material_key, transforms, ridge_multimeshes.Count));
+        TreeSpecies species = TreeSpecies.by_kind(kind);
         _add_far_multimesh(result.bark, far_bark_materials[species.bark_set].As<Material>(), transforms, customs, true, true);
         if (result.leaves != null)
         {
@@ -262,7 +274,67 @@ public partial class Forest : Node3D
         }
     }
 
-    public void attach_ridge_impostors(TreeImpostors impostors) => attach_group_impostors(impostors, ridge_groups, ridge_multimeshes, 90);
+    public void attach_ridge_impostors(TreeImpostors impostors)
+    {
+        if (Game.Instance.has_flag("unbatched-canopy")) attach_group_impostors(impostors, ridge_groups, ridge_multimeshes, 90);
+        else attach_batched_ridges(impostors);
+    }
+
+    private void attach_batched_ridges(TreeImpostors impostors)
+    {
+        int cells = 0, trees = 0;
+        var keys = ridge_groups.Select(g => g.Key).Distinct().OrderBy(k => k, StringComparer.Ordinal).ToArray();
+        if (keys.Length == 0 || keys.Any(k => !impostors.baked.ContainsKey(k))) return;
+        TreeImpostors.Family atlas = impostors.family(keys);
+        foreach (var cell in ridge_groups.GroupBy(g => canopy_cell(g.Transforms[0].Origin)))
+        {
+            var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+                UseCustomData = true, Mesh = atlas.Quad, InstanceCount = cell.Sum(g => g.Transforms.Count) };
+            Aabb bounds = default;
+            int instance = 0;
+            foreach (var group in cell)
+            {
+                TreeImpostors.Baked b = impostors.baked[group.Key];
+                Aabb local = new(new Vector3(-b.extent.X * 0.5f, (float)b.base_y, -b.extent.X * 0.5f),
+                    new Vector3(b.extent.X, b.extent.Y, b.extent.X));
+                local = local.Merge(group.Mesh.bark.GetAabb());
+                if (group.Mesh.leaves != null) local = local.Merge(leaf_bounds(group.Mesh));
+                for (int i = 0; i < group.Transforms.Count; i++)
+                {
+                    Transform3D transform = group.Transforms[i];
+                    Aabb at = transform * local;
+                    bounds = instance == 0 ? at : bounds.Merge(at);
+                    mm.SetInstanceTransform(instance, transform);
+                    mm.SetInstanceCustomData(instance, new Color(MathF.Atan2(transform.Basis.Z.X, transform.Basis.Z.Z),
+                        ridge_multimeshes[group.First].Multimesh.GetInstanceCustomData(i).A, atlas.Layers[group.Key], 0));
+                    instance++;
+                }
+            }
+            mm.CustomAabb = bounds.Grow(1.5f);
+            float switchAt = 90 + new Vector2(bounds.Size.X, bounds.Size.Z).Length() * 0.5f;
+            AddChild(new MultiMeshInstance3D { Name = "RidgeCanopy", Multimesh = mm, MaterialOverride = atlas.Color,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, GIMode = GeometryInstance3D.GIModeEnum.Disabled,
+                VisibilityRangeBegin = switchAt, VisibilityRangeBeginMargin = 8,
+                VisibilityRangeFadeMode = GeometryInstance3D.VisibilityRangeFadeModeEnum.Self });
+            AddChild(new MultiMeshInstance3D { Name = "RidgeCanopyShadow", Multimesh = mm, MaterialOverride = atlas.Shadow,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly, GIMode = GeometryInstance3D.GIModeEnum.Disabled,
+                VisibilityRangeBegin = switchAt });
+            // Every variant in this cell uses the same bounds and native
+            // range reference, so no hole or duplicate band opens at the swap.
+            foreach (var group in cell)
+            for (int i = group.First; i < group.First + (group.Mesh.leaves == null ? 1 : 2); i++)
+            {
+                var original = ridge_multimeshes[i];
+                original.CustomAabb = mm.CustomAabb;
+                original.VisibilityRangeEnd = switchAt;
+                original.VisibilityRangeEndMargin = 8;
+                original.VisibilityRangeFadeMode = GeometryInstance3D.VisibilityRangeFadeModeEnum.Self;
+            }
+            cells++;
+            trees += instance;
+        }
+        GD.Print($"Batched canopy: {trees} trees in {cells} spatial families (previously {ridge_groups.Count} variant groups)");
+    }
 
     public void attach_far_impostors(TreeImpostors impostors) => attach_group_impostors(impostors, far_groups, far_multimeshes, 70);
 
@@ -281,6 +353,8 @@ public partial class Forest : Node3D
             if (!materials.TryGetValue(group.Key, out var pair))
             {
                 pair = ((ShaderMaterial)baked.material.Duplicate(), (ShaderMaterial)baked.shadow_material.Duplicate());
+                pair.Color.Shader = Content.Load<Shader>("res://shaders/tree_impostor_multimesh.gdshader");
+                pair.Shadow.Shader = pair.Color.Shader;
                 pair.Color.SetShaderParameter("use_instance_custom", true);
                 pair.Shadow.SetShaderParameter("use_instance_custom", true);
                 materials.Add(group.Key, pair);
@@ -377,7 +451,7 @@ public partial class Forest : Node3D
     {
         // ---------------------------------------------------------------- materials
         ShaderMaterial mat = new ShaderMaterial();
-        mat.Shader = Content.Load<Shader>("res://shaders/bark.gdshader");
+        mat.Shader = Content.Load<Shader>(far ? "res://shaders/bark_multimesh.gdshader" : "res://shaders/bark.gdshader");
         Camp.bind_texture(mat, "albedo_tex", G.format("res://textures/%s_albedo.png", bark_set));
         Camp.bind_texture(mat, "normal_tex", G.format("res://textures/%s_normal.png", bark_set));
         Camp.bind_texture(mat, "orm_tex", G.format("res://textures/%s_orm.png", bark_set));
@@ -390,7 +464,7 @@ public partial class Forest : Node3D
     public ShaderMaterial _make_leaf_material(TreeSpecies species, bool far)
     {
         ShaderMaterial mat = new ShaderMaterial();
-        mat.Shader = Content.Load<Shader>("res://shaders/foliage.gdshader");
+        mat.Shader = Content.Load<Shader>(far ? "res://shaders/foliage_multimesh.gdshader" : "res://shaders/foliage.gdshader");
         Camp.bind_texture(mat, "albedo_tex", G.format("res://textures/%s.png", species.leaf_atlas));
         Camp.bind_texture(mat, "normal_trans_tex", G.format("res://textures/%s_nt.png", species.leaf_atlas));
         mat.SetShaderParameter("use_instance_custom", far);

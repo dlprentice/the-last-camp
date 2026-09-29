@@ -9,7 +9,7 @@ The conversion checks began on September 26, 2026 with
 | Check | Observed result |
 | --- | --- |
 | C# compilation and Godot import | Passed without errors or warnings |
-| C# regression suite | 108 passed, zero failed on September 29: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, terrain seams, player-boundary motion and cached-mesh lifetime included |
+| C# regression suite | 109 passed, zero failed on September 29: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, canopy partitioning, terrain seams, player-boundary motion and cached-mesh lifetime included |
 | Python tooling suite | 47 passed, zero failed |
 | Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
 | Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte |
@@ -101,8 +101,24 @@ passes freeze wind and bypass leaf LOD. The former animated cull bounds left
 excessive empty texture space and enlarged both billboard footprints and their
 native transition ranges. Separate exported High runs saved 1.8–2.5 ms of
 main-view GPU time at the arrival, pond and night-fire views. Full-size arrival,
-pond, elevated woodland and dawn comparisons retained forest coverage. This
-later change is not included in the three-preset route table below.
+pond, elevated woodland and dawn comparisons retained forest coverage.
+
+Ridge canopies now share texture arrays across 64-metre spatial cells. The
+21,017 placements are unchanged; the distant representation uses 354 cells
+instead of 2,360 variant groups. Near geometry and its matching cards share
+culling bounds and transition ranges. A hardware fixture checks partitioned
+native transforms/tints, zero unused instance-uniform allocations in MultiMesh
+shaders, and pixel-identical array/individual rendering at three angles. The
+CPU test checks the partition records; the headless renderer cannot read back
+the native buffers. Complete High arrival, pond and night-fire views saved
+1.1–2.9 ms of GPU time beyond the tighter atlases, with full-size images inspected.
+`--unbatched-canopy` retains the previous grouping for comparison. Arrays trade
+additional texture memory for fewer draws; the route measurements below include
+both canopy changes.
+The exported High gameplay route subsequently passed all 15 waypoints,
+interactions, preset changes and the evening-to-morning session with zero
+failures. A 96-second 1080p/24 diagnostic recording with native audio was
+retained; its offline frame rate is not a gameplay-performance measurement.
 
 The feature profiler now preserves the fire's original shadow projection,
 takes each view's lighting snapshot at its authored hour, and avoids reassigning
@@ -124,17 +140,18 @@ warm-up; High, Medium and Low run sequentially after any grass rebuild finishes.
 
 | Preset | Internal resolution scale | Mean frame time | Mean FPS | 99th percentile |
 | --- | --- | --- | --- | --- |
-| High | 77%, FSR2 | 41.84 ms | 23.9 | 54.57 ms |
-| Medium | 67%, FSR2 | 36.97 ms | 27.0 | 51.26 ms |
-| Low | 50%, FSR2 | 22.39 ms | 44.7 | 27.51 ms |
+| High | 77%, FSR2 | 34.63 ms | 28.9 | 46.08 ms |
+| Medium | 67%, FSR2 | 28.84 ms | 34.7 | 37.31 ms |
+| Low | 50%, FSR2 | 19.17 ms | 52.2 | 22.07 ms |
 
-The preceding full-density-grass build measured 45.22 / 38.71 / 23.72 ms for
-High / Medium / Low. These are separate route runs, not matched frame pairs;
-the fixed-view comparison above isolates the grass change more closely.
+The preceding grass-culling build, before tighter canopy atlases and spatial
+batching, measured 41.84 / 36.97 / 22.39 ms for High / Medium / Low. These are
+separate route runs, not matched frame pairs; fixed-view comparisons isolate
+the individual changes more closely.
 SDFGI is disabled. Grass uses native curve LOD and the gradual density reduction
 described above. All three presets had zero frame intervals over 100 ms.
-Renderer memory peaked at roughly 1.96–2.19 GB, and process peak working set
-reached 5.78 GB across the sequential presets. No generation-two managed
+Renderer memory peaked at roughly 2.50–2.73 GB, and process peak working set
+reached 6.12 GB across the sequential presets. No generation-two managed
 collection occurred during these short measurements.
 Godot's static-memory and water-subview timing counters returned zero and are
 unavailable measurements, not zero cost. A manual grass-LOD experiment added

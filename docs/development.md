@@ -56,6 +56,14 @@ submitted against the conservative native draw count at three camera positions:
 godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-grass-density --probe-out="$PWD/local-data/grass-density-check"
 ```
 
+The canopy check compares individually textured cards with the array batch,
+verifies native tree transforms/tints after spatial partitioning, and checks
+that MultiMesh shaders do not allocate unused per-object uniform blocks:
+
+```bash
+godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-canopy-batches --probe-out="$PWD/local-data/canopy-check"
+```
+
 Use fresh output directories. These are small shader probes, not the game world.
 Adding `--probe-termination` leaves it drawing after `TERMINATION_PROBE_READY`;
 sending SIGTERM to that printed PID exercises the production shutdown handler.
@@ -94,6 +102,7 @@ native render settings before and immediately after a no-op restoration and
 exits nonzero on a mismatch. It checks settings, not the renderer's internal
 caches; the repeated controls still need comparable timing and geometry counts.
 `--full-grass-density` disables the distance budget for a reference capture.
+`--unbatched-canopy` retains the old per-variant ridge groups for comparison.
 Each view uses its authored hour and FOV. Avoid interpreting a changed control
 as a feature optimization, or the main-view GPU counter as total frame cost.
 

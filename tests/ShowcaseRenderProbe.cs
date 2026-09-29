@@ -117,6 +117,11 @@ public partial class ShowcaseRenderProbe : SceneTree
         camera.Fov = 42;
         view.AddChild(camera);
         camera.MakeCurrent();
+        if (OS.GetCmdlineUserArgs().Contains("--probe-canopy-batches"))
+        {
+            await CheckCanopyBatches();
+            return;
+        }
         if (OS.GetCmdlineUserArgs().Contains("--probe-grass-density"))
         {
             await CheckGrassDensity();
@@ -172,6 +177,125 @@ public partial class ShowcaseRenderProbe : SceneTree
         await capture("hardware_wet");
         G.print("SHOWCASE_RENDER_PROBE_DONE output=", output, " frames_drawn=", Engine.GetFramesDrawn());
         Quit(0);
+    }
+
+    private async Task CheckCanopyBatches()
+    {
+        bool passed = true;
+        var rows = new Godot.Collections.Array();
+        using (var partition = new TestCanopyBatching())
+        using (var result = partition.run())
+        {
+            rows.Add(result);
+            passed &= result["failed"].AsInt32() == 0;
+        }
+        foreach (string name in new[] { "bark", "foliage", "tree_impostor" })
+        {
+            int[] counts = new int[2];
+            for (int variant = 0; variant < 2; variant++)
+            {
+                string path = $"res://shaders/{name}{(variant == 1 ? "_multimesh" : "")}.gdshader";
+                var shader = Content.Load<Shader>(path);
+                passed &= shader.GetShaderUniformList().Count > 0;
+                var node = new MeshInstance3D { Mesh = new QuadMesh(), Visible = false,
+                    MaterialOverride = new ShaderMaterial { Shader = shader } };
+                view.AddChild(node);
+                await ToSignal(this, SignalName.ProcessFrame);
+                counts[variant] = RenderingServer.InstanceGeometryGetShaderParameterList(node.GetInstance()).Count;
+                node.Free();
+            }
+            bool ok = counts[0] > 0 && counts[1] == 0;
+            passed &= ok;
+            rows.Add(new Godot.Collections.Dictionary { { "shader", name }, { "individual_parameters", counts[0] },
+                { "multimesh_parameters", counts[1] }, { "passed", ok } });
+            GD.Print($"CANOPY_PARAMETER_PROBE {name}: {counts[0]}->{counts[1]}, {(ok ? "PASS" : "FAIL")}");
+        }
+        var maker = new TreeImpostors();
+        var individual = new Node3D();
+        view.AddChild(individual);
+        var transforms = new Transform3D[6];
+        var keys = Enumerable.Range(0, 6).Select(i => i.ToString()).ToArray();
+        for (int i = 0; i < 6; i++)
+        {
+            using Image color = Image.CreateEmpty(96 + i * 12, 16 + i * 2, false, Image.Format.Rgba8);
+            color.Fill(Color.FromHsv(i / 6.0f, 0.65f, 0.85f));
+            color.GenerateMipmaps();
+            using Image normal = Image.CreateEmpty(color.GetWidth(), color.GetHeight(), false, Image.Format.Rgba8);
+            normal.Fill(new Color(0.5f, 0.5f, 1, 1));
+            normal.GenerateMipmaps();
+            var baked = new TreeImpostors.Baked { albedo = ImageTexture.CreateFromImage(color), normal = ImageTexture.CreateFromImage(normal),
+                extent = new Vector2(0.8f + i * 0.13f, 2 + i * 0.21f), base_y = i * 0.08 };
+            baked.quad = TreeImpostors._quad(baked.extent.X, baked.extent.Y, baked.base_y);
+            baked.material = new ShaderMaterial { Shader = Content.Load<Shader>("res://shaders/tree_impostor.gdshader") };
+            baked.material.SetShaderParameter("albedo_atlas", baked.albedo);
+            baked.material.SetShaderParameter("normal_atlas", baked.normal);
+            baked.material.SetShaderParameter("use_instance_custom", true);
+            baked.material.SetShaderParameter("roughness", 0.4f + i * 0.05f);
+            baked.material.SetShaderParameter("translucency", 0.1f + i * 0.04f);
+            baked.shadow_material = (ShaderMaterial)baked.material.Duplicate();
+            maker.baked.Add(keys[i], baked);
+            transforms[i] = new Transform3D(new Basis(Vector3.Up, i * 0.23f).Scaled(Vector3.One * (0.9f + i * 0.04f)),
+                new Vector3(-7.5f + i * 3, 0, 0));
+            var one = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+                UseCustomData = true, Mesh = baked.quad, InstanceCount = 1 };
+            one.SetInstanceTransform(0, transforms[i]);
+            one.SetInstanceCustomData(0, new Color(i * 0.23f, 0.4f, 0, 0));
+            individual.AddChild(new MultiMeshInstance3D { Multimesh = one, MaterialOverride = baked.material,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        }
+        TreeImpostors.Family family = maker.family(keys);
+        var all = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            UseCustomData = true, Mesh = family.Quad, InstanceCount = 6,
+            CustomAabb = new Aabb(new Vector3(-10, -1, -10), new Vector3(20, 8, 20)) };
+        for (int i = 0; i < 6; i++)
+        {
+            all.SetInstanceTransform(i, transforms[i]);
+            all.SetInstanceCustomData(i, new Color(i * 0.23f, 0.4f, i, 0));
+        }
+        var batched = new MultiMeshInstance3D { Multimesh = all, MaterialOverride = family.Color,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
+        view.AddChild(batched);
+        foreach (int angle in new[] { 0, 1, 2 })
+        {
+            camera.Position = new Vector3((angle - 1) * 5, 4, 27);
+            camera.LookAt(new Vector3(0, 1.5f, 0));
+            individual.Visible = true; batched.Visible = false;
+            for (int frame = 0; frame < 8; frame++) await ToSignal(this, SignalName.ProcessFrame);
+            await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+            using Image reference = view.GetTexture().GetImage();
+            reference.SavePng(output.PathJoin($"canopy_{angle}_individual.png"));
+            individual.Visible = false; batched.Visible = true;
+            for (int frame = 0; frame < 8; frame++) await ToSignal(this, SignalName.ProcessFrame);
+            await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+            using Image actual = view.GetTexture().GetImage();
+            actual.SavePng(output.PathJoin($"canopy_{angle}_batched.png"));
+            byte[] expected = reference.GetData(), observed = actual.GetData();
+            double error = expected.Zip(observed).Average(pair => Math.Abs((int)pair.First - pair.Second));
+            int changed = expected.Zip(observed).Count(pair => Math.Abs((int)pair.First - pair.Second) > 2);
+            var centers = new HashSet<Color>();
+            Color background = reference.GetPixel(0, 0);
+            bool visible = true;
+            for (int i = 0; i < 6; i++)
+            {
+                var b = maker.baked[keys[i]];
+                Vector3 center = transforms[i].Origin + Vector3.Up *
+                    (float)((b.base_y + b.extent.Y * 0.5) * transforms[i].Basis.Y.Length());
+                Vector2I pixel = (Vector2I)camera.UnprojectPosition(center);
+                Color sample = reference.GetPixel(pixel.X, pixel.Y);
+                centers.Add(sample);
+                visible &= new Vector3(sample.R - background.R, sample.G - background.G, sample.B - background.B).Length() > 0.1f;
+            }
+            bool ok = error < 0.05 && changed < expected.Length * 0.003 && visible && centers.Count == 6;
+            passed &= ok;
+            rows.Add(new Godot.Collections.Dictionary { { "angle", angle }, { "mean_byte_error", error }, { "changed_bytes", changed }, { "passed", ok } });
+            GD.Print($"CANOPY_BATCH_PROBE {angle}: error={error:F5}, changed={changed}, {(ok ? "PASS" : "FAIL")}");
+        }
+        using var file = Godot.FileAccess.Open(output.PathJoin("canopy-batches.json"), Godot.FileAccess.ModeFlags.Write);
+        file.StoreString(Json.Stringify(rows, "  "));
+        view.Free(); maker.Free();
+        G.drain_finalizers();
+        await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        Quit(passed ? 0 : 1);
     }
 
     private async Task CheckGrassDensity()
