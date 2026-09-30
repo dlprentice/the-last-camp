@@ -41,3 +41,9 @@ Runtime testing, rendering and performance work are authorized. Use isolated
 offscreen GPU runs, retain before/after evidence, and measure the exported game.
 Keep visual and performance claims limited to what has actually been inspected
 and measured; the conversion's CPU fixtures alone do not establish acceptance.
+
+Current optimization work is on `work/vegetation-optimization`. It retains the
+September 30 grass-density and spatial-bounds candidates plus diagnostic profile
+cases. These changes are still under review; `master` retains the verified
+research checkpoint. Compare route timing, hitches and visual coverage before
+promoting the candidates. See `docs/validation.md` for the measured tradeoffs.

@@ -138,9 +138,9 @@ public partial class QualityPreset : RefCounted
         p.tier = QualityPreset.Tier.HIGH;
         p.display_name = "High";
         p.contact_shadows = true;
-        // Measured on the RTX 4060 Laptop (2026-09-10): the frame is fragment-bound
-        // in vegetation, so the atlas and internal resolution are the levers that
-        // pay without changing the layout. Ultra keeps the full-size settings.
+        // Internal resolution and shadow budgets reduce GPU work while retaining
+        // the layout. Vegetation geometry and repeated passes remain significant;
+        // lower pixel counts alone do not resolve the measured frame-time budget.
         p.render_scale = 0.77;
         p.upscaler = Viewport.Scaling3DModeEnum.Fsr2;
         p.directional_shadow_size = 2048;

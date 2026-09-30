@@ -52,8 +52,11 @@ godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- -
 ```
 
 The grass draw-prefix check compares the production shader with every instance
-submitted against the conservative native draw count at three camera positions.
-It also requires an unchanged reference to repeat exactly. Wind, temporal AA,
+submitted against the conservative native draw count and adaptive cull bounds
+at three camera positions, for both the default and diagnostic density curves
+(six comparisons). Native mesh LOD is disabled in this geometry fixture, and
+the all-instance reference has deliberately generous bounds. It also requires
+an unchanged reference to repeat exactly. Wind, temporal AA,
 debanding and the light's stochastic screen-space contact shadows are disabled
 in this geometry fixture; the game's contact shadows remain enabled on High/Ultra:
 
@@ -123,8 +126,19 @@ caches; the repeated controls still need comparable timing and geometry counts.
 `--full-grass-density` disables the distance budget for a reference capture.
 `--unbatched-canopy` retains the old per-variant ridge groups for comparison.
 `--resident-textures` loads all streamed maps at full detail for comparison.
+The optimization work branch uses a candidate distant-grass minimum of 0.045;
+`--dense-distant-grass` retains the preceding 0.18 minimum. Both preserve the same
+density curve through 39 m. `--grass-cells-8m` and `--adaptive-grass-bounds` enable
+the spatial experiments; without them, cells remain 16 m with fixed conservative
+bounds. The `grass density 6m` profile case tests an earlier density transition,
+and `grass adaptive bounds` tests distance-aware cull margins. These are measured
+candidates, not a blanket recommendation to reduce vegetation quality.
 `--no-contact-shadows` disables the High/Ultra directional contact pass; the
 profiler also has `contact shadows off` and `contact shadows on` cases.
+The `vrs 2x2` and `fsr2 50%` profile cases isolate coarser fragment shading and
+lower internal resolution. They are diagnostics, not gameplay defaults. The
+reflection-active fraction records whether the pond requested its mirror;
+the last-submitted primitive count can remain nonzero while it is suspended.
 Each view uses its authored hour and FOV. Avoid interpreting a changed control
 as a feature optimization, or the main-view GPU counter as total frame cost.
 
@@ -153,6 +167,8 @@ results, rather than treating an optimization technique as a promised saving.
 | --- | --- | --- |
 | Geometry or pixel work? | [Godot GPU optimization](https://docs.godotengine.org/en/latest/tutorials/performance/gpu_optimization.html), [NVIDIA GPU bottleneck analysis](https://developer.nvidia.com/blog/the-peak-performance-analysis-method-for-optimizing-any-gpu-workload/) | Compare resolution, shader work and geometry independently. A high GPU utilization number does not identify the limiting hardware unit. Preserve colour, depth and shadow pass timings, not only FPS. |
 | Why can a large batch remain expensive? | [Godot mesh LOD](https://docs.godotengine.org/en/latest/tutorials/3d/mesh_lod.html), [3D optimization](https://docs.godotengine.org/en/latest/tutorials/performance/optimizing_3d_performance.html) | MultiMesh instances share culling and an LOD selected from the nearest part of the batch AABB. Keep spatial cells; fewer draw calls alone do not prove less GPU work. |
+| How can grass retain coverage with less geometry? | [Godot MultiMesh optimization](https://docs.godotengine.org/en/latest/tutorials/performance/using_multimesh.html), [AMD procedural grass](https://gpuopen.com/learn/mesh_shaders/mesh_shaders-procedural_grass_rendering/) | The game already combines native instance prefixes, fractional shrinking and wider surviving clumps. Measure the remaining per-cell over-submission and deformation cost. AMD's mesh-shader implementation is a conceptual reference, not a shader that can be pasted into this Godot renderer. |
+| Can the GPU reject individual instances before drawing? | [Godot indirect MultiMesh implementation](https://github.com/godotengine/godot/pull/99455), [RenderingServer command-buffer API](https://docs.godotengine.org/en/latest/classes/class_renderingserver.html#class-renderingserver-method-multimesh-get-command-buffer-rd-rid) | Yes, custom compute culling can update indirect instance counts. The pinned .NET API exposes both buffers. This is not automatic MultiMesh culling or a proven speedup here; any prototype must preserve instance identity, wind motion vectors, LOD index counts and secondary-view visibility. |
 | How should distant woodland change representation? | [Godot visibility ranges](https://docs.godotengine.org/en/latest/tutorials/3d/visibility_ranges.html) | Retain continuous silhouettes and reduce material/geometry cost together. Built-in alpha fades invoke transparent rendering; evaluate dither or opaque-compatible transitions in motion. Existing canopy arrays already address this; closer impostors previously lost performance. |
 | Would occlusion solve the forest? | [Godot occlusion culling](https://docs.godotengine.org/en/latest/tutorials/3d/occlusion_culling.html) | A whole AABB must be behind an actual solid occluder. Leaf canopies cannot be replaced with opaque occlusion walls. Terrain occlusion was tested and gave negligible benefit in the camp views; do not keep it merely because it is available. |
 | How do shadows multiply foliage cost? | [Godot lights and shadows](https://docs.godotengine.org/en/latest/tutorials/3d/lights_and_shadows.html), [dev6 release](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-6/) | Cascades can submit geometry repeatedly. High already uses two cascades, an 80 m shadow range and a 2048 atlas. Measure caster families before reducing these further. Contact shadows supplement small visible geometry but cannot replace offscreen casters. |

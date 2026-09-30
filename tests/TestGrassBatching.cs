@@ -15,17 +15,23 @@ public partial class TestGrassBatching : TestCase
         assert_eq(Understory.grass_draw_count(bounds, Vector3.Zero, 0), 0, "empty cells remain empty");
         int far = Understory.grass_draw_count(bounds, new Vector3(120, 1, 120), population);
         assert_true(far > 0 && far < population / 4, "far cells keep cover with fewer native instances");
+        for (int distance = 0; distance <= 39; distance++)
+            assert_eq(Understory.grass_density_at(distance), Understory.grass_density_at(distance, 0.18f),
+                "the reduced distant floor preserves the established foreground density curve");
+        int previousFar = Understory.grass_draw_count(bounds, new Vector3(120, 1, 120), population, 0.18f);
+        assert_lt(far, previousFar / 2.0, "subpixel distant grass does not retain the old fixed population floor");
+        foreach (Vector2 curve in new[] { new Vector2(Understory.GrassDensityStart, Understory.GrassDensityTransition), new Vector2(6, 9) })
         for (int direction = 0; direction < 16; direction++)
         for (int distance = 0; distance <= 160; distance += 4)
         {
             float angle = direction * MathF.Tau / 16;
             Vector3 camera = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle)) * distance + new Vector3(-8, 2, -8);
-            int draw = Understory.grass_draw_count(bounds, camera, population);
+            int draw = Understory.grass_draw_count(bounds, camera, population, start: curve.X, transition: curve.Y);
             for (int x = 0; x <= 4; x++)
             for (int z = 0; z <= 4; z++)
             {
                 Vector3 plant = bounds.Position + new Vector3(x * 4, 1, z * 4);
-                float survivorLimit = Math.Min(1, Understory.grass_density_at(plant.DistanceTo(camera)) + Understory.GrassDensityBlend);
+                float survivorLimit = Math.Min(1, Understory.grass_density_at(plant.DistanceTo(camera), start: curve.X, transition: curve.Y) + Understory.GrassDensityBlend);
                 assert_true(draw >= Math.Ceiling(population * (double)survivorLimit),
                     "native prefix includes every plant that can survive the shader's transition, even at cell corners");
             }

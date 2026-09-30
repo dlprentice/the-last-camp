@@ -55,14 +55,18 @@ public partial class Understory : Node3D
     public GodotThread _replant_thread;
     private double _preparedGrassDensity;
     private double _preparedGrassDistance;
-    private readonly List<(MultiMesh Mesh, bool Distant, MultiMeshInstance3D Node, Aabb Bounds)> _grassBatches = new();
+    private readonly List<(MultiMesh Mesh, bool Distant, MultiMeshInstance3D Node, Aabb Bounds, float Radius)> _grassBatches = new();
     public const float GrassDensityStart = 10.0f;
     public const float GrassDensityTransition = 14.0f;
-    public const float GrassDensityMinimum = 0.18f;
+    public const float GrassDensityMinimum = 0.045f;
     public const float GrassDensityBlend = 0.035f;
     public bool distance_grass_enabled { get; private set; }
+    public float grass_density_minimum { get; private set; } = GrassDensityMinimum;
+    private float _grassDensityStart = GrassDensityStart;
+    private float _grassDensityTransition = GrassDensityTransition;
     private double _nearGrassRatio = 1.0;
     private Vector3 _grassCamera = new(float.PositiveInfinity, 0, 0);
+    public bool adaptive_grass_bounds;
 
     public Understory(TerrainField p_field, ScenePlan p_plan)
     {
@@ -102,6 +106,8 @@ public partial class Understory : Node3D
         // Full foreground coverage, smoothly thinned and widened farther away.
         // Keep a reference switch for visual/performance comparisons.
         distance_grass_enabled = Game.Instance?.has_flag("full-grass-density") != true;
+        adaptive_grass_bounds = Game.Instance?.has_flag("adaptive-grass-bounds") == true;
+        grass_density_minimum = Game.Instance?.has_flag("dense-distant-grass") == true ? 0.18f : GrassDensityMinimum;
         _preparedGrassDensity = planter.density;
         _preparedGrassDistance = planter.extent - GrassPlanter.CHUNK_SIZE;
         blade_count = 0;
@@ -112,7 +118,8 @@ public partial class Understory : Node3D
             apply_quality(Quality.Instance.current);
         }
         ArrayMesh blade = GrassPlanter.clump_mesh();
-        _upload_grass(GrassPlanter.merge_chunks(planter.chunks, 16), blade, grass_material, "Grass");
+        int renderCellSize = Game.Instance?.has_flag("grass-cells-8m") == true ? 8 : 16;
+        _upload_grass(GrassPlanter.merge_chunks(planter.chunks, renderCellSize), blade, grass_material, "Grass");
         if (distant_grass_material == null)
         {
             distant_grass_material = new ShaderMaterial();
@@ -147,10 +154,27 @@ public partial class Understory : Node3D
             mmi.GIMode = GeometryInstance3D.GIModeEnum.Disabled;
             mmi.Layers = unchecked((uint)(Pond.GRASS_LAYER));
             mmi.LodBias = _grassLodBias;
+            // Density compensation broadens the clump's horizontal footprint.
+            // Include that deformation in native culling instead of clipping
+            // blades at the rest mesh's cell boundary.
+            float scaledRadius = 0;
+            if (prefix != "HillGrass")
+            {
+                float maxFootprint = 0;
+                for (int i = 0; i < chunk.buffer.Count; i += (int)GrassPlanter.FLOATS_PER_INSTANCE)
+                    maxFootprint = Math.Max(maxFootprint, new Vector2(chunk.buffer[i], chunk.buffer[i + 8]).Length());
+                Aabb restBounds = mesh.GetAabb();
+                float xExtent = Math.Max(Math.Abs(restBounds.Position.X), Math.Abs(restBounds.End.X));
+                float zExtent = Math.Max(Math.Abs(restBounds.Position.Z), Math.Abs(restBounds.End.Z));
+                float horizontalRadius = new Vector2(xExtent, zExtent).Length();
+                scaledRadius = maxFootprint * horizontalRadius;
+                float maxWiden = 2.15f / MathF.Sqrt(GrassDensityMinimum + GrassDensityBlend * 0.5f);
+                mmi.ExtraCullMargin = scaledRadius * (maxWiden - 1) + 1.0f;
+            }
             _set_range(mmi, prefix == "HillGrass" ? 800 : _grass_distance);
             AddChild(mmi);
             grass_chunks.Add(mmi);
-            _grassBatches.Add((mm, prefix == "HillGrass", mmi, chunk.aabb));
+            _grassBatches.Add((mm, prefix == "HillGrass", mmi, chunk.aabb, scaledRadius));
         }
     }
 
@@ -177,7 +201,7 @@ public partial class Understory : Node3D
         // Distant planning widens clumps as density falls. Preserve that same
         // coverage adjustment while reusing the already uploaded transforms.
         distant_grass_material?.SetShaderParameter("population_width", 1.0 / Math.Sqrt(Math.Max(farRatio, 0.001)));
-        grass_material?.SetShaderParameter("density_lod", new Vector4(GrassDensityStart, GrassDensityTransition, GrassDensityMinimum, GrassDensityBlend));
+        grass_material?.SetShaderParameter("density_lod", new Vector4(_grassDensityStart, _grassDensityTransition, grass_density_minimum, GrassDensityBlend));
         _grassCamera = new Vector3(float.PositiveInfinity, 0, 0);
         UpdateGrassDraws();
     }
@@ -189,13 +213,52 @@ public partial class Understory : Node3D
         ApplyGrassBudget();
     }
 
-    public static float grass_density_at(float distance)
+    public void set_distance_grass_minimum(float minimum)
     {
-        float t = Math.Max(0, (distance - GrassDensityStart) / GrassDensityTransition);
-        return Math.Max(GrassDensityMinimum, 1.0f / (1.0f + t * t));
+        grass_density_minimum = Math.Clamp(minimum, GrassDensityMinimum, 1);
+        ApplyGrassBudget();
     }
 
-    public static int grass_draw_count(Aabb bounds, Vector3 camera, int population)
+    public void set_grass_density_curve(float start, float transition)
+    {
+        _grassDensityStart = Math.Max(0, start);
+        _grassDensityTransition = Math.Max(1, transition);
+        ApplyGrassBudget();
+    }
+
+    public void set_adaptive_grass_bounds(bool enabled)
+    {
+        adaptive_grass_bounds = enabled;
+        if (!enabled)
+            foreach (var batch in _grassBatches)
+                if (!batch.Distant)
+                    batch.Node.ExtraCullMargin = batch.Radius * (2.15f / MathF.Sqrt(GrassDensityMinimum + GrassDensityBlend * 0.5f) - 1) + 1;
+        ApplyGrassBudget();
+    }
+
+    public static float grass_cull_margin(Aabb bounds, Vector3 camera, float radius,
+        float minimum = GrassDensityMinimum, float start = GrassDensityStart, float transition = GrassDensityTransition)
+    {
+        // Distance, widening and density compensation are monotonic. The
+        // farthest corner bounds every root, plus movement before the next
+        // update. Round upward so small steps do not dirty native bounds.
+        Vector3 extent = (bounds.Position - camera).Abs().Max((bounds.End - camera).Abs());
+        float farthest = extent.Length() + 2;
+        float t = Math.Clamp((farthest - 20) / 90, 0, 1);
+        float widen = 1 + t * t * (3 - 2 * t) * 1.15f;
+        widen /= MathF.Sqrt(Math.Min(1, grass_density_at(farthest, minimum, start, transition) + GrassDensityBlend * 0.5f));
+        return MathF.Ceiling((radius * (widen - 1) + 1) * 4) * 0.25f;
+    }
+
+    public static float grass_density_at(float distance, float minimum = GrassDensityMinimum,
+        float start = GrassDensityStart, float transition = GrassDensityTransition)
+    {
+        float t = Math.Max(0, (distance - start) / transition);
+        return Math.Max(minimum, 1.0f / (1.0f + t * t));
+    }
+
+    public static int grass_draw_count(Aabb bounds, Vector3 camera, int population, float minimum = GrassDensityMinimum,
+        float start = GrassDensityStart, float transition = GrassDensityTransition)
     {
         // Nearest horizontal point, with room for camera motion between updates.
         // The shader uses each plant's actual 3D distance, so this must be an
@@ -204,7 +267,7 @@ public partial class Understory : Node3D
         float dx = Math.Max(Math.Max(bounds.Position.X - camera.X, camera.X - end.X), 0);
         float dz = Math.Max(Math.Max(bounds.Position.Z - camera.Z, camera.Z - end.Z), 0);
         float nearest = Math.Max(0, MathF.Sqrt(dx * dx + dz * dz) - 2.0f);
-        float keep = Math.Min(1, grass_density_at(nearest) + GrassDensityBlend);
+        float keep = Math.Min(1, grass_density_at(nearest, minimum, start, transition) + GrassDensityBlend);
         return Math.Clamp((int)Math.Ceiling(population * (double)keep), 0, population);
     }
 
@@ -223,8 +286,13 @@ public partial class Understory : Node3D
         {
             if (batch.Distant) continue;
             int population = (int)Math.Round(batch.Mesh.InstanceCount * _nearGrassRatio);
-            int count = grass_draw_count(batch.Bounds, position, population);
+            int count = grass_draw_count(batch.Bounds, position, population, grass_density_minimum, _grassDensityStart, _grassDensityTransition);
             if (batch.Mesh.VisibleInstanceCount != count) batch.Mesh.VisibleInstanceCount = count;
+            if (adaptive_grass_bounds)
+            {
+                float margin = grass_cull_margin(batch.Bounds, position, batch.Radius, grass_density_minimum, _grassDensityStart, _grassDensityTransition);
+                if (batch.Node.ExtraCullMargin != margin) batch.Node.ExtraCullMargin = margin;
+            }
             submitted += count;
         }
         blade_count = submitted;

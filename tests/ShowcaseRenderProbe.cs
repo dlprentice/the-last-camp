@@ -457,6 +457,7 @@ public partial class ShowcaseRenderProbe : SceneTree
         sun.ShadowContactShadowsAllow = false;
         view.UseTaa = false;
         view.UseDebanding = false;
+        view.MeshLodThreshold = 0;
         RenderingServer.GlobalShaderParameterSet("wind_strength", 0.0f);
         RenderingServer.GlobalShaderParameterSet("player_position", new Vector3(10000, 0, 0));
         var material = new ShaderMaterial { Shader = Content.Load<Shader>("res://shaders/grass.gdshader") };
@@ -465,7 +466,7 @@ public partial class ShowcaseRenderProbe : SceneTree
         var planter = new GrassPlanter(new TerrainField(), 32, 0.15);
         planter.plan();
         var mesh = GrassPlanter.clump_mesh();
-        var batches = new List<(MultiMesh Mesh, Aabb Bounds)>();
+        var batches = new List<(MultiMesh Mesh, Aabb Bounds, MultiMeshInstance3D Node, float Radius)>();
         foreach (var chunk in planter.chunks)
         {
             var batch = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
@@ -476,17 +477,25 @@ public partial class ShowcaseRenderProbe : SceneTree
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
             node.SetInstanceShaderParameter("grass_population", (float)chunk.count);
             view.AddChild(node);
-            batches.Add((batch, chunk.aabb));
+            float footprint = 0;
+            for (int i = 0; i < chunk.buffer.Count; i += (int)GrassPlanter.FLOATS_PER_INSTANCE)
+                footprint = Math.Max(footprint, new Vector2(chunk.buffer[i], chunk.buffer[i + 8]).Length());
+            Aabb rest = mesh.GetAabb();
+            float radius = new Vector2(Math.Max(Math.Abs(rest.Position.X), Math.Abs(rest.End.X)),
+                Math.Max(Math.Abs(rest.Position.Z), Math.Abs(rest.End.Z))).Length() * footprint;
+            batches.Add((batch, chunk.aabb, node, radius));
         }
         bool passed = true;
         var report = new Godot.Collections.Dictionary();
         var positions = new[] { new Vector3(10, 2, 30), new Vector3(20, 2, 45), new Vector3(-38, 1.7f, 15) };
-        for (int shot = 0; shot < positions.Length; shot++)
+        for (int shot = 0; shot < positions.Length * 2; shot++)
         {
-            camera.Position = positions[shot];
+            var curve = shot < positions.Length ? new Vector2(Understory.GrassDensityStart, Understory.GrassDensityTransition) : new Vector2(6, 9);
+            material.SetShaderParameter("density_lod", new Vector4(curve.X, curve.Y, Understory.GrassDensityMinimum, Understory.GrassDensityBlend));
+            camera.Position = positions[shot % positions.Length];
             camera.LookAt(new Vector3(0, 0.4f, 0));
             long full = 0, reduced = 0;
-            foreach (var batch in batches) { batch.Mesh.VisibleInstanceCount = -1; full += batch.Mesh.InstanceCount; }
+            foreach (var batch in batches) { batch.Mesh.VisibleInstanceCount = -1; batch.Node.ExtraCullMargin = 64; full += batch.Mesh.InstanceCount; }
             for (int frame = 0; frame < 8; frame++) await ToSignal(this, SignalName.ProcessFrame);
             await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
             using var reference = view.GetTexture().GetImage();
@@ -499,8 +508,10 @@ public partial class ShowcaseRenderProbe : SceneTree
             GD.Print($"GRASS_REPEAT {shot}: {repeatDifferences} different bytes without draw-count changes");
             foreach (var batch in batches)
             {
-                int count = Understory.grass_draw_count(batch.Bounds, camera.Position, batch.Mesh.InstanceCount);
+                int count = Understory.grass_draw_count(batch.Bounds, camera.Position, batch.Mesh.InstanceCount, start: curve.X, transition: curve.Y);
                 batch.Mesh.VisibleInstanceCount = count;
+                batch.Node.ExtraCullMargin = Understory.grass_cull_margin(batch.Bounds, camera.Position, batch.Radius,
+                    start: curve.X, transition: curve.Y);
                 reduced += count;
             }
             for (int frame = 0; frame < 8; frame++) await ToSignal(this, SignalName.ProcessFrame);
@@ -516,6 +527,7 @@ public partial class ShowcaseRenderProbe : SceneTree
             bool ok = repeatDifferences == 0 && differences == 0 && reduced < full && colors.Count > 64;
             passed &= ok;
             report[shot] = new Godot.Collections.Dictionary { { "full_instances", full }, { "submitted_instances", reduced },
+                { "density_start", curve.X }, { "density_transition", curve.Y },
                 { "different_bytes", differences }, { "repeat_different_bytes", repeatDifferences }, { "sampled_colors", colors.Count }, { "passed", ok } };
             GD.Print($"GRASS_DENSITY_PROBE {shot}: {full}->{reduced}, changed bytes={differences}, {(ok ? "PASS" : "FAIL")}");
         }

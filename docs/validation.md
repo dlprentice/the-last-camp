@@ -230,6 +230,28 @@ separate canopy representation. These measurements identify priorities, not
 the result of turning off required scene elements. All three views completed
 with status zero, no new engine core and no NVIDIA Xid.
 
+An early-alpha foliage experiment passed nine isolated image comparisons but
+did not improve the exported scene: main-view GPU changes stayed within 0.1 ms
+of the controls in arrival, pond and night-fire views. The experimental shader
+was removed. Increasing reflection mesh LOD from 4 to 8 pixels or reducing its
+far plane from 700 to 250 m was similarly neutral. Those defaults remain intact;
+reducing a counter is not enough to accept a change.
+
+A separate exported pixel-cost comparison kept the same output resolution and
+scene. Uniform 2×2 variable-rate shading was supported by the device but changed
+main-view GPU time by only −0.35 / +0.11 / +0.09 ms in arrival / pond / night fire.
+Reducing FSR2's internal scale from 77% to 50% saved 5.10 / 3.62 / 4.89 ms, yet
+left 25.82 / 22.85 / 24.52 ms of main-view work. Neither is a new quality default.
+Together with the component tests, this prioritizes submitted vegetation and
+repeated passes over minor fragment-shader reductions; it does not identify a
+specific GPU hardware unit without a hardware-counter capture.
+
+A pond-visibility trial used conservative terrain-bank occluders, first with one
+water bound and then 144 wave-bounded tiles. Both retained active reflections in
+all four tested views and gave no consistent frame-time improvement. The trial
+was removed. A visually hidden-looking pond is insufficient evidence to disable
+its mirror; an optimization must conservatively account for every visible part.
+
 The corresponding shader/native-prefix grass check matches exactly in three
 hardware views after disabling stochastic contact-shadow samples in the test
 fixture. Production contact shadows remain enabled. The candidate reduced
@@ -240,6 +262,32 @@ changes and rest/sleep to dawn. Full-size foreground, pond and path images were
 inspected; the retained 96-second diagnostic does not yet establish complete
 motion or audio acceptance. The source-based optimization rationale is in the
 [development guide](development.md#optimization-references-and-decisions).
+
+The `work/vegetation-optimization` checkpoint also retains unaccepted spatial
+experiments. Six hardware comparisons matched the all-instance reference exactly
+when using conservative native prefixes and adaptive cull bounds. Native mesh
+LOD was disabled in that fixture to isolate geometry rejection. Four focused
+`TestGrassBatching` tests passed on September 30; the full-suite counts above
+remain the earlier September 29 results.
+
+A same-export, uncapped 1080p route comparison measured the following. Both runs
+use the 0.045 minimum; the second additionally enables 8 m cells and adaptive
+bounds. This is one paired comparison, not proof of a general improvement:
+
+| Preset | 16 m / fixed: mean / p99 / FPS | 8 m / adaptive: mean / p99 / FPS |
+| --- | --- | --- |
+| High | 35.06 / 46.83 ms / 28.5 | 34.24 / 47.50 ms / 29.2 |
+| Medium | 29.27 / 38.79 ms / 34.2 | 29.15 / 40.65 ms / 34.3 |
+| Low | 19.51 / 26.86 ms / 51.3 | 19.04 / 24.59 ms / 52.5 |
+
+High's main-view GPU time fell from 29.56 to 28.28 ms, while render-thread CPU
+time rose from 8.24 to 9.67 ms and average draw calls rose from 6,091 to 8,071.
+The candidate's Low run included one 102.33 ms frame; the baseline had no frames
+over 100 ms. Peak process working set reached 6.44 GB versus 5.78 GB. Both runs
+exited with status zero and no new core or NVIDIA Xid. Those tradeoffs leave the
+spatial settings opt-in. Full-size adaptive-bound pond and foreground images
+were inspected, but the combined 8 m/adaptive path has not received complete
+moving visual review. Performance remains below the intended gameplay target.
 
 ### Stability and visual limits
 

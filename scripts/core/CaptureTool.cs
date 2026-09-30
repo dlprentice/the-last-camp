@@ -406,6 +406,10 @@ public partial class CaptureTool : Node
         _profile_fire_shadow_mode = camp.campsite.firepit.light.OmniShadowMode;
         _profile_sun_casters = (long)world.sun.ShadowCasterMask;
         _profile_distance_grass = camp.understory.distance_grass_enabled;
+        _profileAdaptiveGrassBounds = camp.understory.adaptive_grass_bounds;
+        _profileVrsMode = GetViewport().VrsMode;
+        _profileVrsTexture = GetViewport().VrsTexture;
+        _profileVrsUpdate = GetViewport().VrsUpdateMode;
         _profile_sun_splits = new Vector3(world.sun.DirectionalShadowSplit1, world.sun.DirectionalShadowSplit2, world.sun.DirectionalShadowSplit3);
         if (Game.Instance.has_flag("profile-check-state"))
         {
@@ -431,7 +435,7 @@ public partial class CaptureTool : Node
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "control after restore" }, { (StringName)"apply", Callable.From(() =>
 {
 
-}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "grass distance density" }, { (StringName)"apply", Callable.From(() => camp.understory.set_distance_grass(true)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "full grass density" }, { (StringName)"apply", Callable.From(() => camp.understory.set_distance_grass(false)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "sdfgi off" }, { (StringName)"apply", Callable.From(() =>
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "grass distance density" }, { (StringName)"apply", Callable.From(() => camp.understory.set_distance_grass(true)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "grass density 6m" }, { (StringName)"apply", Callable.From(() => camp.understory.set_grass_density_curve(6, 9)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "dense distant grass" }, { (StringName)"apply", Callable.From(() => camp.understory.set_distance_grass_minimum(0.18f)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "full grass density" }, { (StringName)"apply", Callable.From(() => camp.understory.set_distance_grass(false)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "sdfgi off" }, { (StringName)"apply", Callable.From(() =>
 {
     world.environment.SdfgiEnabled = false;
 }) } }, new Godot.Collections.Dictionary { { (StringName)"name", "ssil off" }, { (StringName)"apply", Callable.From(() =>
@@ -620,7 +624,13 @@ public partial class CaptureTool : Node
 {
     GetViewport().Scaling3DMode = Viewport.Scaling3DModeEnum.Fsr2;
     GetViewport().Scaling3DScale = 0.77f;
-}) } } };
+}) } }, new Godot.Collections.Dictionary { { (StringName)"name", "native msaa2" }, { (StringName)"apply", Callable.From(() => _profile_antialiasing(1.0f, Viewport.Scaling3DModeEnum.Bilinear)) } }, new Godot.Collections.Dictionary { { (StringName)"name", "fsr1 msaa2" }, { (StringName)"apply", Callable.From(() => _profile_antialiasing(0.77f, Viewport.Scaling3DModeEnum.Fsr)) } } };
+        cases.Add(new Godot.Collections.Dictionary { { "name", "vrs 2x2" },
+            { "apply", Callable.From(_profile_vrs) } });
+        cases.Add(new Godot.Collections.Dictionary { { "name", "grass adaptive bounds" },
+            { "apply", Callable.From(() => camp.understory.set_adaptive_grass_bounds(true)) } });
+        cases.Add(new Godot.Collections.Dictionary { { "name", "fsr2 50%" },
+            { "apply", Callable.From(() => GetViewport().Scaling3DScale = 0.5f) } });
         Godot.Collections.Dictionary report = new Godot.Collections.Dictionary();
         List<string> wanted = G.split(Game.Instance.arg_value("profile-cases", ""), ",", false);
         List<string> views = G.split(Game.Instance.arg_value("profile-views", "fire,pond"), ",", false);
@@ -671,6 +681,7 @@ public partial class CaptureTool : Node
                 double frame = 0.0;
                 long objects = 0, primitives = 0, draw_calls = 0;
                 double visiblePrimitives = 0, shadowPrimitives = 0, reflectedPrimitives = 0;
+                int reflectionActive = 0;
                 double textureMemory = 0;
                 ulong streamedMemory = 0;
                 long samples = 90;
@@ -688,6 +699,7 @@ public partial class CaptureTool : Node
                     visiblePrimitives += RenderingServer.ViewportGetRenderInfo(rid, RenderingServer.ViewportRenderInfoType.Visible, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
                     shadowPrimitives += RenderingServer.ViewportGetRenderInfo(rid, RenderingServer.ViewportRenderInfoType.Shadow, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
                     reflectedPrimitives += RenderingServer.ViewportGetRenderInfo(camp.pond.reflection_viewport.GetViewportRid(), RenderingServer.ViewportRenderInfoType.Visible, RenderingServer.ViewportRenderInfo.PrimitivesInFrame);
+                    if (camp.pond._reflection_visible) reflectionActive++;
                 }
                 gpu /= (double)samples;
                 cpu /= (double)samples;
@@ -709,6 +721,7 @@ public partial class CaptureTool : Node
                 measured["main_visible_primitives"] = Math.Round(visiblePrimitives / samples);
                 measured["main_shadow_primitives"] = Math.Round(shadowPrimitives / samples);
                 measured["reflection_visible_primitives_last_submitted"] = Math.Round(reflectedPrimitives / samples);
+                measured["reflection_active_fraction"] = (double)reflectionActive / samples;
                 measured["peak_texture_memory_bytes"] = textureMemory;
                 measured["peak_streamed_texture_memory_bytes"] = streamedMemory;
                 G.print(G.format("PROFILE %-22s gpu %6.2f ms   cpu %6.2f ms   frame %6.2f ms   objects %6d   tris %9d   draws %5d", new Godot.Collections.Array { c["name"], gpu, cpu, frame, objects, primitives, draw_calls }));
@@ -751,7 +764,7 @@ public partial class CaptureTool : Node
             if (node is Node3D) Read(node, path, "visible");
             if (node is GeometryInstance3D geometry)
             {
-                Read(node, path, "cast_shadow", "lod_bias", "visibility_range_begin", "visibility_range_end",
+                Read(node, path, "cast_shadow", "lod_bias", "extra_cull_margin", "visibility_range_begin", "visibility_range_end",
                     "visibility_range_begin_margin", "visibility_range_end_margin", "visibility_range_fade_mode");
                 if (geometry.MaterialOverride is ShaderMaterial mat) materials.Add(mat);
                 if (node is MultiMeshInstance3D batch) Read(batch.Multimesh, path, "visible_instance_count");
@@ -767,7 +780,7 @@ public partial class CaptureTool : Node
                 string name = uniform["name"].AsString();
                 state[$"material/{mat.GetInstanceId()}/{mat.Shader.ResourcePath}:{name}"] = mat.GetShaderParameter(name).ToString();
             }
-        Read(GetViewport(), "viewport", "mesh_lod_threshold", "scaling_3d_scale", "scaling_3d_mode", "use_taa");
+        Read(GetViewport(), "viewport", "mesh_lod_threshold", "scaling_3d_scale", "scaling_3d_mode", "use_taa", "msaa_3d", "texture_mipmap_bias", "vrs_mode", "vrs_texture", "vrs_update_mode");
         Read(Game.Instance.world.sun, "sun", "directional_shadow_max_distance", "directional_shadow_mode",
             "directional_shadow_split_1", "directional_shadow_split_2", "directional_shadow_split_3");
         return state;
@@ -780,6 +793,32 @@ public partial class CaptureTool : Node
     public long _profile_sun_casters = 0xFFFFF;
     private Vector3 _profile_sun_splits;
     private bool _profile_distance_grass;
+    private bool _profileAdaptiveGrassBounds;
+    private Viewport.VrsModeEnum _profileVrsMode;
+    private Viewport.VrsUpdateModeEnum _profileVrsUpdate;
+    private Texture2D _profileVrsTexture;
+
+    private void _profile_vrs()
+    {
+        // Constant 2x2 fragment shading isolates pixel cost without thinning
+        // geometry. This is a diagnostic, not the game's quality default.
+        using var image = Image.CreateEmpty(1, 1, false, Image.Format.Rgb8);
+        image.Fill(new Color(85 / 255.0f, 85 / 255.0f, 0));
+        var viewport = GetViewport();
+        viewport.VrsTexture = ImageTexture.CreateFromImage(image);
+        viewport.VrsMode = Viewport.VrsModeEnum.Texture;
+        viewport.VrsUpdateMode = Viewport.VrsUpdateModeEnum.Once;
+    }
+
+    private void _profile_antialiasing(float scale, Viewport.Scaling3DModeEnum mode)
+    {
+        var viewport = GetViewport();
+        viewport.UseTaa = false;
+        viewport.Scaling3DMode = mode;
+        viewport.Scaling3DScale = scale;
+        viewport.TextureMipmapBias = 0;
+        viewport.Msaa3D = Viewport.Msaa.Msaa2X;
+    }
 
     public void _profile_snapshot(Node root)
     {
@@ -905,7 +944,13 @@ public partial class CaptureTool : Node
         Game.Instance.world.sun.ShadowCasterMask = unchecked((uint)(_profile_sun_casters));
         GetViewport().DebugDraw = Viewport.DebugDrawEnum.Disabled;
         Quality.Instance.apply(Quality.Instance.current.tier);
+        GetViewport().VrsMode = _profileVrsMode;
+        GetViewport().VrsTexture = _profileVrsTexture;
+        GetViewport().VrsUpdateMode = _profileVrsUpdate;
+        camp.understory.set_adaptive_grass_bounds(_profileAdaptiveGrassBounds);
         camp.understory.set_distance_grass(_profile_distance_grass);
+        camp.understory.set_grass_density_curve(Understory.GrassDensityStart, Understory.GrassDensityTransition);
+        camp.understory.set_distance_grass_minimum(Game.Instance.has_flag("dense-distant-grass") ? 0.18f : Understory.GrassDensityMinimum);
         var sun = Game.Instance.world.sun;
         sun.DirectionalShadowSplit1 = _profile_sun_splits.X;
         sun.DirectionalShadowSplit2 = _profile_sun_splits.Y;
