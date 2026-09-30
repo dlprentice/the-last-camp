@@ -200,6 +200,47 @@ for High / Medium / Low on a later exported run. It remains optional pending
 visual acceptance; these are not default-preset numbers.
 **Performance is unfinished; no 60 FPS gameplay claim is established.**
 
+A September 30 exported diagnostic isolates the current costs at three fixed
+High views. It includes the candidate distant-grass floor of 0.045, with the
+foreground density curve unchanged through 39 m. Measurements follow warm-up
+and a restored control, at 1920×1080 output with 77% FSR2. The table is the
+reduction in **main-view GPU milliseconds when a family is hidden/disabled**,
+not a proposal to remove it or an additive budget:
+
+| Diagnostic change | Arrival | Pond | Night fire |
+| --- | ---: | ---: | ---: |
+| Hide all understory | 11.49 | 6.71 | 9.83 |
+| Hide grass only | 7.74 | 4.04 | 6.18 |
+| Hide entire forest | 7.60 | 6.73 | 5.16 |
+| Hide nearby trees | 4.47 | 2.89 | 3.02 |
+| Hide far-tree mesh batches | 4.04 | 2.69 | 1.84 |
+| Hide ridge mesh batches | 1.58 | 0.08 | 0.14 |
+| Disable forest shadow casters | 3.65 | 3.00 | 1.70 |
+| Disable understory/dressing shadow casters | 2.96 | 0.99 | 1.54 |
+| Hide scanned dressing | 2.49 | 1.30 | 0.93 |
+
+Restored controls measured 32.14 / 26.79 / 29.20 ms of main-view GPU time.
+The first arrival control was still settling (34.19 ms before restoration),
+so small changes there need repeated confirmation. Disabling planar reflections
+reduced **total frame intervals** by 6.03 / 4.87 / 3.27 ms, despite much smaller
+changes in the main-view GPU counter. The reflection viewport must not be
+treated as free because that counter excludes its work. Distant mesh batches
+are not the same as all distant canopy impostors; these cases preserve the
+separate canopy representation. These measurements identify priorities, not
+the result of turning off required scene elements. All three views completed
+with status zero, no new engine core and no NVIDIA Xid.
+
+The corresponding shader/native-prefix grass check matches exactly in three
+hardware views after disabling stochastic contact-shadow samples in the test
+fixture. Production contact shadows remain enabled. The candidate reduced
+main-view GPU cost by roughly 0.5–0.8 ms in fixed comparisons against the older
+0.18 floor; that small saving does not solve the overall performance target.
+Its exported 15-waypoint gameplay/session check passed, including preset
+changes and rest/sleep to dawn. Full-size foreground, pond and path images were
+inspected; the retained 96-second diagnostic does not yet establish complete
+motion or audio acceptance. The source-based optimization rationale is in the
+[development guide](development.md#optimization-references-and-decisions).
+
 ### Stability and visual limits
 
 High startup repeatedly produced Vulkan device loss and an NVIDIA Xid 13 fault

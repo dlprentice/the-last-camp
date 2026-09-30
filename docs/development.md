@@ -141,6 +141,50 @@ CPU/GPU frame times, memory and hitches. Measure the exported C# build; the
 editor host's JIT settings can differ. See [validation](validation.md) for the
 measured results and their limits.
 
+### Optimization references and decisions
+
+The September 30 research pass cross-checked the following primary sources
+against the exported game and Godot **4.8 dev6, `8898c2b3d`**. The `latest` manual
+can describe later engine changes: verify API and renderer behavior in that
+pinned source before using them. See [validation](validation.md) for measured
+results, rather than treating an optimization technique as a promised saving.
+
+| Question | Primary reference | Consequence for this scene |
+| --- | --- | --- |
+| Geometry or pixel work? | [Godot GPU optimization](https://docs.godotengine.org/en/latest/tutorials/performance/gpu_optimization.html), [NVIDIA GPU bottleneck analysis](https://developer.nvidia.com/blog/the-peak-performance-analysis-method-for-optimizing-any-gpu-workload/) | Compare resolution, shader work and geometry independently. A high GPU utilization number does not identify the limiting hardware unit. Preserve colour, depth and shadow pass timings, not only FPS. |
+| Why can a large batch remain expensive? | [Godot mesh LOD](https://docs.godotengine.org/en/latest/tutorials/3d/mesh_lod.html), [3D optimization](https://docs.godotengine.org/en/latest/tutorials/performance/optimizing_3d_performance.html) | MultiMesh instances share culling and an LOD selected from the nearest part of the batch AABB. Keep spatial cells; fewer draw calls alone do not prove less GPU work. |
+| How should distant woodland change representation? | [Godot visibility ranges](https://docs.godotengine.org/en/latest/tutorials/3d/visibility_ranges.html) | Retain continuous silhouettes and reduce material/geometry cost together. Built-in alpha fades invoke transparent rendering; evaluate dither or opaque-compatible transitions in motion. Existing canopy arrays already address this; closer impostors previously lost performance. |
+| Would occlusion solve the forest? | [Godot occlusion culling](https://docs.godotengine.org/en/latest/tutorials/3d/occlusion_culling.html) | A whole AABB must be behind an actual solid occluder. Leaf canopies cannot be replaced with opaque occlusion walls. Terrain occlusion was tested and gave negligible benefit in the camp views; do not keep it merely because it is available. |
+| How do shadows multiply foliage cost? | [Godot lights and shadows](https://docs.godotengine.org/en/latest/tutorials/3d/lights_and_shadows.html), [dev6 release](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-6/) | Cascades can submit geometry repeatedly. High already uses two cascades, an 80 m shadow range and a 2048 atlas. Measure caster families before reducing these further. Contact shadows supplement small visible geometry but cannot replace offscreen casters. |
+| Should cutout shaders discard earlier? | [AMD RDNA performance guide, pixel shaders](https://gpuopen.com/learn/rdna-performance-guide/#pixel-shaders) | Discard and divergent texture access have tradeoffs; do not assume an early return is faster. Evaluate transparent card area and an early-alpha variant separately, preserving texture derivatives and silhouette coverage. AMD-specific throughput figures are not measurements of the tested NVIDIA GPU. |
+| Can antialiasing be simplified? | [SpeedTree rendering, alpha-to-coverage](https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-4-next-generation-speedtree-rendering) | Evaluate moving leaves and grass, not just a still. This historical reference explains the technique, not current hardware performance. The local FSR1/MSAA trial saved time but increased foliage noise; default FSR2 remains. |
+| Would VRS or streaming be the main answer? | [Godot VRS](https://docs.godotengine.org/en/latest/tutorials/3d/variable_rate_shading.html), [dev5 texture streaming](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-5/) | VRS reduces fragment shading, not submitted geometry. Streaming controls texture residency. Neither is evidence that repeated foliage depth/shadow work disappears. Streaming is already enabled on supported PBR maps; its measured route FPS was unchanged. |
+
+The pinned [Forward+ renderer](https://github.com/godotengine/godot/blob/8898c2b3d/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp)
+puts animated foliage's colour rendering in the motion-vector list. Therefore
+the profiler's **Render Motion Pass is not a separable motion-blur cost**.
+Removing motion vectors by disguising time-dependent deformation would also
+invalidate temporal reconstruction. The same source counts LOD primitives
+without the MultiMesh instance multiplier in that branch; use native timings
+and explicit instance counts rather than claiming actual triangle savings from
+that counter alone.
+
+Representative warm High arrival samples put depth prepass around 8.6 ms,
+directional/spot shadows around 6.5 ms and animated colour/motion around 11.3 ms.
+SSAO, SSIL, SSR, contact shadows and fog integration each cost less than 0.5 ms;
+FSR2 costs roughly 1 ms. These labels can aggregate work across views, and their
+sum is not the main viewport's timing. Feature-disable savings are also not
+additive: removing vegetation changes the shadow and reflection workloads too.
+The priority is preserving foliage coverage while reducing waste in those
+repeated passes, then validating shadow/reflection budgets and the complete
+playable route. A shader-only improvement must survive the exported comparison.
+
+The GodotCon [million-tree presentation abstract](https://talks.godotengine.org/godotcon-ams-2026/talk/DL7SJJ/)
+also describes voxel aggregation and MultiMesh LOD limitations. Only its abstract
+was reviewed; its tree-count claim is not a benchmark for this game or a reason
+to replace the current renderer wholesale. The Horizon vegetation slide deck
+could not be retrieved (HTTP 403), so its contents are not used as evidence.
+
 ## Rendering
 
 ```bash
