@@ -52,7 +52,10 @@ godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- -
 ```
 
 The grass draw-prefix check compares the production shader with every instance
-submitted against the conservative native draw count at three camera positions:
+submitted against the conservative native draw count at three camera positions.
+It also requires an unchanged reference to repeat exactly. Wind, temporal AA,
+debanding and the light's stochastic screen-space contact shadows are disabled
+in this geometry fixture; the game's contact shadows remain enabled on High/Ultra:
 
 ```bash
 godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-grass-density --probe-out="$PWD/local-data/grass-density-check"

@@ -139,7 +139,7 @@ public partial class ShowcaseRenderProbe : SceneTree
         }
         if (OS.GetCmdlineUserArgs().Contains("--probe-grass-density"))
         {
-            await CheckGrassDensity();
+            await CheckGrassDensity(sun);
             return;
         }
         for (long form = 0; form < 4; form++)
@@ -450,8 +450,13 @@ public partial class ShowcaseRenderProbe : SceneTree
         Quit(passed ? 0 : 1);
     }
 
-    private async Task CheckGrassDensity()
+    private async Task CheckGrassDensity(DirectionalLight3D sun)
     {
+        // This is a geometry equivalence check. Contact shadows intentionally
+        // jitter their samples between frames, including on stationary grass.
+        sun.ShadowContactShadowsAllow = false;
+        view.UseTaa = false;
+        view.UseDebanding = false;
         RenderingServer.GlobalShaderParameterSet("wind_strength", 0.0f);
         RenderingServer.GlobalShaderParameterSet("player_position", new Vector3(10000, 0, 0));
         var material = new ShaderMaterial { Shader = Content.Load<Shader>("res://shaders/grass.gdshader") };
@@ -486,6 +491,12 @@ public partial class ShowcaseRenderProbe : SceneTree
             await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
             using var reference = view.GetTexture().GetImage();
             reference.SavePng(output.PathJoin($"grass_{shot}_shader_only.png"));
+            for (int frame = 0; frame < 8; frame++) await ToSignal(this, SignalName.ProcessFrame);
+            await new Signal(RenderingServer.Singleton, RenderingServerInstance.SignalName.FramePostDraw);
+            using var repeated = view.GetTexture().GetImage();
+            repeated.SavePng(output.PathJoin($"grass_{shot}_repeat.png"));
+            long repeatDifferences = reference.GetData().Zip(repeated.GetData()).Count(pair => pair.First != pair.Second);
+            GD.Print($"GRASS_REPEAT {shot}: {repeatDifferences} different bytes without draw-count changes");
             foreach (var batch in batches)
             {
                 int count = Understory.grass_draw_count(batch.Bounds, camera.Position, batch.Mesh.InstanceCount);
@@ -502,10 +513,10 @@ public partial class ShowcaseRenderProbe : SceneTree
             var colors = new HashSet<(byte, byte, byte)>();
             for (int pixel = 0; pixel + 2 < expected.Length; pixel += stride * 7)
                 colors.Add((expected[pixel], expected[pixel + 1], expected[pixel + 2]));
-            bool ok = differences == 0 && reduced < full && colors.Count > 64;
+            bool ok = repeatDifferences == 0 && differences == 0 && reduced < full && colors.Count > 64;
             passed &= ok;
             report[shot] = new Godot.Collections.Dictionary { { "full_instances", full }, { "submitted_instances", reduced },
-                { "different_bytes", differences }, { "sampled_colors", colors.Count }, { "passed", ok } };
+                { "different_bytes", differences }, { "repeat_different_bytes", repeatDifferences }, { "sampled_colors", colors.Count }, { "passed", ok } };
             GD.Print($"GRASS_DENSITY_PROBE {shot}: {full}->{reduced}, changed bytes={differences}, {(ok ? "PASS" : "FAIL")}");
         }
         using var file = Godot.FileAccess.Open(output.PathJoin("grass-density.json"), Godot.FileAccess.ModeFlags.Write);
