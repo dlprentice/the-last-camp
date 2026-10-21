@@ -52,6 +52,13 @@ Walking stays within a woodland area roughly 240 metres across around the camp
 and pond. The surrounding hills and forest continue as scenery. At the boundary,
 you can walk along it or turn back; a short hint points you toward the pond.
 
+## Where it is going
+
+The finished game is a quiet story of about 90 minutes: three days closing your
+grandmother's camp, following her journal to the places she and your grandfather
+loved, with a storm, a canoe, fishing and a last fire, and no fail state. See
+[the design](docs/design.md) and [the roadmap](docs/roadmap.md).
+
 ## Controls
 
 | Input | Action |
