@@ -1,43 +1,42 @@
-# Contributor and agent guide
+# The Last Camp: agent guide
 
-This is a Godot 4.8 dev6 .NET C# project using native Jolt and Forward+ Vulkan.
+A first-person story game in Godot 4.8 dev6 .NET (C#, Forward+ Vulkan, native
+Jolt). This repository is **public** under MIT. The maintainer's machine and
+game-dev guides apply on top of this page; it adds only what is specific here.
 
-Game logic, tests, diagnostics and capture harnesses are C#. Build the world,
-materials and UI in code; retain only the minimal main-scene bootstrap. No editor
-authoring, previews or tool scripts. Python/Blender asset tooling and GPU shaders
-keep their native languages. Keep the project self-contained.
+## Read for the task
 
-Read the documentation relevant to the task:
+- [README.md](README.md): what the game is today, controls and the player commands.
+- [docs/architecture.md](docs/architecture.md): source map and how the systems fit.
+- [docs/development.md](docs/development.md): build, tests, capture, profiling, rendering, export, assets.
+- [docs/validation.md](docs/validation.md): what has been measured and inspected, and the open limits.
+- [CONTRIBUTING.md](CONTRIBUTING.md): issue reports, review evidence and attribution.
 
-- [README.md](README.md) for setup, controls, supported platforms and release contents.
-- [CONTRIBUTING.md](CONTRIBUTING.md) when preparing an issue report or contribution,
-  including review evidence and attribution requirements.
-- [docs/development.md](docs/development.md) for the applicable import, test, capture,
-  performance, rendering, export or asset-preparation procedure.
+## Rules for this repository
 
-- Run checks locally. Do not add or dispatch hosted workflows without maintainer approval.
-- Preserve source changes, credits and existing outputs. Use fresh output directories.
-  Generated media, build output, downloads and logs belong in ignored local-data/.
-- Use the first-import step on a clean clone. Run the affected tests after source changes.
-  A headless pass does not establish GPU appearance or realtime performance.
-- Capture and inspect affected views after visual changes. Review changed cinematics in
-  motion with their sound; do not infer audio quality from loudness alone.
-- Keep deterministic placement, authored walking/camera routes, grounded props, continuous
-  forest coverage, the shared wind field and the no-music film direction.
-- Keep converted asset files and the corresponding SOURCES.md rows consistent. Default
-  atlas rebaking must not replace the credited photoscan PBR sets.
-- Prefer original locally generated art and audio. Replace existing assets only after
-  inspecting the result in play and measuring its cost; keep credited originals
-  until the replacement is at least as good. Offline Blender generators are valid
-  code-built content and must be committed with their generated assets.
-- Third-party code and assets need redistribution permission and complete attribution.
-  Include engine and component notices when distributing executable builds.
-- Avoid broad rewrites, unrequested runtime dependencies and performance claims based on
-  offline Movie Maker output. Describe measurements and remaining limitations accurately.
-- Do not commit credentials, caches, generated movies, private machine notes or prior
-  development history. master is the default branch of the clean public source edition.
+- Public repository: tracked files carry no machine paths, private notes or session
+  notes. `CLAUDE.local.md` and everything in `local-data/` stay untracked.
+- Direction: a relaxed story game with no survival penalty and no fail state, and
+  no music; environment and Foley carry the sound.
+- Credits: every third-party file keeps its row in `textures/`, `models/` or
+  `audio/SOURCES.md`, with `CREDITS.md` and `THIRD_PARTY_NOTICES.md` in step. Converted
+  files and their rows change together. Default atlas rebaking must not replace the
+  credited PBR sets. A credited asset is retired only when a locally made replacement
+  is at least as good in play and costs no more frame time; then its credit goes too.
+- `tests/fixtures/` is the GDScript-to-C# conversion contract. Update it only for an
+  intentional, reviewed content change, never to hide a mismatch.
+- Placement and generated content stay seeded and deterministic. A change that moves
+  props, trails or places updates the traversal route and camera paths with it.
+- Frame-rate claims come from the exported build; Movie Maker output is not frame rate.
+  Keep SDFGI off in play presets and keep the shutdown and resource-lifetime
+  mitigations recorded in [validation](docs/validation.md).
+- No addons, GDExtensions or new runtime dependencies. No hosted CI workflows; all
+  checks run locally.
+- Executable builds ship the engine, .NET runtime and asset notices;
+  `tools/export_linux.py` copies and checks them.
 
-Runtime testing, rendering and performance work are authorized. Use isolated
-offscreen GPU runs, retain before/after evidence, and measure the exported game.
-Keep visual and performance claims limited to what has actually been inspected
-and measured; the conversion's CPU fixtures alone do not establish acceptance.
+## Branches
+
+`master` is the default branch. `work/vegetation-optimization` (pushed) holds the
+September 30 grass-density and grass-bounds candidates. Decide them, then merge the
+accepted parts or keep the rest as an `archive/` tag.

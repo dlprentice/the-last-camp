@@ -8,8 +8,8 @@ For a bug report, include the Godot version, operating system, GPU/driver,
 quality preset, command or location, and a relevant log or screenshot. State
 whether it occurs in gameplay or offline Movie Maker output.
 
-Keep changes deterministic and preserve scene composition, walking routes,
-prop support and complete asset credits. Visual changes need before/after
+Keep changes deterministic, keep props supported and asset credits complete.
+A change that moves walking routes or camera paths updates their checks too. Visual changes need before/after
 captures; cinematic changes need a moving review. Passing unit tests does
 not demonstrate visual quality or realtime performance.
 

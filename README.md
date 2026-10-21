@@ -1,8 +1,10 @@
 # The Last Camp
 
-A small first-person camping game made in **Godot**. Spend an evening in the
+A first-person camping game made in **Godot**. Today it is one evening in the
 woods: carry firewood, tend the fire, aim skipping stones across the pond,
-light your lantern and turn in at the tent. Stay to explore when morning comes.
+light your lantern and turn in at the tent, then stay to explore when morning
+comes. It takes about 10 to 15 minutes, and there is no title menu or saved
+progress yet beyond your best stone skip.
 
 ![The camp and its wooded approach](docs/images/arrival.png)
 
@@ -97,10 +99,10 @@ background music. Movie Maker renders them offline; their output FPS is not
 the game's interactive frame rate.
 
 Download the full film, shorter reel and Linux package from the
-[release page](https://github.com/dlprentice/the-last-camp/releases/tag/v1.0.0).
+[v1.0.0 release page](https://github.com/dlprentice/the-last-camp/releases/tag/v1.0.0).
 Those are the earlier Godot 4.7.2 release's artifacts, not captures or a binary of
 the current C# source. They are distributed with credits and SHA-256 checksums.
-The existing offline rendering tool remains available with:
+The repository holds the film's generators, not rendered movies. Render it again with:
 
 ```bash
 tools/render1080.sh one_night

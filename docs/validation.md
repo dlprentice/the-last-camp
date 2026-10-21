@@ -9,8 +9,8 @@ The conversion checks began on September 26, 2026 with
 | Check | Observed result |
 | --- | --- |
 | C# compilation and Godot import | Passed without errors or warnings |
-| C# regression suite | 109 passed, zero failed on September 29: conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, canopy partitioning, terrain seams, player-boundary motion and cached-mesh lifetime included |
-| Python tooling suite | 49 passed, zero failed; includes import-metadata preservation and alpha-atlas importer checks |
+| C# regression suite | 109 passed, zero failed on September 29 and again on October 20 (on the `work/vegetation-optimization` checkpoint): conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, canopy partitioning, terrain seams, player-boundary motion and cached-mesh lifetime included |
+| Python tooling suite | 49 passed, zero failed (rerun October 20); includes import-metadata preservation and alpha-atlas importer checks |
 | Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
 | Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte |
 | Capture dependency preflight and shell syntax | Passed |
@@ -56,6 +56,9 @@ checks cover firewood pickup and consumption, fire feeding, resting and standing
 lantern input, aimed stone throws, photo mode, pause/resume on the pier and quality
 changes. The evening journal and sleep sequence have additional traversal checks.
 The regression suite alone does not establish how these interactions feel.
+On October 20, a High offscreen session check of the `work/vegetation-optimization`
+source (run through the editor host, not an export) passed again: 15 waypoints,
+33 checks, zero failures, with no new core or kernel GPU fault.
 
 The full exported High interaction route also completed with SDFGI disabled,
 including a real High/Medium/High preset round trip, the journal and sleep to a
@@ -119,8 +122,9 @@ unused individual atlas bindings and the forest retires the source atlases.
 A hardware check renders identically after source release and managed collection.
 The exported High gameplay route subsequently passed all 15 waypoints,
 interactions, preset changes and the evening-to-morning session with zero
-failures. A 96-second 1080p/24 diagnostic recording with native audio was
-retained; its offline frame rate is not a gameplay-performance measurement.
+failures. A 96-second 1080p/24 diagnostic recording with native audio was made
+but never fully watched or listened to, and has since been deleted; its offline
+frame rate was not a gameplay-performance measurement.
 
 The opaque PBR maps now use the native
 [4.8 mip-streaming importer](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-5/)
@@ -201,8 +205,9 @@ visual acceptance; these are not default-preset numbers.
 **Performance is unfinished; no 60 FPS gameplay claim is established.**
 
 A September 30 exported diagnostic isolates the current costs at three fixed
-High views. It includes the candidate distant-grass floor of 0.045, with the
-foreground density curve unchanged through 39 m. Measurements follow warm-up
+High views. It was measured with the `work/vegetation-optimization` candidate
+distant-grass floor of 0.045 (`master` keeps 0.18), with the foreground density
+curve unchanged through 39 m. Measurements follow warm-up
 and a restored control, at 1920×1080 output with 77% FSR2. The table is the
 reduction in **main-view GPU milliseconds when a family is hidden/disabled**,
 not a proposal to remove it or an additive budget:
@@ -232,13 +237,12 @@ with status zero, no new engine core and no NVIDIA Xid.
 
 The corresponding shader/native-prefix grass check matches exactly in three
 hardware views after disabling stochastic contact-shadow samples in the test
-fixture. Production contact shadows remain enabled. The candidate reduced
+fixture. Production contact shadows remain enabled. The work-branch candidate reduced
 main-view GPU cost by roughly 0.5–0.8 ms in fixed comparisons against the older
 0.18 floor; that small saving does not solve the overall performance target.
 Its exported 15-waypoint gameplay/session check passed, including preset
 changes and rest/sleep to dawn. Full-size foreground, pond and path images were
-inspected; the retained 96-second diagnostic does not yet establish complete
-motion or audio acceptance. The source-based optimization rationale is in the
+inspected; complete motion and audio acceptance is still open. The source-based optimization rationale is in the
 [development guide](development.md#optimization-references-and-decisions).
 
 ### Stability and visual limits

@@ -10,7 +10,7 @@ and Blender.
 
 Optional media/asset tools need Python 3.10+, NumPy, Pillow, FFmpeg/ffprobe with
 libx264 and AAC, Bash and ripgrep. Model conversion uses Blender's bundled glTF
-importer/exporter (checked with Blender 5.2.1). Nothing installs dependencies or
+importer/exporter (checked with Blender 5.2). Nothing installs dependencies or
 downloads art automatically. All checks run locally; there is no hosted CI.
 
 ## Build and CPU-only checks
