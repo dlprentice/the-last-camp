@@ -37,9 +37,3 @@ here.
   checks run locally.
 - Executable builds ship the engine, .NET runtime and asset notices;
   `tools/export_linux.py` copies and checks them.
-
-## Branches
-
-`master` is the default branch. `work/vegetation-optimization` (pushed) holds the
-September 30 grass-density and grass-bounds candidates; roadmap milestone M0 decides
-what merges and what becomes an `archive/` tag.

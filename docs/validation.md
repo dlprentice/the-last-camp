@@ -205,8 +205,8 @@ visual acceptance; these are not default-preset numbers.
 **Performance is unfinished; no 60 FPS gameplay claim is established.**
 
 A September 30 exported diagnostic isolates the current costs at three fixed
-High views. It was measured with the `work/vegetation-optimization` candidate
-distant-grass floor of 0.045 (`master` keeps 0.18), with the foreground density
+High views. It was measured with the distant-grass floor of 0.045 (then a candidate,
+now the default; the earlier floor was 0.18), with the foreground density
 curve unchanged through 39 m. Measurements follow warm-up
 and a restored control, at 1920×1080 output with 77% FSR2. The table is the
 reduction in **main-view GPU milliseconds when a family is hidden/disabled**,
@@ -235,15 +235,57 @@ separate canopy representation. These measurements identify priorities, not
 the result of turning off required scene elements. All three views completed
 with status zero, no new engine core and no NVIDIA Xid.
 
+An early-alpha foliage experiment passed nine isolated image comparisons but
+did not improve the exported scene: main-view GPU changes stayed within 0.1 ms
+of the controls in arrival, pond and night-fire views. The experimental shader
+was removed. Increasing reflection mesh LOD from 4 to 8 pixels or reducing its
+far plane from 700 to 250 m was similarly neutral. Those defaults remain intact;
+reducing a counter is not enough to accept a change.
+
+A separate exported pixel-cost comparison kept the same output resolution and
+scene. Uniform 2×2 variable-rate shading was supported by the device but changed
+main-view GPU time by only −0.35 / +0.11 / +0.09 ms in arrival / pond / night fire.
+Reducing FSR2's internal scale from 77% to 50% saved 5.10 / 3.62 / 4.89 ms, yet
+left 25.82 / 22.85 / 24.52 ms of main-view work. Neither is a new quality default.
+Together with the component tests, this prioritizes submitted vegetation and
+repeated passes over minor fragment-shader reductions; it does not identify a
+specific GPU hardware unit without a hardware-counter capture.
+
+A pond-visibility trial used conservative terrain-bank occluders, first with one
+water bound and then 144 wave-bounded tiles. Both retained active reflections in
+all four tested views and gave no consistent frame-time improvement. The trial
+was removed. A visually hidden-looking pond is insufficient evidence to disable
+its mirror; an optimization must conservatively account for every visible part.
+
 The corresponding shader/native-prefix grass check matches exactly in three
 hardware views after disabling stochastic contact-shadow samples in the test
-fixture. Production contact shadows remain enabled. The work-branch candidate reduced
+fixture. Production contact shadows remain enabled. The 0.045 floor reduced
 main-view GPU cost by roughly 0.5–0.8 ms in fixed comparisons against the older
 0.18 floor; that small saving does not solve the overall performance target.
 Its exported 15-waypoint gameplay/session check passed, including preset
 changes and rest/sleep to dawn. Full-size foreground, pond and path images were
 inspected; complete motion and audio acceptance is still open. The source-based optimization rationale is in the
 [development guide](development.md#optimization-references-and-decisions).
+
+Two spatial experiments were measured on September 30 and not adopted: 8 m
+near-grass cells and distance-aware (adaptive) cull bounds. Six hardware
+comparisons matched the all-instance reference exactly with them. A same-export,
+uncapped 1080p route comparison, both runs at the 0.045 floor, measured the
+following. It is one paired comparison, not proof of a general effect:
+
+| Preset | 16 m / fixed: mean / p99 / FPS | 8 m / adaptive: mean / p99 / FPS |
+| --- | --- | --- |
+| High | 35.06 / 46.83 ms / 28.5 | 34.24 / 47.50 ms / 29.2 |
+| Medium | 29.27 / 38.79 ms / 34.2 | 29.15 / 40.65 ms / 34.3 |
+| Low | 19.51 / 26.86 ms / 51.3 | 19.04 / 24.59 ms / 52.5 |
+
+High's main-view GPU time fell from 29.56 to 28.28 ms, while render-thread CPU
+time rose from 8.24 to 9.67 ms and average draw calls rose from 6,091 to 8,071.
+The experiment's Low run included one 102.33 ms frame; the baseline had none
+over 100 ms. Peak process working set reached 6.44 GB versus 5.78 GB. Those
+tradeoffs kept the game on 16 m cells with a fixed cull margin; the experiments
+are preserved in the `archive/vegetation-optimization` tag. The fixed margin
+itself has not yet been benchmarked on its own.
 
 ### Stability and visual limits
 

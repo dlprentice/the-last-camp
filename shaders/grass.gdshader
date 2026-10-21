@@ -27,7 +27,7 @@ uniform float distance_widen : hint_range(0.0, 2.0) = 1.15;
 uniform float population_width = 1.0;
 // Native draw prefixes omit distant instances before vertex shading. The
 // per-plant blend below keeps the density change continuous within each cell.
-uniform vec4 density_lod = vec4(10.0, 14.0, 0.18, 0.035);
+uniform vec4 density_lod = vec4(10.0, 14.0, 0.045, 0.035);
 instance uniform float grass_population = 0.0;
 
 varying float v_height;

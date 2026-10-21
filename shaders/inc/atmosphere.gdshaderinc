@@ -1,7 +1,7 @@
 // Single-scattering atmosphere (Rayleigh + Mie + ozone absorption).
 // Units are metres. The observer sits on a spherical planet; rays are marched
 // through the shell and the light-path optical depth is integrated per sample.
-// Mirrored in scripts/world/atmosphere.gd so the sun light matches the sky.
+// Mirrored in scripts/world/Atmosphere.cs so the sun light matches the sky.
 
 const float ATM_PLANET_RADIUS = 6360000.0;
 const float ATM_TOP_RADIUS = 6420000.0;
