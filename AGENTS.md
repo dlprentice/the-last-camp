@@ -1,8 +1,10 @@
 # The Last Camp: agent guide
 
-A first-person story game in Godot 4.8 dev6 .NET (C#, Forward+ Vulkan, native
-Jolt). This repository is **public** under MIT. The maintainer's machine and
-game-dev guides apply on top of this page; it adds only what is specific here.
+A first-person camping game in Godot 4.8 dev6 .NET (C#, Forward+ Vulkan, native
+Jolt), being built into the story game in [the design](docs/design.md); the README
+says what plays today. This repository is **public** under MIT. The maintainer's
+machine and game-dev guides apply on top of this page; it adds only what is specific
+here.
 
 ## Read for the task
 
@@ -18,17 +20,16 @@ game-dev guides apply on top of this page; it adds only what is specific here.
 
 - Public repository: tracked files carry no machine paths, private notes or session
   notes. `CLAUDE.local.md` and everything in `local-data/` stay untracked.
-- Direction: a relaxed story game with no survival penalty and no fail state, and
-  no music; environment, Foley and June's voice carry the sound ([design](docs/design.md)).
 - Credits: every third-party file keeps its row in `textures/`, `models/` or
   `audio/SOURCES.md`, with `CREDITS.md` and `THIRD_PARTY_NOTICES.md` in step. Converted
   files and their rows change together. Default atlas rebaking must not replace the
   credited PBR sets. A credited asset is retired only when a locally made replacement
   is at least as good in play and costs no more frame time; then its credit goes too.
-- `tests/fixtures/` is the GDScript-to-C# conversion contract. Update it only for an
-  intentional, reviewed content change, never to hide a mismatch.
+- `tests/fixtures/` is the content baseline. Change it only through the rebaseline
+  procedure in [its README](tests/fixtures/README.md), never to hide a mismatch.
 - Placement and generated content stay seeded and deterministic. A change that moves
-  props, trails or places updates the traversal route and camera paths with it.
+  props, trails or places updates the traversal route and camera paths with it, and
+  re-renders the affected film shots for review.
 - Frame-rate claims come from the exported build; Movie Maker output is not frame rate.
   Keep SDFGI off in play presets and keep the shutdown and resource-lifetime
   mitigations recorded in [validation](docs/validation.md).

@@ -38,7 +38,9 @@ when source changes. The main scene is a one-node bootstrap; `MainScene.cs`
 creates its children in code. No `.gd` files or authored `.tres` files remain.
 
 The fixture probes do not enter the gameplay scene, render or play audio.
-Their reference hashes and scope are documented in [tests/fixtures](../tests/fixtures/README.md).
+Their reference hashes, scope and rebaseline procedure are documented in
+[tests/fixtures](../tests/fixtures/README.md). They were measured at the conversion
+commit, and whether they still pass on `master` is not yet recorded (roadmap M0).
 A passing CPU check does not establish rendered appearance, audio mix, traversal
 or hardware performance.
 
@@ -135,7 +137,10 @@ It also sprints toward the walking boundary in four directions and injects one
 fall-through to exercise recovery. Any recovery during normal walking or
 interactions fails the run.
 With `--session-check`, it also opens the journal and completes rest/sleep through
-the tent's actual interaction ray. Benchmark without Movie
+the tent's actual interaction ray. The traversal writes no video by itself. It has
+been recorded once under Movie Maker (`--fixed-fps 24 --write-movie`, September 30),
+and that recording went in a later storage cleanup; a committed gameplay capture
+tool is roadmap milestone M0. Benchmark without Movie
 Maker or fixed FPS, recording the GPU, driver, resolution, internal scale,
 CPU/GPU frame times, memory and hitches. Measure the exported C# build; the
 editor host's JIT settings can differ. See [validation](validation.md) for the
@@ -254,7 +259,8 @@ checks actual pixels independently of the streamer's memory counter.
 
 Shipped textures, models and recordings are ready to import. Build new content
 locally using committed generators. The historical photoscan conversion tools
-work from retained source caches; they do not fetch new art:
+work from the retained source cache in ignored `tools/downloads/` (the original
+credited downloads, kept so converted files can be rebuilt); they do not fetch new art:
 
 ```bash
 python3 tools/bake_textures.py --only leaves_oak,water
