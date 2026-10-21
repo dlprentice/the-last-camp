@@ -54,9 +54,15 @@ you can walk along it or turn back; a short hint points you toward the pond.
 
 ## Where it is going
 
-The finished game is a quiet story of about 90 minutes: three days closing your
-grandmother's camp, following her journal to the places she and your grandfather
-loved, with a storm, a canoe, fishing and a last fire, and no fail state. See
+The finished game is a quiet story of about an hour. Your grandmother June can no
+longer manage the trail, so you come to close her camp for the last time, three days
+before the lease ends. Her journal and her voice send you to the places she and your
+grandfather Tom loved: a spring, their first fire ring, the heron blind across the
+pond by canoe, a birch grove and a lookout. On the way you find what Tom was doing
+out here alone in his last summer. You fish, split wood, keep the fire going through
+a night storm, watch the sun go down from Tom's bench, write the last page of June's
+journal, and on the final morning leave the clearing the way it was before anyone
+camped there. It will have a title menu, saves, settings and gamepad support. See
 [the design](docs/design.md) and [the roadmap](docs/roadmap.md).
 
 ## Controls
