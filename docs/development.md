@@ -39,8 +39,8 @@ creates its children in code. No `.gd` files or authored `.tres` files remain.
 
 The fixture probes do not enter the gameplay scene, render or play audio.
 Their reference hashes, scope and rebaseline procedure are documented in
-[tests/fixtures](../tests/fixtures/README.md). They were measured at the conversion
-commit, and whether they still pass on `master` is not yet recorded (roadmap M0).
+[tests/fixtures](../tests/fixtures/README.md). Both passed unchanged on `master`
+on October 20, so the fixtures are the current-game baseline.
 A passing CPU check does not establish rendered appearance, audio mix, traversal
 or hardware performance.
 
@@ -112,6 +112,32 @@ godot-offscreen --timeout 600 -- -- --skip-intro --quality=high --session-check 
 godot-offscreen --timeout 600 -- -- --benchmark=high --out="$PWD/local-data/benchmark-high.json"
 ```
 
+`--benchmark-route=loop` replaces the default fixed camera route (`bench`) with a
+60 s eye-height walk from the trail through the clearing, past the fire, table
+and tent, along the pier and back. The JSON records the route, the internal
+render scale and the .NET tiered-compilation setting.
+
+Gameplay footage is recorded with `tools/gameplay_capture.py`. It runs the real
+player-controller traversal, or a named camera review route, under Movie Maker
+at a fixed 60 FPS and 1920x1080, through `godot-offscreen` when installed, then
+trims the loading frames at the game's `CAPTURE_START`/`CAPTURE_DONE` markers,
+encodes H.264/AAC into a fresh folder under `local-data/captures/` and removes
+the AVI. It checks the encoded frame count, duration and audio, samples the
+frame edges for an unfilled viewport, and records the source commit (with a
+diff when the tree is dirty) in `manifest.json`. Build C# first; the tool
+refuses an assembly older than the sources:
+
+```bash
+dotnet build
+python3 tools/gameplay_capture.py traversal --seconds 60
+python3 tools/gameplay_capture.py review:grass
+```
+
+`--seconds N` ends the run after N seconds of footage (the game's
+`--capture-seconds`). `review:grass` films close, grazing, distant, boundary,
+wet and night views of the groundcover in about 54 s. Arguments after `--` go to
+the game. The footage is offline: it says nothing about real-time frame rate.
+
 For a controlled feature comparison, `--profile` supports named views and cases:
 
 ```bash
@@ -138,9 +164,7 @@ fall-through to exercise recovery. Any recovery during normal walking or
 interactions fails the run.
 With `--session-check`, it also opens the journal and completes rest/sleep through
 the tent's actual interaction ray. The traversal writes no video by itself. It has
-been recorded once under Movie Maker (`--fixed-fps 24 --write-movie`, September 30),
-and that recording went in a later storage cleanup; a committed gameplay capture
-tool is roadmap milestone M0. Benchmark without Movie
+been recorded under Movie Maker; use the capture tool above. Benchmark without Movie
 Maker or fixed FPS, recording the GPU, driver, resolution, internal scale,
 CPU/GPU frame times, memory and hitches. Measure the exported C# build; the
 editor host's JIT settings can differ. See [validation](validation.md) for the

@@ -10,7 +10,7 @@ The conversion checks began on September 26, 2026 with
 | --- | --- |
 | C# compilation and Godot import | Passed without errors or warnings |
 | C# regression suite | 109 passed, zero failed on September 29 and again on October 20 (on the `work/vegetation-optimization` checkpoint; `master` has not been counted separately): conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, canopy partitioning, terrain seams, player-boundary motion and cached-mesh lifetime included |
-| Python tooling suite | 49 passed, zero failed (rerun October 20); includes import-metadata preservation and alpha-atlas importer checks |
+| Python tooling suite | 49 passed on October 20, and 56 with the gameplay-capture tool's tests (October 21); includes import-metadata preservation and alpha-atlas importer checks |
 | Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
 | Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte |
 | Capture dependency preflight and shell syntax | Passed |

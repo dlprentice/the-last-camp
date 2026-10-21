@@ -14,12 +14,17 @@ rate; measure performance with the exported build's --benchmark instead.
   python3 tools/gameplay_capture.py review:grass -- --dense-distant-grass
   python3 tools/gameplay_capture.py traversal --check
 
+Build the C# assembly first (`dotnet build`); the tool refuses a stale one so the
+GPU slot is not spent compiling. The finished MP4 is sampled for flat edge bands,
+which mean the game viewport did not fill the frame.
+
 Arguments after `--` are passed to the game. Uses the optional godot-offscreen
 machine wrapper when installed (isolated display, serialized GPU access).
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import datetime, timezone
 import importlib.util
 import json
@@ -49,6 +54,15 @@ RESERVE_BYTES = 2_000_000_000
 LOCK_WAIT_SECONDS = 21600
 # Length of an uncapped run, for the disk estimate only (the engine decides).
 SCRIPT_SECONDS = {"traversal": 420, "review": 60}
+# A letterboxed or undersized viewport leaves a flat band at the frame's edge.
+# Real scene content varies along each edge; a band whose luma spans (1st to
+# 99th percentile) no more than this on every sampled frame is a defect. On the
+# October 21 review clip the unfilled right band spanned 0 and the scene's
+# edges 60-210.
+EDGE_BAND = 16
+EDGE_FLAT_RANGE = 4
+EDGE_SAMPLES = 5
+ASSEMBLY = ROOT / ".godot" / "mono" / "temp" / "bin" / "Debug" / "LastCamp.dll"
 
 
 def script_name(value: str) -> str:
@@ -82,7 +96,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     options = parser.parse_args(argv)
     for arg in extra:
         if not arg.startswith("--") or any(arg == f or arg.startswith(f + "=") for f in (
-                "--traverse", "--review-route", "--capture-seconds", "--quality", "--write-movie", "--fixed-fps")):
+                "--traverse", "--review-route", "--capture-seconds", "--quality", "--write-movie", "--fixed-fps",
+                "--movie-size", "--resolution")):
             parser.error(f"game argument {arg!r} is set by this tool or is not a --flag")
     options.extra = extra
     return options
@@ -114,7 +129,7 @@ def capture_markers(text: str) -> tuple[int, int, str]:
 
 
 def game_args(options: argparse.Namespace, out: Path) -> list[str]:
-    args = ["--skip-intro", f"--quality={options.quality}"]
+    args = ["--skip-intro", f"--quality={options.quality}", f"--movie-size={SIZE[0]}x{SIZE[1]}"]
     if options.script == "traversal":
         args.append(f"--traverse={out / 'traversal'}")
     else:
@@ -131,10 +146,58 @@ def verify_encode(info: dict, frames: int) -> None:
         raise RuntimeError(f"Encoded {video.get('nb_frames')} frames; the game recorded {frames}")
 
 
+def stale_sources(assembly: Path = ASSEMBLY, root: Path = ROOT) -> list[Path]:
+    """C# sources newer than the built game assembly (all of them when it is missing)."""
+    sources = [*root.glob("*.csproj"), *(path for folder in ("scripts", "tests") for path in (root / folder).rglob("*.cs"))]
+    if not assembly.exists():
+        return sources
+    built = assembly.stat().st_mtime
+    return [path for path in sources if path.stat().st_mtime > built]
+
+
+def edge_ranges(gray: bytes, width: int = SIZE[0], height: int = SIZE[1], band: int = EDGE_BAND) -> dict:
+    """Luma span (1st to 99th percentile) of each edge band of one 8-bit frame."""
+    if len(gray) != width * height:
+        raise RuntimeError(f"Expected a {width}x{height} gray frame, got {len(gray)} bytes")
+    rows = [gray[y * width:(y + 1) * width] for y in range(height)]
+    left = [v for row in rows for v in row[:band]]
+    right = [v for row in rows for v in row[width - band:]]
+    top = [v for row in rows[:band] for v in row]
+    bottom = [v for row in rows[height - band:] for v in row]
+
+    def span(values: list[int]) -> int:
+        values = sorted(values)
+        return values[max(0, int(len(values) * 0.99) - 1)] - values[int(len(values) * 0.01)]
+    return {name: span(values) for name, values in
+            (("left", left), ("right", right), ("top", top), ("bottom", bottom))}
+
+
+def check_edges(samples: list[dict]) -> None:
+    """Fail when an edge band is flat on every sampled frame (an unfilled viewport)."""
+    for edge in ("left", "right", "top", "bottom"):
+        if samples and all(sample[edge] <= EDGE_FLAT_RANGE for sample in samples):
+            raise RuntimeError(f"The {edge} {EDGE_BAND}-pixel band is a flat colour on every sampled frame; "
+                               "the game viewport did not fill the recorded frame")
+
+
+def sample_edges(movie: Path, ffmpeg: str, seconds: float) -> list[dict]:
+    samples = []
+    for index in range(EDGE_SAMPLES):
+        at = seconds * (index + 0.5) / EDGE_SAMPLES
+        gray = subprocess.run([ffmpeg, "-v", "error", "-ss", f"{at:.3f}", "-i", str(movie), "-frames:v", "1",
+                               "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+                              check=True, capture_output=True, timeout=120).stdout
+        samples.append({"seconds": round(at, 3), **edge_ranges(gray)})
+    return samples
+
+
 def capture(options: argparse.Namespace, tools: dict, out: Path, manifest: dict) -> None:
-    render.command([tools["dotnet"], "build", "--nologo"], out / "build.log", options.timeout)
     avi = out / "capture.avi"
-    args = [tools["godot"], "--path", str(ROOT), "--fullscreen", "--rendering-method", "forward_plus",
+    # --resolution sizes the window and --movie-size (game) renders the root
+    # viewport at exactly 1920x1080 whatever size the window gets, so the
+    # movie frame is filled edge to edge.
+    args = [tools["godot"], "--path", str(ROOT), "--fullscreen", "--resolution", f"{SIZE[0]}x{SIZE[1]}",
+            "--rendering-method", "forward_plus",
             "--rendering-driver", "vulkan", "--disable-vsync", "--write-movie", str(avi),
             "--fixed-fps", str(FPS), "--", *game_args(options, out)]
     if "offscreen" in tools:
@@ -150,6 +213,9 @@ def capture(options: argparse.Namespace, tools: dict, out: Path, manifest: dict)
     finally:
         if avi.exists():
             manifest["avi_bytes"] = avi.stat().st_size
+        placement = out / "offscreen" / "window-placement.txt"
+        if placement.exists():
+            manifest["offscreen_window_placement"] = placement.read_text(encoding="utf-8").strip()
     if "Forward+" not in text:
         raise RuntimeError("Forward+ was not reported; refusing fallback-renderer footage")
     start, end, reason = capture_markers(text)
@@ -183,6 +249,8 @@ def capture(options: argparse.Namespace, tools: dict, out: Path, manifest: dict)
     info = render.media_info(movie, tools["ffprobe"])
     (out / "ffprobe.json").write_text(json.dumps(info, indent=2), encoding="utf-8")
     verify_encode(info, frames)
+    manifest["edge_samples"] = sample_edges(movie, tools["ffmpeg"], frames / FPS)
+    check_edges(manifest["edge_samples"])
     manifest["mp4_bytes"] = movie.stat().st_size
     avi.unlink()
     manifest["avi_removed"] = True
@@ -194,13 +262,17 @@ def capture(options: argparse.Namespace, tools: dict, out: Path, manifest: dict)
 def main(argv: list[str] | None = None) -> int:
     options = parse_args(argv)
     tools = {"godot": render.executable(options.godot), "git": render.executable("git"),
-             "dotnet": render.executable("dotnet"), "ffmpeg": render.executable("ffmpeg"),
+             "ffmpeg": render.executable("ffmpeg"),
              "ffprobe": render.executable("ffprobe")}
     if sys.platform == "linux" and (offscreen := shutil.which("godot-offscreen")):
         tools["offscreen"] = offscreen
     version = subprocess.check_output([tools["godot"], "--version"], text=True, timeout=20).strip()
     if not version.startswith("4.8.dev6.mono."):
         raise RuntimeError(f"Pinned Godot 4.8 dev6 .NET required; found {version}")
+    stale = stale_sources()
+    if stale:
+        raise RuntimeError(f"The game assembly is missing or older than {len(stale)} C# source(s) "
+                           f"(first: {stale[0].relative_to(ROOT)}); run `dotnet build` first")
     needed = estimate_bytes(options.seconds, options.script)
     free = check_space(options.out_root, needed)
     print(f"Disk: {free / 1e9:.1f} GB free, {needed / 1e9:.1f} GB estimated", flush=True)
@@ -214,11 +286,16 @@ def main(argv: list[str] | None = None) -> int:
     out = Path(tempfile.mkdtemp(prefix=f"{label}-{stamp}-", dir=options.out_root))
     (out / ".gdignore").touch()
     print(f"Output: {out}", flush=True)
+    status = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True)
+    diff = subprocess.check_output(["git", "diff", "HEAD", "--binary"], cwd=ROOT)
+    if diff:
+        (out / "source.diff").write_bytes(diff)
     manifest = {
         "script": options.script, "seconds": options.seconds, "quality": options.quality, "fps": FPS,
         "size": list(SIZE), "extra_game_args": options.extra, "engine": version,
         "source_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-        "source_dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()),
+        "source_dirty": bool(status.strip()), "source_status": status.splitlines(),
+        "source_diff_sha256": hashlib.sha256(diff).hexdigest() if diff else None,
         "estimated_bytes": needed, "free_bytes_at_start": free, "offline_movie_maker": True,
         "real_time_performance_claim": False, "started_utc": datetime.now(timezone.utc).isoformat(),
         "status": "running"}

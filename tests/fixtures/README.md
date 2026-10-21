@@ -22,11 +22,12 @@ measurements.
 ## Role and current state
 
 The fixtures proved the GDScript-to-C# conversion exact at that commit. Terrain,
-vegetation and gameplay have changed on purpose since then, and whether
-`SceneContractProbe` and `FingerprintProbe` still pass on `master` has not been
-recorded. Roadmap milestone M0 runs both, traces every mismatch to its commit and
-rebaselines the fixtures to the current game. From then on they are the current-game
-baseline: a key that changes outside a deliberate content change is a regression.
+vegetation and gameplay changes made since then left every recorded key unchanged:
+on October 20 both probes passed on `master` at `1b33dfd` (`SCENE_CONTRACT PASS`
+and `CONTENT_PARITY count=1065 result=PASS`), so no rebaseline was needed. The
+fixtures are the current-game baseline: a key that changes outside a deliberate
+content change is a regression, and a deliberate change follows the procedure
+below.
 
 ## Rebaseline procedure
 

@@ -41,5 +41,7 @@ here.
 ## Branches
 
 `master` is the default branch. `work/vegetation-optimization` (pushed) holds the
-September 30 grass-density and grass-bounds candidates; roadmap milestone M0 decides
-what merges and what becomes an `archive/` tag.
+September 30 grass-density and grass-bounds candidates and is already preserved as
+the `archive/vegetation-optimization` tag. `work/m0-grass-merge` (pushed) is the
+merge of its accepted parts, waiting for roadmap milestone M0's footage and
+benchmark review before it goes to `master`. Both branches are removed when it does.
