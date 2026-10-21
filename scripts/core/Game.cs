@@ -81,6 +81,37 @@ public partial class Game : Node
     private PosixSignalRegistration _terminationSignal;
     private int _terminationRequested;
 
+    private bool _captureStarted, _captureDone;
+
+    /// Marks the start of a scripted run's recorded footage for the gameplay
+    /// capture tool, which trims the loading frames before this marker. With
+    /// `--capture-seconds=N`, the run ends N seconds (game time, so N seconds of
+    /// fixed-rate footage) later, whatever the script is doing.
+    public void begin_capture_window(string script)
+    {
+        if (_captureStarted) return;
+        _captureStarted = true;
+        G.print(G.format("CAPTURE_START script=%s frames_drawn=%d", new Godot.Collections.Array { script, (long)Engine.GetFramesDrawn() }));
+        double seconds = arg_value("capture-seconds", "0").ToFloat();
+        if (seconds > 0)
+            _end_capture_after(seconds);
+    }
+
+    private async void _end_capture_after(double seconds)
+    {
+        await ToSignal(GetTree().CreateTimer(seconds, true, false, false), SceneTreeTimer.SignalName.Timeout);
+        end_capture_window("time limit");
+        quit_cleanly(0);
+    }
+
+    /// Marks the end of the recorded footage; the first call wins.
+    public void end_capture_window(string reason)
+    {
+        if (!_captureStarted || _captureDone) return;
+        _captureDone = true;
+        G.print(G.format("CAPTURE_DONE reason=%s frames_drawn=%d", new Godot.Collections.Array { reason, (long)Engine.GetFramesDrawn() }));
+    }
+
     public async void quit_cleanly(long code = 0)
     {
         /// Imported Ogg/WAV playbacks release their decoder data on the audio mixer
@@ -244,7 +275,7 @@ public partial class Game : Node
     public bool is_tool_run()
     {
         /// Any automated run that must finish and quit on its own.
-        foreach (Variant flag in new Godot.Collections.Array { "capture", "benchmark", "profile", "traverse", "cinematic", "review-assets", "scene-smoke", "check-pond" })
+        foreach (Variant flag in new Godot.Collections.Array { "capture", "benchmark", "profile", "traverse", "cinematic", "review-assets", "scene-smoke", "check-pond", "review-route" })
         {
             if (has_flag(flag.AsString()))
             {

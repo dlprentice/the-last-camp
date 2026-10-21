@@ -34,6 +34,32 @@ public partial class CaptureTool : Node
     public static readonly Godot.Collections.Array<Vector3> BENCH_PATH = new Godot.Collections.Array<Vector3> { new Vector3(6.0f, 1.7f, 22.0f), new Vector3(4.0f, 1.7f, 10.0f), new Vector3(-4.0f, 1.7f, 4.0f), new Vector3(-12.0f, 1.7f, 3.0f), new Vector3(-20.0f, 1.6f, 6.0f), new Vector3(-14.0f, 1.7f, 12.0f), new Vector3(-2.0f, 1.7f, 10.0f), new Vector3(8.0f, 1.7f, -2.0f), new Vector3(4.0f, 1.7f, -10.0f) };
     public static readonly Godot.Collections.Array<Vector3> BENCH_LOOK = new Godot.Collections.Array<Vector3> { new Vector3(-10.0f, 1.0f, 2.0f), new Vector3(-6.0f, 1.0f, 0.0f), new Vector3(-30.0f, 1.0f, 0.0f), new Vector3(-40.0f, 2.0f, 4.0f), new Vector3(-45.0f, 3.0f, 10.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(2.0f, 2.0f, -20.0f), new Vector3(0.0f, 0.8f, 0.0f) };
 
+    /// The full-loop benchmark route: an eye-height walk at an unhurried pace
+    /// from the trail through the clearing, past the fire, table and tent, down
+    /// to the shore, out along the pier and back up to the trail. The camera
+    /// looks along the route. Points follow the traversal's walkable waypoints;
+    /// heights are relative to the ground (or the water over the pond).
+    public static readonly Godot.Collections.Array<Vector3> LOOP_PATH = new Godot.Collections.Array<Vector3> { new Vector3(1.5f, 1.7f, 24.0f), new Vector3(1.0f, 1.7f, 9.0f), new Vector3(2.6f, 1.7f, 4.2f), new Vector3(7.0f, 1.7f, 3.2f), new Vector3(4.4f, 1.7f, -0.4f), new Vector3(-3.6f, 1.7f, 3.6f), new Vector3(-9.0f, 1.7f, 2.0f), new Vector3(-16.0f, 1.6f, 6.3f), new Vector3(-23.1f, 1.6f, 5.4f), new Vector3(-16.5f, 1.6f, 6.6f), new Vector3(-14.2f, 1.7f, 9.0f), new Vector3(-6.0f, 1.7f, 10.0f), new Vector3(1.0f, 1.7f, 14.0f), new Vector3(1.5f, 1.7f, 24.0f) };
+    public const double LOOP_SECONDS = 60.0;
+
+    /// Benchmark routes by name: path, look-ahead (null looks along the path) and seconds.
+    public static (Godot.Collections.Array<Vector3> Path, Godot.Collections.Array<Vector3> Look, double Seconds) benchmark_route(string name) => name switch
+    {
+        "loop" => (LOOP_PATH, null, LOOP_SECONDS),
+        "bench" or "" => (BENCH_PATH, BENCH_LOOK, BENCH_SECONDS),
+        _ => throw new ArgumentException($"unknown benchmark route '{name}' (bench, loop)"),
+    };
+
+    /// What the .NET runtime was told about tiered compilation: the project's
+    /// runtimeconfig switch and the DOTNET_TieredCompilation override, if any.
+    public static Godot.Collections.Dictionary tiered_compilation_setting()
+    {
+        object configured = AppContext.GetData("System.Runtime.TieredCompilation");
+        string env = System.Environment.GetEnvironmentVariable("DOTNET_TieredCompilation");
+        bool effective = env != null ? env.Trim() is not ("0" or "false" or "False") : configured?.ToString() is not ("false" or "False");
+        return new Godot.Collections.Dictionary { { "runtimeconfig", configured?.ToString() ?? "unset" }, { "environment", env ?? "unset" }, { "enabled", effective } };
+    }
+
     public Camera3D camera;
 
     public override void _Ready()
@@ -342,8 +368,19 @@ public partial class CaptureTool : Node
         }
         DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
         Godot.Collections.Dictionary results = new Godot.Collections.Dictionary();
-        Spline path = new Spline(BENCH_PATH);
-        Spline look = new Spline(BENCH_LOOK);
+        string route_name = Game.Instance.arg_value("benchmark-route", "bench");
+        (Godot.Collections.Array<Vector3> route_path, Godot.Collections.Array<Vector3> route_look, double route_seconds) route;
+        try { route = benchmark_route(route_name); }
+        catch (ArgumentException error)
+        {
+            G.push_error(error.Message);
+            Game.Instance.quit_cleanly(1);
+            return;
+        }
+        Spline path = new Spline(route.route_path);
+        Spline look = route.route_look != null ? new Spline(route.route_look) : null;
+        // A closed route (the loop) looks a short way ahead, wrapping past its end.
+        Vector3 look_at(double u) => look != null ? ground_relative(look.sample(u)) : ground_relative(path.sample((u + 0.025) % 1.0));
         foreach (QualityPreset.Tier tier in tiers)
         {
             if (Quality.Instance.current.tier != tier) Quality.Instance.apply(tier);
@@ -354,35 +391,99 @@ public partial class CaptureTool : Node
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             }
             camera.GlobalPosition = ground_relative(path.sample(0.0));
-            camera.LookAt(ground_relative(look.sample(0.0)), Vector3.Up);
+            camera.LookAt(look_at(0.0), Vector3.Up);
             await _wait(WARMUP_SECONDS);
             FrameMetrics metrics = new FrameMetrics(GetViewport(), Game.Instance.camp.pond);
             ulong measured_start = Time.GetTicksUsec();
             double elapsed = 0.0;
-            while (elapsed < BENCH_SECONDS)
+            while (elapsed < route.route_seconds)
             {
                 await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
                 metrics.Sample();
                 elapsed = (Time.GetTicksUsec() - measured_start) / 1000000.0;
-                double u = elapsed / BENCH_SECONDS;
+                double u = Math.Min(elapsed / route.route_seconds, 1.0);
                 camera.GlobalPosition = ground_relative(path.sample(u));
-                camera.LookAt(ground_relative(look.sample(u)), Vector3.Up);
+                camera.LookAt(look_at(u), Vector3.Up);
             }
             Godot.Collections.Dictionary row = metrics.Report();
             row["render_scale"] = preset.render_scale;
+            row["internal_scale"] = Game.Instance.render_viewport?.Scaling3DScale ?? GetViewport().Scaling3DScale;
             row["upscaler"] = preset.upscaler.ToString();
             results[preset.display_name.ToLowerInvariant()] = row;
-            GD.Print($"BENCH {preset.display_name}: mean={row["mean_ms"]}ms p99={row["p99_ms"]}ms fps={row["fps"]} GPU={row["main_view_gpu_ms"]}ms draws={row["mean_draw_calls"]}");
+            GD.Print($"BENCH {route_name} {preset.display_name}: mean={row["mean_ms"]}ms p99={row["p99_ms"]}ms fps={row["fps"]} GPU={row["main_view_gpu_ms"]}ms draws={row["mean_draw_calls"]}");
         }
         FileAccess file = FileAccess.Open(out_path, FileAccess.ModeFlags.Write);
         if (file != null)
         {
-            Godot.Collections.Dictionary payload = new Godot.Collections.Dictionary { { (StringName)"engine", Engine.GetVersionInfo()["string"] }, { (StringName)"gpu", RenderingServer.GetVideoAdapterName() }, { (StringName)"resolution", G.format("%dx%d", new Godot.Collections.Array { G.Index(GetViewport().Get("size"), "x"), G.Index(GetViewport().Get("size"), "y") }) }, { (StringName)"results", results } };
+            Godot.Collections.Dictionary payload = new Godot.Collections.Dictionary { { (StringName)"engine", Engine.GetVersionInfo()["string"] }, { (StringName)"gpu", RenderingServer.GetVideoAdapterName() }, { (StringName)"resolution", G.format("%dx%d", new Godot.Collections.Array { G.Index(GetViewport().Get("size"), "x"), G.Index(GetViewport().Get("size"), "y") }) }, { (StringName)"route", route_name == "" ? "bench" : route_name }, { (StringName)"route_seconds", route.route_seconds }, { (StringName)"tiered_compilation", tiered_compilation_setting() }, { (StringName)"results", results } };
             file.StoreString(Json.Stringify(payload, "  "));
             G.print("BENCH_WRITTEN ", ProjectSettings.GlobalizePath(out_path));
         }
         G.print("BENCH_DONE");
         Game.Instance.quit_cleanly();
+    }
+
+    /// One moving camera segment of a review route. Positions are relative to the
+    /// ground (or the water) under them; the camera eases from the start to the
+    /// end pose over the segment's seconds of game time.
+    public readonly record struct ReviewSegment(string Name, Vector3 From, Vector3 To, Vector3 LookFrom, Vector3 LookTo,
+        double Seconds, double Hour, string Weather = "", float Fov = 68.0f);
+
+    /// `--review-route=grass`: the M0 groundcover review in motion: close, grazing,
+    /// distant, boundary, wet and night views of the grass, so a density change
+    /// can be judged as footage rather than stills. Distant grass beyond about
+    /// 40 m is where the distant floor applies.
+    public static readonly Dictionary<string, ReviewSegment[]> REVIEW_ROUTES = new()
+    {
+        ["grass"] = new ReviewSegment[]
+        {
+            new("close", new Vector3(10.5f, 0.75f, 10.0f), new Vector3(6.5f, 0.75f, 6.8f), new Vector3(-2.0f, 0.2f, 4.0f), new Vector3(-6.0f, 0.2f, 1.0f), 8.0, 17.6),
+            new("grazing", new Vector3(-3.0f, 0.45f, 1.6f), new Vector3(-8.0f, 0.45f, 2.6f), new Vector3(-30.0f, 0.1f, 5.0f), new Vector3(-34.0f, 0.1f, 9.0f), 8.0, 18.4),
+            new("distant", new Vector3(3.2f, 1.72f, 15.0f), new Vector3(1.0f, 1.72f, 19.0f), new Vector3(-60.0f, 1.0f, 40.0f), new Vector3(60.0f, 2.0f, 70.0f), 10.0, 17.0),
+            new("boundary", new Vector3(98.0f, 1.7f, 2.0f), new Vector3(106.0f, 1.7f, 10.0f), new Vector3(160.0f, 2.0f, 30.0f), new Vector3(40.0f, 1.0f, 40.0f), 10.0, 17.2),
+            new("wet", new Vector3(9.0f, 1.1f, 8.6f), new Vector3(6.0f, 1.1f, 6.0f), new Vector3(-4.0f, 0.3f, 2.0f), new Vector3(-12.0f, 0.3f, 4.0f), 8.0, 17.5, "rain_detail"),
+            new("night", new Vector3(7.0f, 1.55f, 7.0f), new Vector3(3.0f, 1.55f, 10.0f), new Vector3(0.5f, 0.9f, -1.0f), new Vector3(-30.0f, 0.6f, 12.0f), 10.0, 23.4),
+        },
+    };
+
+    public async void run_review_route(string name)
+    {
+        if (!REVIEW_ROUTES.TryGetValue(name, out ReviewSegment[] segments))
+        {
+            G.push_error($"Unknown review route '{name}'; known: {string.Join(", ", REVIEW_ROUTES.Keys)}");
+            Game.Instance.quit_cleanly(1);
+            return;
+        }
+        WorldController world = Game.Instance.world;
+        void place(ReviewSegment segment, double u)
+        {
+            double e = smoothstep(0.0, 1.0, u);
+            camera.GlobalPosition = ground_relative(segment.From.Lerp(segment.To, (float)e));
+            camera.LookAt(ground_relative(segment.LookFrom.Lerp(segment.LookTo, (float)e)), Vector3.Up);
+            camera.Fov = segment.Fov;
+        }
+        // Settle the first view before recording starts, as a still capture does.
+        world.weather.apply_chapter(segments[0].Weather, 0.0, segments[0].Seconds, false);
+        world.hour = segments[0].Hour;
+        place(segments[0], 0.0);
+        await _wait(SETTLE_SECONDS);
+        Game.Instance.begin_capture_window("review:" + name);
+        foreach (ReviewSegment segment in segments)
+        {
+            G.print(G.format("REVIEW_SEGMENT name=%s frames_drawn=%d", new Godot.Collections.Array { segment.Name, (long)Engine.GetFramesDrawn() }));
+            double t = 0.0;
+            world.hour = segment.Hour;
+            world.reset_water_lens();
+            while (t < segment.Seconds)
+            {
+                world.weather.apply_chapter(segment.Weather, t, segment.Seconds, true);
+                place(segment, t / segment.Seconds);
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                t += GetProcessDeltaTime();
+            }
+        }
+        Game.Instance.end_capture_window("review route complete");
+        Game.Instance.quit_cleanly(0);
     }
 
     public async void run_profile(string out_path)

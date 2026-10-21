@@ -25,7 +25,7 @@ public partial class Main : Node3D
         if (!OS.GetCmdlineUserArgs().Contains("--package-check"))
         {
             string[] args = OS.GetCmdlineUserArgs();
-            bool capture = args.Any(a => new[] { "--capture", "--benchmark", "--profile", "--traverse", "--cinematic", "--review-assets", "--check-pond", "--movie-size" }.Any(flag => a == flag || a.StartsWith(flag + "=", StringComparison.Ordinal)));
+            bool capture = args.Any(a => new[] { "--capture", "--benchmark", "--profile", "--traverse", "--cinematic", "--review-assets", "--check-pond", "--movie-size", "--review-route" }.Any(flag => a == flag || a.StartsWith(flag + "=", StringComparison.Ordinal)));
             if (capture && DisplayServer.GetName() != "headless")
             {
                 Vector2I size = new(1920, 1080);
@@ -220,6 +220,14 @@ public partial class Main : Node3D
             CaptureTool capture2 = new CaptureTool();
             _sceneRoot.AddChild(capture2);
             capture2.run_benchmark(Game.Instance.arg_value("benchmark", ""), Game.Instance.arg_value("out", "user://benchmark.json"));
+            return;
+        }
+        if (Game.Instance.has_flag("review-route"))
+        {
+            loading.finish();
+            CaptureTool review_route = new CaptureTool();
+            _sceneRoot.AddChild(review_route);
+            review_route.run_review_route(Game.Instance.arg_value("review-route", "grass"));
             return;
         }
         if (Game.Instance.has_flag("cinematic"))

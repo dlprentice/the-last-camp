@@ -54,6 +54,7 @@ public partial class TraversalCheck : Node
     public async void _walk()
     {
         await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+        Game.Instance.begin_capture_window("traversal");
         _report["start"] = _snapshot("start");
         foreach (Godot.Collections.Dictionary wp in WAYPOINTS)
         {
@@ -84,6 +85,7 @@ public partial class TraversalCheck : Node
             Variant f = f_item;
             G.print(G.format("TRAVERSAL_FAILURE %s", f));
         }
+        Game.Instance.end_capture_window("traversal complete");
         Game.Instance.quit_cleanly(passed ? 0 : 1);
     }
 
