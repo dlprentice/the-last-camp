@@ -1,11 +1,12 @@
 shader_type spatial;
 render_mode cull_disabled, diffuse_burley;
 #include "res://shaders/inc/noise.gdshaderinc"
+#include "res://shaders/inc/common.gdshaderinc"
 global uniform float scene_wetness;
 uniform sampler2D weave_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D weave_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 void fragment() {
-	STREAMING_UV = UV * 2.0; // Samples repeat four times; reserve one extra mip.
+	STREAMING_LOD = streaming_lod(dFdx(UV * 2.0), dFdy(UV * 2.0)); // Samples repeat four times; reserve one extra mip.
 	vec3 weave = texture(weave_tex, UV * 4.0).rgb;
 	float edge = min(min(UV.x, 1.90 - UV.x), min(UV.y, 1.20 - UV.y));
 	float border = smoothstep(0.022, 0.026, edge) * (1.0 - smoothstep(0.045, 0.049, edge));

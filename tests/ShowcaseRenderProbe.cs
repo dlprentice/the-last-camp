@@ -198,7 +198,6 @@ public partial class ShowcaseRenderProbe : SceneTree
     {
         sun.ShadowBias = 0.025f;
         sun.ShadowNormalBias = 1.6f;
-        sun.ShadowContactShadowsOpacity = 0.85f;
         sun.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel2Splits;
         sun.DirectionalShadowMaxDistance = 80;
         RenderingServer.DirectionalShadowAtlasSetSize(2048, true);
@@ -250,9 +249,14 @@ public partial class ShowcaseRenderProbe : SceneTree
             render_mode unshaded, fog_disabled;
             uniform sampler2D surface : source_color, filter_linear_mipmap_anisotropic;
             void fragment() {
-                // Non-default UVs exercise the dev6 feedback override.
-                STREAMING_UV = UV * 0.125;
-                ALBEDO = texture(surface, STREAMING_UV).rgb;
+                // A shader-supplied level exercises the STREAMING_LOD feedback override:
+                // the footprint of UV * 0.125 with the engine's 16x anisotropy limit.
+                vec2 coord = UV * 0.125;
+                vec2 ddx = dFdx(coord);
+                vec2 ddy = dFdy(coord);
+                float footprint_sq = max(min(dot(ddx, ddx), dot(ddy, ddy)), max(dot(ddx, ddx), dot(ddy, ddy)) / 256.0);
+                STREAMING_LOD = 0.5 * log2(max(footprint_sq, 1e-30)) + 12.0;
+                ALBEDO = texture(surface, coord).rgb;
             }
             """ };
         var material = new ShaderMaterial { Shader = shader };

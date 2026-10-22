@@ -139,7 +139,8 @@ void fragment() {
 	vec2 uv_far = world_pos.xz * tile_far;
 	// Feedback must follow world-space sampling, not the mesh's arbitrary UVs.
 	// Reserve a mip for FSR2/negative texture bias and the broad far projection.
-	STREAMING_UV = world_pos.xz * min(tile_near, tile_far) * 0.5;
+	vec2 streaming_pos = world_pos.xz * min(tile_near, tile_far) * 0.5;
+	STREAMING_LOD = streaming_lod(dFdx(streaming_pos), dFdy(streaming_pos));
 	vec2 dx_n = dFdx(uv_near);
 	vec2 dy_n = dFdy(uv_near);
 

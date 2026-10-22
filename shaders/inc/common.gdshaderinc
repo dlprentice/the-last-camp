@@ -43,3 +43,14 @@ vec3 view_normal_from_world(mat4 view, vec3 world_normal) {
 float luminance(vec3 c) {
 	return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
+
+// Texture-streaming level for STREAMING_LOD from the screen-space gradients of
+// the coordinate the feedback should follow. Same footprint rule as
+// BaseMaterial3D: minor axis, limited to 16x anisotropy, offset by the
+// engine's 4096-texel reference (log2 = 12).
+float streaming_lod(vec2 ddx, vec2 ddy) {
+	float dx_sq = dot(ddx, ddx);
+	float dy_sq = dot(ddy, ddy);
+	float footprint_sq = max(min(dx_sq, dy_sq), max(dx_sq, dy_sq) / 256.0);
+	return 0.5 * log2(max(footprint_sq, 1e-30)) + 12.0;
+}

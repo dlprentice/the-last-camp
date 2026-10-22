@@ -94,7 +94,7 @@ void fragment() {
 	footprint += vec3(lessThan(w, vec3(0.002))) * 1e6;
 	vec2 streaming_uv = footprint.x <= footprint.y && footprint.x <= footprint.z ? tex_pos.zy :
 		(footprint.y <= footprint.z ? tex_pos.xz : tex_pos.xy);
-	STREAMING_UV = streaming_uv * tile * 0.5;
+	STREAMING_LOD = streaming_lod(dFdx(streaming_uv * tile * 0.5), dFdy(streaming_uv * tile * 0.5));
 	vec3 albedo = sample_albedo(tex_pos, w) * tint;
 	vec3 orm = sample_orm(tex_pos, w);
 	vec3 n_world = sample_normal(tex_pos, n, w);
