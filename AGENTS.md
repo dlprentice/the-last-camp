@@ -1,6 +1,6 @@
 # The Last Camp: agent guide
 
-A first-person camping game in Godot 4.8 dev6 .NET (C#, Forward+ Vulkan, native
+A first-person camping game in Godot 4.8 beta1 .NET (C#, Forward+ Vulkan, native
 Jolt), being built into the story game in [the design](docs/design.md); the README
 says what plays today. This repository is **public** under MIT. The maintainer's
 machine and game-dev guides apply on top of this page; it adds only what is specific

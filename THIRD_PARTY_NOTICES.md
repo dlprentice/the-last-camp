@@ -58,7 +58,7 @@ Distribute that file, `LICENSE`, this notice and `credits.md` alongside the bina
 
 ## .NET runtime
 
-The C# project uses .NET 8. Self-contained Linux packages also carry
+The C# project uses .NET 10. Self-contained Linux packages also carry
 `DOTNET-RUNTIME-LICENSE.TXT` and `DOTNET-RUNTIME-THIRD-PARTY-NOTICES.TXT`, copied
 from the exact runtime pack identified by the exported dependency manifest.
 Keep both with the executable and its `data_LastCamp_linuxbsd_x86_64/` directory.

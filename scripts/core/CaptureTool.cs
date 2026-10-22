@@ -858,7 +858,7 @@ public partial class CaptureTool : Node
                 if (node is MultiMeshInstance3D batch) Read(batch.Multimesh, path, "visible_instance_count");
             }
             if (node is Light3D) Read(node, path, "shadow_enabled", "shadow_caster_mask", "shadow_contact_shadows_allow",
-                "shadow_contact_shadows_opacity", "shadow_contact_shadows_blur");
+                "shadow_contact_shadows_blur");
             if (node is OmniLight3D) Read(node, path, "omni_shadow_mode");
             foreach (Node child in node.GetChildren()) nodes.Push(child);
         }

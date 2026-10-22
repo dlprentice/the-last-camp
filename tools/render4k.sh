@@ -23,7 +23,7 @@ OUT=$(mktemp -d "$OUT_ROOT/${NAME}-4k.XXXXXX")
 WORK=$(mktemp -d "$WORK_ROOT/${NAME}-4k.XXXXXX")
 trap 'echo "Render files retained: $WORK; output: $OUT"' EXIT
 GODOT=${GODOT:-godot}
-case "$("$GODOT" --version)" in 4.8.dev6.mono.*) ;; *) echo "Godot 4.8 dev6 .NET required" >&2; exit 2 ;; esac
+case "$("$GODOT" --version)" in 4.8.beta1.mono.*) ;; *) echo "Godot 4.8 beta1 .NET required" >&2; exit 2 ;; esac
 export GODOT
 dotnet build --nologo > "$OUT/build.log" 2>&1
 ENGINE=("$GODOT" --path "$PWD")

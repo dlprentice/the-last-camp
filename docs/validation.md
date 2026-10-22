@@ -1,7 +1,7 @@
 # Validation and known limits
 
-The source targets **Godot 4.8 dev6 .NET**, C#, Forward+ Vulkan and native Jolt.
-The conversion checks began on September 26, 2026 with
+The source targets **Godot 4.8 beta1 .NET** (`4.8.beta1.mono.official.4d10419ca`) with .NET SDK 10.0.402, C#,
+Forward+ Vulkan and native Jolt. Results below are dated; the conversion checks began on September 26, 2026 with
 `4.8.dev6.mono.official.8898c2b3d` and .NET SDK 8.0.424 on Linux x86-64.
 
 ## Checked without rendering
