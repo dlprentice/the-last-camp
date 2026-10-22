@@ -14,8 +14,8 @@ physics and Forward+ Vulkan. There are no addons or GDExtensions.
 
 ## Start here
 
-Install **Godot 4.8 dev6 .NET**, its matching .NET export templates, and the **.NET 8 SDK**. The engine is a development snapshot from
-[godotengine.org](https://godotengine.org/article/dev-snapshot-godot-4-8-dev-6/). The project needs a Vulkan-capable
+Install **Godot 4.8 beta1 .NET**, its matching .NET export templates, and the **.NET 10 SDK**. The engine is a beta build from
+[godotengine.org](https://godotengine.org/download/archive/4.8-beta1/). The project needs a Vulkan-capable
 GPU and Forward+; the Compatibility renderer and web/mobile exports are not
 supported. The C# source is tested on Linux x86-64, including offscreen GPU
 captures and scripted traversal with the actual player controller. Performance

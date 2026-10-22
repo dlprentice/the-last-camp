@@ -2,7 +2,7 @@
 
 ## Toolchain
 
-Use **Godot 4.8 dev6 .NET**, the matching .NET export templates, and the **.NET 8
+Use **Godot 4.8 beta1 .NET**, the matching .NET export templates, and the **.NET 10
 SDK** pinned by `global.json`. Godot is the engine; C# constructs the complete
 world, UI, materials and behavior. No editor workflow, addons or GDExtensions
 are required. GPU shaders remain shader source; offline asset tools use Python
@@ -28,7 +28,7 @@ godot --headless --path . --script res://tests/FingerprintProbe.cs
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-Keep `--quit-after` after `--import`: 4.8 dev6's default one-frame import exit
+Keep `--quit-after` after `--import`: Godot 4.8's default one-frame import exit
 can race its background help-cache worker. The extra headless iterations allow
 that work to finish before shutdown; they do not launch gameplay or GPU rendering.
 
@@ -72,7 +72,7 @@ the source atlases before checking the retained array again:
 godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-canopy-batches --probe-out="$PWD/local-data/canopy-check"
 ```
 
-Two probes exercise the native dev6 rendering additions:
+Two probes exercise rendering features that are new in 4.8:
 
 ```bash
 godot-offscreen --timeout 90 -- --script res://tests/ShowcaseRenderProbe.cs -- --probe-texture-streaming --probe-out="$PWD/local-data/streaming-check"
@@ -266,7 +266,7 @@ rendered and interactive check.
 ## Asset preparation
 
 The nine opaque PBR sets use Godot's `StreamedTexture2D` importer. Their custom
-shaders provide `STREAMING_UV` from the actual projected texture coordinates,
+shaders provide `STREAMING_LOD` from the actual projected texture coordinates,
 with a conservative mip reserve for upscaling. Alpha-cutout atlases and utility
 maps retain the ordinary importer. Runtime-generated canopy arrays are separate
 and do not stream. Refresh metadata without repacking images or changing credits:
@@ -275,7 +275,7 @@ and do not stream. Refresh metadata without repacking images or changing credits
 python3 tools/import_textures.py --imports-only
 ```
 
-The dev6 loader and streaming override must agree about the initial mip. Atlas
+The 4.8 loader and streaming override must agree about the initial mip. Atlas
 baking first initializes streaming feedback, then pins full detail and flushes
 again before drawing; otherwise a newly loaded coarse mip can be reported as
 fully resident. The prior override is restored after baking. The hardware probe

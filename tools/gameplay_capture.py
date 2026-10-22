@@ -267,8 +267,8 @@ def main(argv: list[str] | None = None) -> int:
     if sys.platform == "linux" and (offscreen := shutil.which("godot-offscreen")):
         tools["offscreen"] = offscreen
     version = subprocess.check_output([tools["godot"], "--version"], text=True, timeout=20).strip()
-    if not version.startswith("4.8.dev6.mono."):
-        raise RuntimeError(f"Pinned Godot 4.8 dev6 .NET required; found {version}")
+    if not version.startswith("4.8.beta1.mono."):
+        raise RuntimeError(f"Pinned Godot 4.8 beta1 .NET required; found {version}")
     stale = stale_sources()
     if stale:
         raise RuntimeError(f"The game assembly is missing or older than {len(stale)} C# source(s) "
