@@ -25,3 +25,6 @@ renders/
 # .NET SDK output (Godot normally places these under .godot/)
 /bin/
 /obj/
+
+# Claude Code per-machine settings: can hold approved commands verbatim
+.claude/settings.local.json
