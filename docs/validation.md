@@ -12,7 +12,7 @@ Forward+ Vulkan and native Jolt. Results below are dated; the conversion checks 
 | C# regression suite | 109 passed, zero failed on September 29 and again on October 20 (on the `work/vegetation-optimization` checkpoint; `master` has not been counted separately): conversion contracts, runtime readback, prop geometry, stone flight, grass batching/quality restoration, canopy partitioning, terrain seams, player-boundary motion and cached-mesh lifetime included |
 | Python tooling suite | 49 passed on October 20, and 56 with the gameplay-capture tool's tests (October 21); includes import-metadata preservation and alpha-atlas importer checks |
 | Main-scene builder | Canonical dump matches the original scene: root plus nine children, native stored properties, owners, groups and persistent connections |
-| Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte |
+| Deterministic content and audio | At the conversion checkpoint, all 1,065 SHA-256 fingerprints matched the GDScript reference byte for byte; the 50 keys of the retired synthesised audio bank were later removed, leaving 1,015 |
 | Capture dependency preflight and shell syntax | Passed |
 | Blender conversion fixture | Separate LOD object names and alpha preserved; 448 triangles reduced to 224, and a 64×64 texture resized to 32×32 |
 | Linux .NET release package | Exported successfully with its self-contained runtime and required license notices |

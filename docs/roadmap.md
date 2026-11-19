@@ -338,7 +338,7 @@ transforms, meadow and grass batches, camera routes, waves, the generated audio 
 | M1 | `main.scene.txt` | title, menus and the story nodes join the main scene |
 | M2 | held-item meshes, `main.scene.txt` | the viewmodel replaces the floating held meshes |
 | M3, M4 | terrain samples, grass and meadow batches, vegetation plans, dressing transforms, camera routes | footpaths change `TRAIL` and `TRAIL_BOUNDS`, which feed terrain and grass; places displace plants |
-| M5, M6, M7 | audio bank | new `Synth.cs` sounds |
+| M5, M6, M7 | audio bank | the synthesised bank removed; sounds come from the ElevenLabs manifest |
 | M8, M9 | vegetation plans and batches, generated tree meshes | performance work and the canopy re-bake |
 
 Any key outside its milestone's groups is a regression until proved otherwise.
@@ -369,7 +369,7 @@ owner for any change to a file it does not own. The lead owns these shared files
 | B. Activities | `scripts/activities/` (new: paddling, fishing, splitting, bucket, forage, cooking, tarp, ring, tent strike); `scripts/world/CampWeather.cs` (the band-driven storm); `scripts/camp/Wildlife.cs` (catchable fish, loon, heron); small agreed hooks in `scripts/camp/Canoe.cs`, `Firepit.cs`, `Dock.cs` and `CampKitchen.cs`, and the tent-strike hook requested from lane C; `tests/TestActivities*.cs` | M5, M6 |
 | C. Places and world | `scripts/camp/places/` (new); `scripts/camp/HabitatDiversity.cs` (forage spots); `scripts/player/JuneCamera.cs` (new handheld camera and photo check); `tools/blender/places_*.py`; `models/generated/places/`; `scripts/camp/Tent.cs` (interior and struck state); the place texture generators in `tools/` | M3 trailhead, M4 |
 | D. Hands | `tools/blender/hands.py` and `tools/blender/held_props.py`; `models/generated/hands/` and `models/generated/held/`; `scripts/player/Viewmodel.cs` (new) | M2, M3 |
-| E. Voice and audio | `tools/voice.py`; `audio/voice/`; `scripts/audio/` (`Synth.cs`, `AudioDirector.cs`, new `VoicePlayer.cs`); a gameplay-audio review mode in `tools/film_review.py` | M1–M3 voice, M5–M7 sounds, M7, M9 mix |
+| E. Voice and audio | `tools/voice.py`; `audio/voice/`; `scripts/audio/` (`SoundBank.cs`, `AudioDirector.cs`, `VoicePlayer.cs`); a gameplay-audio review mode in `tools/film_review.py` | M1–M3 voice, M5–M7 sounds, M7, M9 mix |
 | F. Performance and canopy | `scripts/camp/Understory.cs`, `Forest.cs`, `RidgeForest.cs`, `TreeImpostors.cs`; `scripts/generation/` (`GrassPlanter.cs`, `TreeGenerator.cs`, `TreeSpecies.cs`); `shaders/`; `scripts/core/QualityPreset.cs`, `Quality.cs`, `CaptureTool.cs`, `FrameMetrics.cs`; `tools/gameplay_capture.py`; `tools/bake_textures.py` leaf atlases | M0, M8, M9 canopy |
 
 The GPU runs of every lane queue on the one machine-wide GPU lock, and lane F's

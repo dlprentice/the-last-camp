@@ -9,10 +9,11 @@ owners, groups and persistent connections of the detached main scene. Script
 identity is normalized to the class name, and script-defined fields are excluded.
 The C# builder is compared against this fixture before the scene enters the tree.
 
-The 1,065 content fingerprints use SHA-256 over Godot's `var_to_bytes` encoding.
+The 1,015 content fingerprints use SHA-256 over Godot's `var_to_bytes` encoding.
 They cover the sampled terrain, planned trees/rocks/shrubs, generated tree and
 plant mesh channels, canoe/tent meshes, scanned-dressing transforms, meadow and
-grass batches, sampled camera routes, analytic waves and the generated audio bank.
+grass batches, sampled camera routes and analytic waves. The game's audio is no
+longer generated in code, so it has no fingerprints.
 The sampled routes also check that the film has no music cues. Byte lengths guard
 against silently accepting empty geometry from a renderer-less mesh readback.
 
@@ -25,7 +26,10 @@ The fixtures proved the GDScript-to-C# conversion exact at that commit. Terrain,
 vegetation and gameplay changes made since then left every recorded key unchanged:
 on October 20 both probes passed on `master` at `1b33dfd` (`SCENE_CONTRACT PASS`
 and `CONTENT_PARITY count=1065 result=PASS`), so no rebaseline was needed. The
-fixtures are the current-game baseline: a key that changes outside a deliberate
+fixtures are the current-game baseline. The one rebaseline since removed the 50
+keys of the retired synthesised audio bank (48 `sound_bank/*`, `noise` and
+`filtered_noise`) when the game's audio moved to ElevenLabs; every other key was
+unchanged, so the fixture is the earlier one minus those keys. A key that changes outside a deliberate
 content change is a regression, and a deliberate change follows the procedure
 below.
 
