@@ -35,6 +35,7 @@ public partial class Camp : Node3D
     public Pond pond;
     public UnderwaterFX underwater_fx;
     public Campsite campsite;
+    public Places places;
     public CampRocks rocks;
     public Wildlife wildlife;
     public AudioDirector audio;
@@ -165,6 +166,9 @@ public partial class Camp : Node3D
         campsite = new Campsite(field);
         AddChild(campsite);
         campsite.build();
+        places = new Places(field, plan, forest);
+        AddChild(places);
+        places.build();
 
         await _stage("Waking the wildlife");
         if (!IsInsideTree())
