@@ -221,7 +221,8 @@ public partial class CampSession : Node
         // passed and the night's asks are done, it is turning in.
         bool restingInTent = _shelterRest && player != null && player.GlobalPosition.DistanceTo(_bed.GlobalPosition) < 3.6f;
         if (restingInTent && Story.Sheltered && Story.CanEndBy(StoryEvents.TurnedIn) && !_ending) _ = EndBand(StoryEvents.TurnedIn, player);
-        bool inTent = player != null && (restingInTent || CampWeather.tent_shelter(site.tent.ToLocal(player.GlobalPosition + Vector3.Up * 0.5f)));
+        // A struck tent is gone: its bare pitch is not inside anything.
+        bool inTent = player != null && !site.tent.struck && (restingInTent || CampWeather.tent_shelter(site.tent.ToLocal(player.GlobalPosition + Vector3.Up * 0.5f)));
         if (inTent && !_inTent)
         {
             Game.Instance.audio?.play_interact(Sounds.TentEnter);
@@ -331,7 +332,7 @@ public partial class CampSession : Node
         Game.Instance.camp?.campsite?.kitchen?.take_letter();
         Story.AddItem("june_letter");
         Story.Raise(StoryEvents.LetterRead);
-        await Reading.Read(StoryTexts.JuneLetter, player);
+        await Reading.Read(StoryTexts.JuneLetter, player, june: true);
     }
 
     public void ReachPlace(string place) => Story.Raise("place:" + place);
@@ -347,6 +348,7 @@ public partial class CampSession : Node
             _ = Sit(StoryEvents.SatPier, player);
             if (!Story.BandDone) Game.Instance.hud?.notify("A few things left first. J opens your journal.");
         }
+        else Sound(Sounds.SitDown);
     }
 
     /// Whether Tom's tin can be opened yet: only after the old fire ring. The tin's
@@ -362,7 +364,7 @@ public partial class CampSession : Node
         if (tent.tin_open)
         {
             Sound(Sounds.PageTurn);
-            _ = Reading.Read(StoryTexts.TallyBook, player);
+            _ = Reading.Read(StoryTexts.TallyBook, player, june: false, StoryTexts.TallySketchPage);
             return true;
         }
         Sound(Sounds.TinOpen);
@@ -379,7 +381,7 @@ public partial class CampSession : Node
         await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
         if (!IsInsideTree()) return;
         Sound(sound);
-        await Reading.Read(pages, player);
+        await Reading.Read(pages, player, june: false, StoryTexts.TallySketchPage);
     }
 
     /// Tom's first notch, seen up close: counts only once the tally book has
@@ -449,7 +451,7 @@ public partial class CampSession : Node
         if (places.Tin != null) places.Tin.Visible = false;
         await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
         if (!IsInsideTree()) return;
-        await Reading.Read(StoryTexts.TomLetter, player);
+        await Reading.Read(StoryTexts.TomLetter, player, june: false);
         Story.AddItem("tom_letter");
         Story.Raise(StoryEvents.StepLifted);
         _lifting = false;
@@ -555,27 +557,22 @@ public partial class CampSession : Node
     public async void WalkOut(Player player)
     {
         if (!await EndBand(StoryEvents.WalkedOut, player)) return;
-        await RunEnding();
+        RunEnding();
     }
 
     public bool EndingRunning { get; private set; }
 
     /// The HUD's closing sequence (the shot, the credits); `credits_finished` when it ends.
-    private async Task RunEnding()
+    /// The HUD's closing sequence: the credits roll, then June's postcard, which
+    /// raises `credits_finished` through `FinishCredits` as it begins.
+    private void RunEnding()
     {
         if (EndingRunning || Story.Facts.Contains(StoryEvents.CreditsFinished)) return;
         EndingRunning = true;
         bool fireKept = Story.StormOutcome != "went_out";
         GD.Print($"STORY_ENDING fire_kept={fireKept}");
-        if (Game.Instance.hud is IEndingScreen ending) await ending.ShowEnding(fireKept);
-        else await ToSignal(GetTree().CreateTimer(EndingFallbackSeconds), SceneTreeTimer.SignalName.Timeout);
-        if (!IsInsideTree()) return;
-        FinishCredits();
-        EndingRunning = false;
+        Game.Instance.hud?.ShowEnding(fireKept);
     }
-
-    /// While the HUD has no closing sequence yet, the credits are a short pause.
-    public const double EndingFallbackSeconds = 3.0;
 
     public void FinishCredits() => Story.Raise(StoryEvents.CreditsFinished);
 

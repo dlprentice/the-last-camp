@@ -641,14 +641,23 @@ public partial class TraversalCheck : Node
         }
         double nearest = fire.ring_stones.Min(st => new Vector2(st.Position.X, st.Position.Z).Length());
         _check(G.format("moving the ring stones sets all %d down off the site in %d moves (nearest %.2f m)", new Godot.Collections.Array { fire.ring_stones.Count, moves, nearest }),
-            fire.stones_scattered && moves >= 3 && nearest >= Firepit.SCATTER_MIN - 0.3 && story.Facts.Contains(LastCamp.Story.StoryEvents.StonesScattered));
+            fire.stones_scattered && moves >= 3 && nearest >= Firepit.SCATTER_MIN - 0.3 && story.Facts.Contains(LastCamp.Story.StoryEvents.StonesScattered) && !fire.has_pit_pillar);
         await _screenshot("story_stones_scattered");
         _check("the last morning is done", session.BandDone);
         Vector2 out_at = CampSession.WalkOutPoint;
         bool walked = await _follow("story_walk_out", new[] { new Vector2(3.4f, 0.9f), new Vector2(3.8f, 3.8f), trail[4], trail[3], trail[2], trail[1], new Vector2(3.9f, 67.6f), out_at });
         await _wait_for(() => story.Finished, 3);
         _check("walking out past the trailhead post raises walked_out", walked && story.Finished && story.Facts.Contains(LastCamp.Story.StoryEvents.WalkedOut));
-        await _wait_for(() => story.Facts.Contains(LastCamp.Story.StoryEvents.CreditsFinished), CampSession.EndingFallbackSeconds + 60);
+        // The HUD's credits roll; a player may let it run or skip it with Enter.
+        await ToSignal(GetTree().CreateTimer(6.0), SceneTreeTimer.SignalName.Timeout);
+        Node roll = Game.Instance.hud.FindChild("Ending", true, false);
+        _check("walking out starts the HUD's ending", session.EndingRunning && roll != null);
+        await _screenshot("story_credits");
+        _player.GetViewport().PushInput(new InputEventAction { Action = "ui_accept", Pressed = true });
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        _player.GetViewport().PushInput(new InputEventAction { Action = "ui_accept", Pressed = false });
+        await _wait_for(() => story.Facts.Contains(LastCamp.Story.StoryEvents.CreditsFinished), 30);
+        await _screenshot("story_postcard");
         _check("the ending runs and raises credits_finished, then June's postcard", story.Facts.Contains(LastCamp.Story.StoryEvents.CreditsFinished) && story.LinesPlayed.Contains("e7"));
         session.LinePlayed -= watch;
         _check($"nothing follows June's last note until the postcard ({string.Join(" ", linesAfterAsh)})", linesAfterAsh.All(id => id == "e7"));

@@ -141,11 +141,16 @@ public partial class Firepit : Node3D
     public const double RAKE_SECONDS = 1.4;
     public const double STONE_SECONDS = 1.1;
     public const double STONE_STAGGER = 0.3;
-    /// Where the scattered stones are set down: out beyond the ring, short of the seats.
-    public const double SCATTER_MIN = 1.75;
-    public const double SCATTER_MAX = 2.35;
+    /// Where the scattered stones are set down: well out from the fire, beyond the
+    /// seats, and off the trampled ground (the trail and the camp's walking lines).
+    public const double SCATTER_MIN = 4.2;
+    public const double SCATTER_MAX = 5.6;
+    public const double SCATTER_PATH_CLEARANCE = 1.4;
+    public const double SCATTER_PROP_CLEARANCE = 1.6;
 
     public bool stones_scattered => stones_moved >= ring_stones.Count;
+    private CollisionShape3D _pit_shape;
+    public bool has_pit_pillar => _pit_shape != null;
 
     /// Rakes the ash out: the burnt ends and the heaped coals are pulled apart
     /// into a low, wide spread. If the fire lived through the storm it is still
@@ -204,16 +209,34 @@ public partial class Firepit : Node3D
     public Vector3 scatter_target(int i)
     {
         MeshInstance3D stone = ring_stones[i];
-        var rng = new RandomNumberGenerator { Seed = (ulong)(1407 + i * 31) };
+        using var rng = new RandomNumberGenerator { Seed = (ulong)(1407 + i * 31) };
         Vector3 at = stone.Position;
         double angle = Math.Atan2(at.Z, at.X) + rng.RandfRange(-0.22f, 0.22f);
         double r = rng.RandfRange((float)SCATTER_MIN, (float)SCATTER_MAX);
-        Vector3 local = new Vector3((float)(Math.Cos(angle) * r), 0, (float)(Math.Sin(angle) * r));
+        Vector3 local = Vector3.Zero;
+        // Turn round the fire in small steps until the spot is clear of the paths and props.
+        for (int k = 0; k < 64; k++)
+        {
+            double a = angle + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 0.09;
+            local = new Vector3((float)(Math.Cos(a) * r), 0, (float)(Math.Sin(a) * r));
+            if (scatter_clear(field, GlobalPosition + local)) break;
+        }
         Vector3 from_world = ToGlobal(at);
         Vector3 to_world = ToGlobal(local);
         double bury = from_world.Y - field.height(from_world.X, from_world.Z);
         local.Y = (float)(field.height(to_world.X, to_world.Z) + bury - GlobalPosition.Y);
         return local;
+    }
+
+    /// Off the trampled ground and clear of the seats, tent, table and woodpile.
+    public static bool scatter_clear(TerrainField field, Vector3 world)
+    {
+        Vector2 p = new(world.X, world.Z);
+        if (field.walking_distance(p) < SCATTER_PATH_CLEARANCE) return false;
+        foreach (Vector2 seat in TerrainField.SEATS)
+            if (p.DistanceTo(seat) < SCATTER_PROP_CLEARANCE) return false;
+        return p.DistanceTo(TerrainField.WOODPILE) > SCATTER_PROP_CLEARANCE + 0.6 && p.DistanceTo(TerrainField.TENT) > 2.6
+            && p.DistanceTo(TerrainField.TABLE) > SCATTER_PROP_CLEARANCE + 0.4;
     }
 
     /// Lifts the next `count` ring stones out of the ring one after another and
@@ -237,6 +260,13 @@ public partial class Firepit : Node3D
             tween.TweenInterval(STONE_STAGGER * (moved - 1));
             tween.TweenProperty(stone, "position", lift, STONE_SECONDS * 0.45).SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Sine);
             tween.TweenProperty(stone, "position", to, STONE_SECONDS * 0.55).SetEase(Tween.EaseType.InOut).SetTrans(Tween.TransitionType.Sine);
+        }
+        // With the ring gone there is nothing left to walk round: the pit's
+        // collision pillar goes too (the tripod's legs stay).
+        if (stones_scattered && _pit_shape != null)
+        {
+            if (IsInsideTree()) _pit_shape.QueueFree(); else _pit_shape.Free();
+            _pit_shape = null;
         }
         return moved;
     }
@@ -723,7 +753,8 @@ public partial class Firepit : Node3D
         body.SetMeta("surface", (StringName)"rock");
         body.on_interact = new Callable(this, Firepit.MethodName.interact);
         body.prompt_text = prompt();
-        CollisionShape3D pit = new CollisionShape3D();
+        CollisionShape3D pit = new CollisionShape3D { Name = "PitPillar" };
+        _pit_shape = pit;
         CylinderShape3D cyl = new CylinderShape3D();
         cyl.Radius = (float)(RING_RADIUS + 0.12);
         cyl.Height = 0.6f;

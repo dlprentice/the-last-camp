@@ -107,6 +107,49 @@ public partial class TestStoryInteractions : TestCase
         rock.Free();
     }
 
+    public void test_reading_sheet_writes_in_each_hand_and_respects_plain_text()
+    {
+        var tree = (SceneTree)Engine.GetMainLoop();
+        bool plain = GameSettings.Current.PlainText;
+        var sheet = new ReadingSheet();
+        tree.Root.AddChild(sheet);
+        GameSettings.Current.PlainText = false;
+        sheet.Read(StoryTexts.JuneLetter, null, june: true);
+        assert_true(sheet.IsOpen && sheet.TextFont == UiTheme.JuneFace, "June's letter is in her script face");
+        sheet.Close();
+        sheet.Read(StoryTexts.TallyBook, null, june: false, StoryTexts.TallySketchPage);
+        assert_true(sheet.TextFont == UiTheme.TomFace, "Tom's tally book is in his pencil hand");
+        GameSettings.Current.PlainText = true;
+        sheet.Next();
+        assert_true(sheet.TextFont == UiTheme.Serif, "with plain text on, the next page is in the serif");
+        sheet.Close();
+        GameSettings.Current.PlainText = plain;
+        foreach (string[] text in new[] { StoryTexts.JuneLetter, StoryTexts.TallyBook, StoryTexts.TomLetter })
+            assert_false(text.Any(page => page.Contains('(') || page.Contains("sketch")), "no stage directions in the read texts");
+        tree.Root.RemoveChild(sheet);
+        sheet.Free();
+    }
+
+    public void test_build_workers_hand_back_plain_data_only()
+    {
+        // Worker threads build these; an engine object made or released there can
+        // be finalized or freed off the main thread (the startup abort).
+        assert_false(typeof(GodotObject).IsAssignableFrom(typeof(TerrainBuilder.Grid)), "the terrain grid is plain data");
+        assert_false(typeof(GodotObject).IsAssignableFrom(typeof(GrassPlanter.Chunk)), "grass chunks are plain data");
+        var grid = new TerrainBuilder.Grid
+        {
+            positions = new[] { new Vector3(0, 0, 0), new Vector3(1, 0.2f, 0), new Vector3(0, 0.1f, 1), new Vector3(1, 0.3f, 1) },
+            normals = new[] { Vector3.Up, Vector3.Up, Vector3.Up, Vector3.Up },
+            uvs = new Vector2[4], colors = new Color[4], indices = new[] { 0, 1, 3, 0, 3, 2 },
+        };
+        using ArrayMesh mesh = TerrainBuilder.mesh_from(grid, null);
+        using ConcavePolygonShape3D shape = TerrainBuilder.collision_from(grid);
+        Vector3[] faces = shape.Data, drawn = mesh.GetFaces();
+        assert_true(faces.Length == drawn.Length && faces.Zip(drawn).All(f => f.First.IsEqualApprox(f.Second)),
+            "the collision is built on the main thread from the same triangles as the mesh");
+        assert_true(Firepit.scatter_clear(new TerrainField(), new Vector3(TerrainField.TRAIL[3].X, 0, TerrainField.TRAIL[3].Y)) == false, "scattered stones stay off the trail");
+    }
+
     public void test_story_props_offer_nothing_until_asked()
     {
         var tent = new Tent(new TerrainField());

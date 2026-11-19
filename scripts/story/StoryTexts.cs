@@ -31,10 +31,12 @@ public static class StoryTexts
         "Aug 12     |\n" +
         "Aug 19     |",
         "July 9\n\n2 herons, the old one and a young one.\n\n\n                              steps: 6 of 20",
-        "July 30\n\nOld one only.\n\n\n                              steps: 14 of 20\n\n" +
-        "(A pencil sketch: the old fire ring, a line up the south slope, a notch drawn at the start.)",
+        "July 30\n\nOld one only.\n\n\n                              steps: 14 of 20",
         "August 19\n\n20th step goes under the bench. She'll find it when she sits.",
     };
+
+    /// The tally-book page that carries Tom's pencil sketch of his route.
+    public const int TallySketchPage = 2;
 
     public static readonly string[] TomLetter =
     {
