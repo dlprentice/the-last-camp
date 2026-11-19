@@ -96,7 +96,7 @@ public partial class HabitatDiversity : Node3D
 
     public static bool placement_allowed(TerrainField field, Vector2 p, double radius)
     {
-        if (field.walking_distance(p) < 0.70 + radius || TerrainField.camp_wear(p) > 0.05)
+        if (field.prop_clearance(p) < 0.70 + radius || TerrainField.camp_wear(p) > 0.05)
         {
             return false;
         }

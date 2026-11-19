@@ -249,7 +249,7 @@ public partial class GrassPlanter
             }
             // Exact clearance at a narrow walking route cannot be reconstructed from
             // the one-metre suitability grid alone.
-            if (p.X > -19.0 && p.X < 12.0 && p.Y > -8.0 && p.Y < 73.0)
+            if ((p.X > -19.0 && p.X < 12.0 && p.Y > -8.0 && p.Y < 73.0) || (field.places_enabled && TerrainField.PLACE_TRAIL_BOUNDS.HasPoint(p)))
             {
                 if (field.walking_distance(p) < 0.52 || TerrainField.camp_wear(p) > 0.94)
                 {

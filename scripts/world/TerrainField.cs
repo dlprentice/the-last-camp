@@ -53,6 +53,12 @@ public partial class TerrainField
     /// Anything this far from the trail's bounding box is untouched by it.
     public static readonly Rect2 TRAIL_BOUNDS = new Rect2(-18.0f, -5.0f, 25.0f, 78.0f);
     public const double TRAIL_INFLUENCE = 4.0;
+    /// The places' paths and outcrop (see PlacesLayout). Off only for the probe
+    /// that chose where they go.
+    public bool places_enabled = true;
+    public static readonly Rect2[] PLACE_LINE_BOUNDS = System.Array.ConvertAll(PlacesLayout.TRAIL_LINE_BOUNDS, r => r.Grow((float)TRAIL_INFLUENCE));
+    public static readonly Rect2 PLACE_TRAIL_BOUNDS = PlacesLayout.ALL_TRAIL_BOUNDS.Grow((float)TRAIL_INFLUENCE);
+    public static readonly Rect2 STEP_CUT_BOUNDS = PlacesLayout.TRAIL_LINE_BOUNDS[2].Grow((float)PlacesLayout.STEP_CUT_OUTER);
 
     /// Ground level the meadow sits on; dips are compressed so dry land never
     /// drops to the water level anywhere but in the pond basin.
@@ -113,11 +119,55 @@ public partial class TerrainField
         // --------------------------------------------------------------------- geometry
         /// Ground height in metres.
         Vector2 p = new Vector2((float)x, (float)z);
+        double h = _landform(x, z, out double detail);
+        if (places_enabled && STEP_CUT_BOUNDS.HasPoint(p))
+        {
+            h = _cut_steps(p, h, out double cut);
+            detail *= 1.0 - cut;
+        }
+        // Trail: blend towards the smooth large-scale surface and sink slightly.
+
+        if (TRAIL_BOUNDS.Grow((float)TRAIL_INFLUENCE).HasPoint(p) || (places_enabled && PLACE_TRAIL_BOUNDS.HasPoint(p)))
+        {
+            double trail_mask = 1.0 - smoothstep(1.2, 3.4, trail_distance(x, z));
+            // The pond carve already replaced the original detail near its shore.
+            // Subtracting that detail again used to move the eastern waterline and
+            // cut a dry outside sample below water. Keep the zero crossing exact.
+            trail_mask *= smoothstep(0.015, 0.32, h - WATER_LEVEL);
+            if (trail_mask > 0.0)
+            {
+                double smooth_h = maxf(h - detail - 0.06, WATER_LEVEL + 0.015);
+                h = lerpf(h, smooth_h, trail_mask * 0.85);
+            }
+        }
+        // Level pads for the fire circle and the tent.
+
+        if (p.DistanceTo(FIRE) < 6.5)
+        {
+            h = _flatten(h, p, FIRE, 2.5, 6.5, _pad_height(FIRE));
+        }
+        if (p.DistanceTo(TENT) < 4.5)
+        {
+            h = _flatten(h, p, TENT, 2.2, 4.5, _pad_height(TENT));
+        }
+        // The levelled summit of Tom's Rock, where the bench and its footstone sit.
+        if (places_enabled && p.DistanceTo(PlacesLayout.TOMS_ROCK) < PlacesLayout.SUMMIT_PAD_OUTER)
+        {
+            h = _flatten(h, p, PlacesLayout.TOMS_ROCK, PlacesLayout.SUMMIT_PAD_INNER, PlacesLayout.SUMMIT_PAD_OUTER, summit_height());
+        }
+        return h;
+    }
+
+    /// The natural landscape with the pond and Tom's outcrop, before the trail
+    /// field and the pads shape it. `detail` is the finest noise octave there.
+    public double _landform(double x, double z, out double detail)
+    {
+        Vector2 p = new Vector2((float)x, (float)z);
         double d = p.Length();
 
         double rolling = _rolling.GetNoise2D((float)x, (float)z) * 2.6;
         double medium = _medium.GetNoise2D((float)x, (float)z) * 0.75;
-        double detail = _detail.GetNoise2D((float)x, (float)z) * 0.22;
+        detail = _detail.GetNoise2D((float)x, (float)z) * 0.22;
         double undulation = rolling + medium + detail;
         double meadow = MEADOW_BASE + (undulation > 0.0 ? undulation : undulation * DIP_COMPRESSION);
         // The compressed meadow gives way to the raw landscape beyond the treeline.
@@ -153,32 +203,62 @@ public partial class TerrainField
                 h = lerpf(h, bed, w);
             }
         }
-        // Trail: blend towards the smooth large-scale surface and sink slightly.
-
-        if (TRAIL_BOUNDS.Grow((float)TRAIL_INFLUENCE).HasPoint(p))
+        // Tom's Rock: a granite outcrop standing above the south-east slope.
+        if (places_enabled)
         {
-            double trail_mask = 1.0 - smoothstep(1.2, 3.4, trail_distance(x, z));
-            // The pond carve already replaced the original detail near its shore.
-            // Subtracting that detail again used to move the eastern waterline and
-            // cut a dry outside sample below water. Keep the zero crossing exact.
-            trail_mask *= smoothstep(0.015, 0.32, h - WATER_LEVEL);
-            if (trail_mask > 0.0)
+            double dk = p.DistanceTo(PlacesLayout.TOMS_ROCK);
+            if (dk < PlacesLayout.ROCK_BASE_RADIUS)
             {
-                double smooth_h = maxf(h - detail - 0.06, WATER_LEVEL + 0.015);
-                h = lerpf(h, smooth_h, trail_mask * 0.85);
+                h += PlacesLayout.ROCK_RISE * (1.0 - smoothstep(PlacesLayout.ROCK_TOP_RADIUS, PlacesLayout.ROCK_BASE_RADIUS, dk));
             }
         }
-        // Level pads for the fire circle and the tent.
-
-        if (p.DistanceTo(FIRE) < 6.5)
-        {
-            h = _flatten(h, p, FIRE, 2.5, 6.5, _pad_height(FIRE));
-        }
-        if (p.DistanceTo(TENT) < 4.5)
-        {
-            h = _flatten(h, p, TENT, 2.2, 4.5, _pad_height(TENT));
-        }
         return h;
+    }
+
+    /// Ground level of the summit pad: the outcrop's natural top at its centre.
+    public double summit_height()
+    {
+        double h = _landform(PlacesLayout.TOMS_ROCK.X, PlacesLayout.TOMS_ROCK.Y, out double fine);
+        return h - fine;
+    }
+
+    /// Levels the ground across Tom's step line, as a path dug into a slope is:
+    /// each point takes the height of the line where it is nearest, blended over
+    /// the segments so the switchback turns stay smooth.
+    public double _cut_steps(Vector2 p, double h, out double strength)
+    {
+        /// The cut follows the smooth landform (without the finest octave), and
+        /// `strength` tells the trail blend how much of that octave is already gone.
+        Vector2[] line = PlacesLayout.STEP_LINE;
+        Span<double> distances = stackalloc double[line.Length - 1];
+        double nearest = INF;
+        for (int i = 0; i + 1 < line.Length; i++)
+        {
+            distances[i] = p.DistanceTo(PlacesLayout.closest_on_segment(p, line[i], line[i + 1]));
+            nearest = minf(nearest, distances[i]);
+        }
+        strength = 1.0 - smoothstep(PlacesLayout.STEP_CUT_INNER, PlacesLayout.STEP_CUT_OUTER, nearest);
+        if (strength <= 0.0)
+        {
+            return h;
+        }
+        // A soft minimum: the nearest leg decides, and two legs share only where
+        // they are equally near (at a turn, or midway down the bank between them).
+        double weight_sum = 0.0;
+        double target_sum = 0.0;
+        for (int i = 0; i + 1 < line.Length; i++)
+        {
+            if (distances[i] >= PlacesLayout.STEP_CUT_OUTER)
+            {
+                continue;
+            }
+            double w = exp(-(distances[i] - nearest) / 0.2);
+            Vector2 c = PlacesLayout.closest_on_segment(p, line[i], line[i + 1]);
+            double target = _landform(c.X, c.Y, out double fine);
+            weight_sum += w;
+            target_sum += w * (target - fine);
+        }
+        return lerpf(h, target_sum / weight_sum, strength);
     }
 
     public double height_fast(double x, double z)
@@ -327,12 +407,44 @@ public partial class TerrainField
 
     public double trail_distance(double x, double z)
     {
+        /// Distance to the nearest walked line: the main trail, or (with the places)
+        /// June's footpaths, Tom's route and his steps, each widened or narrowed by
+        /// its offset in PlacesLayout.TRAIL_LINES.
         Vector2 p = new Vector2((float)x, (float)z);
-        if (!TRAIL_BOUNDS.Grow((float)TRAIL_INFLUENCE).HasPoint(p))
+        double main = TRAIL_INFLUENCE + 1.0;
+        if (TRAIL_BOUNDS.Grow((float)TRAIL_INFLUENCE).HasPoint(p))
         {
-            return TRAIL_INFLUENCE + 1.0;
+            main = distance_to_polyline(p, TRAIL);
         }
-        return distance_to_polyline(p, TRAIL);
+        if (places_enabled && PLACE_TRAIL_BOUNDS.HasPoint(p))
+        {
+            main = minf(main, place_path_distance(p));
+        }
+        return main;
+    }
+
+    public static double place_path_distance(Vector2 p)
+    {
+        double best = TRAIL_INFLUENCE + 1.0;
+        var lines = PlacesLayout.TRAIL_LINES;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (!PLACE_LINE_BOUNDS[i].HasPoint(p))
+            {
+                continue;
+            }
+            best = minf(best, PlacesLayout.distance_to(p, lines[i].line, out _) + lines[i].offset);
+        }
+        return best;
+    }
+
+    /// Clearance for placed props and dressing: the walked lines and the places'
+    /// own ground. Grass and ground materials follow walking_distance alone, so
+    /// the old ring stays overgrown.
+    public double prop_clearance(Vector2 p)
+    {
+        double d = walking_distance(p);
+        return places_enabled ? minf(d, PlacesLayout.prop_reserve(p)) : d;
     }
 
     public static double distance_to_polyline(Vector2 p, Godot.Collections.Array<Vector2> points)
