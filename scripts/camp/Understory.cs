@@ -615,7 +615,7 @@ public partial class Understory : Node3D
     {
         // Distance to the path is 1-Lipschitz, so this protects the whole circular
         // footprint, including points between the sampled habitat boundary checks.
-        if (field.walking_distance(p) < radius + 0.56 || TerrainField.camp_wear(p) > 0.08)
+        if (field.prop_clearance(p) < radius + 0.56 || TerrainField.camp_wear(p) > 0.08)
         {
             return false;
         }
@@ -623,7 +623,7 @@ public partial class Understory : Node3D
         {
             double angle = (double)side * TAU / 16.0;
             Vector2 q = p + new Vector2((float)cos(angle), (float)sin(angle)) * (float)radius;
-            if (field.walking_distance(q) < 0.56 || TerrainField.camp_wear(q) > 0.08)
+            if (field.prop_clearance(q) < 0.56 || TerrainField.camp_wear(q) > 0.08)
             {
                 return false;
             }
@@ -781,7 +781,7 @@ public partial class Understory : Node3D
         {
             return false;
         }
-        if (field.walking_distance(p) < clearance + 0.55)
+        if (field.prop_clearance(p) < clearance + 0.55)
         {
             return false;
         }

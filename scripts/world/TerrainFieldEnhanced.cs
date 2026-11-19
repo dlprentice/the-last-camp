@@ -51,19 +51,18 @@ public partial class TerrainFieldEnhanced : TerrainField
 
         if (h > WATER_LEVEL + 0.35)
         {
-            double radial_envelope = smoothstep(16.0, 42.0, distance) * (1.0 - smoothstep(150.0, 235.0, distance));
-            double trail_guard = smoothstep(2.0, 6.5, distance_to_polyline(p, TRAIL));
-            double fire_guard = smoothstep(8.0, 15.0, p.DistanceTo(FIRE));
-            double tent_guard = smoothstep(6.0, 12.0, p.DistanceTo(TENT));
-            // Preserve the low sunset side across the pond; east/north shoulders can
-            // carry more relief and make the clearing feel nested into actual terrain.
-            double sunset_guard = lerpf(0.34, 1.0, smoothstep(-72.0, -12.0, x));
-            double broad = _macro_a.GetNoise2D((float)x, (float)z) * 0.72 + _macro_b.GetNoise2D((float)x, (float)z) * 0.30;
-            // Positive shoulders are allowed to rise more than drainage folds cut;
-            // that protects the dry-land invariant while creating readable silhouettes.
-            broad = broad >= 0.0 ? broad : broad * 0.58;
-            broad = broad * 1.8 + sculpted_form(p);
-            h += broad * radial_envelope * trail_guard * fire_guard * tent_guard * sunset_guard * smoothstep(WATER_LEVEL + 0.35, WATER_LEVEL + 1.1, h);
+            double relief = _relief(p);
+            // Tom's summit keeps the relief of its centre, so the pad stays level
+            // for the bench and its loose footstone at the height the probe saw.
+            if (places_enabled)
+            {
+                double summit = smoothstep(3.0, 8.0, p.DistanceTo(PlacesLayout.TOMS_ROCK));
+                if (summit < 1.0)
+                {
+                    relief = lerpf(_relief(PlacesLayout.TOMS_ROCK), relief, summit);
+                }
+            }
+            h += relief * smoothstep(WATER_LEVEL + 0.35, WATER_LEVEL + 1.1, h);
         }
         // Alternate subtly steeper and softer bank sectors. Scale the base profile
         // relative to WATER_LEVEL rather than adding height: negative stays negative,
@@ -86,6 +85,25 @@ public partial class TerrainFieldEnhanced : TerrainField
             }
         }
         return h;
+    }
+
+    public double _relief(Vector2 p)
+    {
+        double x = p.X, z = p.Y;
+        double distance = p.Length();
+        double radial_envelope = smoothstep(16.0, 42.0, distance) * (1.0 - smoothstep(150.0, 235.0, distance));
+        double trail_guard = smoothstep(2.0, 6.5, distance_to_polyline(p, TRAIL));
+        double fire_guard = smoothstep(8.0, 15.0, p.DistanceTo(FIRE));
+        double tent_guard = smoothstep(6.0, 12.0, p.DistanceTo(TENT));
+        // Preserve the low sunset side across the pond; east/north shoulders can
+        // carry more relief and make the clearing feel nested into actual terrain.
+        double sunset_guard = lerpf(0.34, 1.0, smoothstep(-72.0, -12.0, x));
+        double broad = _macro_a.GetNoise2D((float)x, (float)z) * 0.72 + _macro_b.GetNoise2D((float)x, (float)z) * 0.30;
+        // Positive shoulders are allowed to rise more than drainage folds cut;
+        // that protects the dry-land invariant while creating readable silhouettes.
+        broad = broad >= 0.0 ? broad : broad * 0.58;
+        broad = broad * 1.8 + sculpted_form(p);
+        return broad * radial_envelope * trail_guard * fire_guard * tent_guard * sunset_guard;
     }
 
     public static double sculpted_form(Vector2 p)

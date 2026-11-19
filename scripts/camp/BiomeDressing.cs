@@ -256,7 +256,7 @@ public partial class BiomeDressing : Node3D
         {
             return true;
         }
-        if (_field.walking_distance(p) < 0.55 + extra * 0.35)
+        if (_field.prop_clearance(p) < 0.55 + extra * 0.35)
         {
             return true;
         }

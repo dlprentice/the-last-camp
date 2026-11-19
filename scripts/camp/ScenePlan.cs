@@ -55,6 +55,8 @@ public partial class ScenePlan
     public Godot.Collections.Array<ScenePlan.TreeEntry> trees = new Godot.Collections.Array<ScenePlan.TreeEntry>();
     public List<ScenePlan.RockEntry> rocks = new List<ScenePlan.RockEntry>();
     public List<ScenePlan.ShrubEntry> shrubs = new List<ScenePlan.ShrubEntry>();
+    /// The trees beside Tom's route that carry his notches, in route order.
+    public List<ScenePlan.TreeEntry> blaze_trees = new List<ScenePlan.TreeEntry>();
 
     public RandomNumberGenerator _rng = new RandomNumberGenerator();
     public TerrainField _field;
@@ -121,6 +123,32 @@ public partial class ScenePlan
         _add_tree(new Vector2(10.0f, -26.0f), TreeSpecies.Kind.SPRUCE, 1.05);
         _add_tree(new Vector2(-9.0f, -31.0f), TreeSpecies.Kind.SNAG, 1.0);
         _add_tree(new Vector2(29.0f, 22.0f), TreeSpecies.Kind.SNAG, 0.9);
+        if (_field.places_enabled)
+        {
+            _place_blaze_trees();
+        }
+    }
+
+    public void _place_blaze_trees()
+    {
+        /// Tom's blazed trees stand where his route needs them. Their own RNG keeps
+        /// the rest of the plan's sequence where it was.
+        RandomNumberGenerator rng = new RandomNumberGenerator();
+        rng.Seed = 1974;
+        TreeSpecies.Kind[] kinds = { TreeSpecies.Kind.PINE, TreeSpecies.Kind.OAK, TreeSpecies.Kind.ALDER, TreeSpecies.Kind.OAK, TreeSpecies.Kind.PINE };
+        PlacesLayout.BlazeSite[] sites = PlacesLayout.blaze_sites();
+        for (int i = 0; i < sites.Length; i++)
+        {
+            ScenePlan.TreeEntry t = new ScenePlan.TreeEntry();
+            t.position = sites[i].tree;
+            t.kind = kinds[i % kinds.Length];
+            t.seed_value = (long)rng.Randi();
+            t.scale = rng.RandfRange(0.98f, 1.16f);
+            t.rotation = rng.Randf() * TAU;
+            t.far = false;
+            trees.Add(t);
+            blaze_trees.Add(t);
+        }
     }
 
     public bool _blocked(Vector2 pos, double spacing)
@@ -129,7 +157,7 @@ public partial class ScenePlan
         {
             return true;
         }
-        if (_field.trail_distance(pos.X, pos.Y) < 3.6)
+        if (_field.trail_distance(pos.X, pos.Y) < 3.6 || (_field.places_enabled && PlacesLayout.keeps_trees_out(pos)))
         {
             return true;
         }
@@ -475,7 +503,7 @@ public partial class ScenePlan
             double angle2 = _rng.Randf() * TAU;
             double radius2 = _rng.RandfRange(12.0f, 85.0f);
             Vector2 pos2 = new Vector2((float)(cos(angle2) * radius2), (float)(sin(angle2) * radius2));
-            if (_field.trail_distance(pos2.X, pos2.Y) < 2.5 || _field.is_underwater(pos2.X, pos2.Y))
+            if (_field.trail_distance(pos2.X, pos2.Y) < 2.5 || _field.is_underwater(pos2.X, pos2.Y) || _field.prop_clearance(pos2) < 1.0)
             {
                 continue;
             }
@@ -634,7 +662,7 @@ public partial class ScenePlan
                 {
                     continue;
                 }
-                if (_field.slope(at.X, at.Y) > 0.70 || _field.walking_distance(at) < 3.8)
+                if (_field.slope(at.X, at.Y) > 0.70 || _field.walking_distance(at) < 3.8 || (_field.places_enabled && PlacesLayout.keeps_trees_out(at)))
                 {
                     continue;
                 }

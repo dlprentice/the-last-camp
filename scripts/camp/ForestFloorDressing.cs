@@ -87,7 +87,7 @@ public partial class ForestFloorDressing : Node3D
                 foreach (Variant point_item in G.Iter(curve["points"]))
                 {
                     Vector3 point = point_item.AsVector3();
-                    if (_field.walking_distance(new Vector2(point.X, point.Z)) < radius + 0.35)
+                    if (_field.prop_clearance(new Vector2(point.X, point.Z)) < radius + 0.35)
                     {
                         clear = false;
                         break;
@@ -340,7 +340,7 @@ public partial class ForestFloorDressing : Node3D
         {
             return false;
         }
-        if (_field.trail_distance(p.X, p.Y) < trail_clearance)
+        if (_field.trail_distance(p.X, p.Y) < trail_clearance || (_field.places_enabled && PlacesLayout.prop_reserve(p) < trail_clearance))
         {
             return false;
         }

@@ -628,7 +628,7 @@ public partial class ScannedDressing : Node3D
         {
             return false;
         }
-        if (_field.walking_distance(p) < trail_clearance)
+        if (_field.prop_clearance(p) < trail_clearance)
         {
             return false;
         }
