@@ -32,7 +32,10 @@ public partial class Firepit : Node3D
     public static readonly Color LIGHT_COLOR = new Color(1.0f, 0.53f, 0.2f);
     public const double BASE_ENERGY = 1.5;
     public const double BASE_RANGE = 12.0;
-    public const double FILL_ENERGY = 0.20;
+    public const double FILL_ENERGY = 0.48;
+    public const double NIGHT_GAIN = 1.7;
+    public const double DAY_GAIN = 2.6;
+    public const double DAY_RANGE = 0.34;
     public const double FILL_RANGE = 22.0;
     public const double RING_RADIUS = 0.9;
     public const double TRIPOD_FOOT_RADIUS = 1.48;
@@ -315,10 +318,15 @@ public partial class Firepit : Node3D
         flicker += 0.035 * sin(_time * 17.0 + 0.6);
         double live = smoothstep(0.05, 0.35, intensity);
         double strength = clampf(intensity, 0.0, MAX_INTENSITY) * (0.55 + 0.45 * live);
-        light.LightEnergy = (float)(BASE_ENERGY * strength * flicker);
-        light.OmniRange = (float)(BASE_RANGE * (0.7 + 0.3 * clampf(intensity, 0.0, 1.0)));
+        // By night the fire lights the clearing in a readable circle; by day the
+        // sun swamps that, so the light gathers into a brighter, short-range
+        // glow on the ring stones and the pot (a smaller shadow volume, too).
+        double day = Game.Instance?.world != null ? Game.Instance.world.daylight() : 0.0;
+        light.LightEnergy = (float)(BASE_ENERGY * strength * flicker * lerpf(NIGHT_GAIN, DAY_GAIN, day));
+        light.OmniRange = (float)(BASE_RANGE * (0.7 + 0.3 * clampf(intensity, 0.0, 1.0)) * lerpf(1.0, DAY_RANGE, day));
         light.Position = new Vector3((float)(0.04 * sin(_time * 3.2)), (float)(0.5 + 0.03 * sin(_time * 5.1)), (float)(0.03 * cos(_time * 2.7)));
-        fill_light.LightEnergy = (float)(FILL_ENERGY * strength * (0.9 + 0.1 * flicker));
+        fill_light.LightEnergy = (float)(FILL_ENERGY * strength * (0.9 + 0.1 * flicker) * (1.0 - day));
+        fill_light.Visible = fill_light.Visible && day < 0.98;
         if (body != null)
         {
             body.prompt_text = prompt();

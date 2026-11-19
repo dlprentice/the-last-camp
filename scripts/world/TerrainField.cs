@@ -517,6 +517,35 @@ public partial class TerrainField
         return clampf(wear + irregular * wear * (1.0 - wear), 0.0, 1.0);
     }
 
+    /// Mouth of the tent, where every trip in and out crosses the same turf.
+    public static readonly Vector2 TENT_MOUTH = TENT + (FIRE - TENT).Normalized() * 2.1f;
+
+    /// How trodden the turf is: 1 on the worn pads and walked lines, easing to 0
+    /// through a few metres of margin, so the sward thins by use rather than by
+    /// a cut edge. Only the camp and the walked routes are ever trodden.
+    public double camp_trample(Vector2 p)
+    {
+        double wear = camp_wear(p);
+        double around = 0.0;
+        if (p.DistanceSquaredTo(FIRE) < 196.0)
+        {
+            around = 1.0 - smoothstep(2.9, 5.8, p.DistanceTo(FIRE));
+            around = maxf(around, 1.0 - smoothstep(1.4, 3.6, p.DistanceTo(TENT_MOUTH)));
+            around = maxf(around, (1.0 - smoothstep(2.6, 4.4, p.DistanceTo(TENT))) * 0.7);
+            around = maxf(around, 1.0 - smoothstep(1.6, 3.4, p.DistanceTo(TABLE)));
+            around = maxf(around, 1.0 - smoothstep(2.0, 3.8, p.DistanceTo(WOODPILE)));
+        }
+        double path = 1.0 - smoothstep(0.5, 1.9, walking_distance(p));
+        double t = maxf(around, path * 0.9);
+        if (t <= 0.0)
+        {
+            return wear;
+        }
+        // An irregular margin: feet wander, so the edge is never a clean ring.
+        double wobble = _variation.GetNoise2D((float)(p.X * 1.7), (float)(p.Y * 1.7)) * 0.30;
+        return clampf(maxf(wear, t * (1.0 + wobble)), 0.0, 1.0);
+    }
+
     public Color material_mask(double x, double z, double? known_height_opt = null, double? known_slope_opt = null)
     {
         double known_height = known_height_opt ?? NAN;

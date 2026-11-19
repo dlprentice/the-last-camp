@@ -111,7 +111,9 @@ public partial class Understory : Node3D
             grass_material.Shader = Content.Load<Shader>("res://shaders/grass.gdshader");
             apply_quality(Quality.Instance.current);
         }
-        ArrayMesh blade = GrassPlanter.clump_mesh();
+        // Thin blades, loosely spread: a close-up blade wider than a finger reads
+        // as a strap, and a tight bunch of them as a planted plug.
+        ArrayMesh blade = GrassPlanter.clump_mesh(7, 5, 0.0135, 77, 2.2);
         _upload_grass(GrassPlanter.merge_chunks(planter.chunks, 16), blade, grass_material, "Grass");
         if (distant_grass_material == null)
         {
@@ -569,9 +571,13 @@ public partial class Understory : Node3D
             }
             double cover = field.woodland_cover(p.X, p.Y);
             double patch = patches.GetNoise2D(p.X, p.Y);
-            double colony = lerpf(0.30, 1.0, smoothstep(-0.40, 0.25, patch));
+            // Tussocks gather in colonies with open sward between them; an even
+            // scatter of separate clumps reads as planted. Trodden camp ground
+            // keeps none, with the colonies thinning toward it.
+            double colony = lerpf(0.08, 1.0, pow(smoothstep(-0.30, 0.40, patch), 1.4));
             double edge = 1.0 - smoothstep(stand_extent * 0.72, stand_extent, radius);
-            if (rng.Randf() > colony * lerpf(0.95, 0.08, cover) * edge)
+            double untrodden = 1.0 - field.camp_trample(p);
+            if (rng.Randf() > colony * lerpf(0.95, 0.08, cover) * edge * untrodden * untrodden)
             {
                 continue;
             }

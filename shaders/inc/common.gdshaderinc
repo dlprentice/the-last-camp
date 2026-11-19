@@ -54,3 +54,17 @@ float streaming_lod(vec2 ddx, vec2 ddy) {
 	float footprint_sq = max(min(dx_sq, dy_sq), max(dx_sq, dy_sq) / 256.0);
 	return 0.5 * log2(max(footprint_sq, 1e-30)) + 12.0;
 }
+
+// Cut-out leaves far away: a leaf narrower than a pixel flips between kept and
+// discarded as wind and the upscaler's jitter move it, which sparkles against
+// the sky. Beyond `soft_start` the cut becomes coverage across the alpha's own
+// screen gradient, dithered per frame so temporal resolve settles it into a
+// soft edge. Near leaves and shadow maps keep the hard cut.
+bool leaf_alpha_keep(float alpha, float cutoff, float dist, vec2 frag, float time, bool shadow_pass) {
+	float soft = shadow_pass ? 0.0 : smoothstep(14.0, 38.0, dist);
+	float width = max(fwidth(alpha), 1e-3) * mix(1.0, 1.6, soft);
+	float coverage = clamp((alpha - cutoff) / width + 0.5, 0.0, 1.0);
+	vec2 cell = frag + vec2(5.588238, 2.471139) * mod(floor(time * 60.0), 64.0);
+	float noise = fract(52.9829189 * fract(dot(cell, vec2(0.06711056, 0.00583715))));
+	return coverage > mix(0.5, noise, soft);
+}

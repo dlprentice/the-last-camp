@@ -113,8 +113,14 @@ void fragment() {
 	// Alpha shrinks in the mip chain; boost it so distant canopies stay full.
 	float mip = textureQueryLod(albedo_tex, UV).x;
 	float alpha = tex.a * (1.0 + clamp(mip, 0.0, 6.0) * 0.22);
-	ALPHA = alpha;
-	ALPHA_SCISSOR_THRESHOLD = alpha_cutoff;
+	if (impostor_bake == 0) {
+		if (!leaf_alpha_keep(alpha, alpha_cutoff, length(world_pos - CAMERA_POSITION_WORLD), FRAGCOORD.xy, TIME, IN_SHADOW_PASS)) {
+			discard;
+		}
+	} else {
+		ALPHA = alpha;
+		ALPHA_SCISSOR_THRESHOLD = alpha_cutoff;
+	}
 
 	vec4 nt = texture(normal_trans_tex, UV);
 	vec3 n_ts = nt.rgb * 2.0 - 1.0;

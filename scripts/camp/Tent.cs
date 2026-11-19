@@ -24,7 +24,7 @@ public partial class Tent : Node3D
     public const double LENGTH = 3.0;
     public const double HEIGHT = 1.6;
     public const double POLE_RADIUS = 0.028;
-    public const double SAG = 0.075;
+    public const double SAG = 0.105;
     /// Sewn panels along the ridge; the cloth bellies between the taut seams.
     public const double PANEL_WIDTH = 0.75;
     public const double CANVAS_TILE = 0.30;
@@ -260,6 +260,20 @@ public partial class Tent : Node3D
         sag += tension * (sin(u * 18.0 + v * 4.0) * 0.006 + sin(u * 27.0 - v * 3.0) * 0.003);
         double seam_phase = absf(fposmod((u - 0.5) * LENGTH / PANEL_WIDTH + 0.5, 1.0) - 0.5) * 2.0;
         sag += 0.016 * sin(v * PI) * smoothstep(0.0, 0.6, seam_phase);
+        // The guy lines pull the hem taut at their pegs (u = 0.2, 0.8) and at
+        // the poles; the cloth between hangs slack in a shallow scallop above
+        // the ground line, never lifting the hem itself.
+        double span = u < 0.2 ? u / 0.2 : (u < 0.8 ? (u - 0.2) / 0.6 : (u - 0.8) / 0.2);
+        double hem_band = smoothstep(0.45, 0.88, v) * (1.0 - smoothstep(0.93, 1.0, v));
+        sag += 0.032 * hem_band * sin(span * PI) * (u > 0.2 && u < 0.8 ? 1.0 : 0.6);
+        // Tension folds fan up from each peg into the slack cloth.
+        foreach (double peg in new[] { 0.2, 0.8 })
+        {
+            double du = u - peg;
+            double rise = 1.0 - v;
+            double fan = exp(-pow(du / (0.025 + rise * 0.16), 2.0)) * smoothstep(0.0, 0.25, rise) * (1.0 - smoothstep(0.35, 0.7, rise));
+            sag += fan * 0.010 * sin(du / (0.02 + rise * 0.05) * 3.0);
+        }
         return p - new Vector3((float)(side * 0.35), 1.0f, 0.0f).Normalized() * (float)sag;
     }
 
@@ -349,6 +363,7 @@ public partial class Tent : Node3D
     {
         /// Sod cloth: the strip of canvas that continues past each ground line and
         /// lies flat on the earth, sealing the tent. Without it the walls float.
+        /// It carries no height (COLOR.r = 0), so the shader dirties it fully.
         FastNoiseLite noise = new FastNoiseLite();
         noise.Seed = 913;
         noise.Frequency = 2.0f;
@@ -368,8 +383,8 @@ public partial class Tent : Node3D
                 double x_out = side * (WIDTH * 0.5 + reach + ripple * 0.03);
                 Vector2 uv_in = new Vector2((float)(z / CANVAS_TILE), (float)(WIDTH * 0.62 / CANVAS_TILE));
                 Vector2 uv_out = new Vector2((float)(z / CANVAS_TILE), (float)((WIDTH * 0.62 + reach) / CANVAS_TILE));
-                inner.Add((int)mb.add_vertex(new Vector3((float)x_in, 0.004f, (float)z), Vector3.Up, uv_in, new Color(0.18f, 0.0f, 0.0f, 1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
-                outer.Add((int)mb.add_vertex(new Vector3((float)x_out, (float)(0.006 + absf(ripple) * 0.01), (float)z), Vector3.Up, uv_out, new Color(0.22f, 0.0f, 0.0f, 1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
+                inner.Add((int)mb.add_vertex(new Vector3((float)x_in, 0.004f, (float)z), Vector3.Up, uv_in, new Color(0.0f, 0.0f, 0.0f, 1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
+                outer.Add((int)mb.add_vertex(new Vector3((float)x_out, (float)(0.006 + absf(ripple) * 0.01), (float)z), Vector3.Up, uv_out, new Color(0.0f, 0.0f, 0.0f, 1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
             }
             for (long i3 = 0; i3 < segments; i3++)
             {
@@ -385,8 +400,8 @@ public partial class Tent : Node3D
             double u2 = (double)i4 / (double)segments;
             double x = (u2 - 0.5) * (WIDTH - 0.06);
             double ripple2 = noise.GetNoise2D((float)(x * 3.0), 21.0f);
-            b_in.Add((int)mb.add_vertex(new Vector3((float)x, 0.004f, (float)back_z), Vector3.Up, new Vector2((float)(x / CANVAS_TILE), 1.8f), new Color(0.18f, 0.0f, 0.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
-            b_out.Add((int)mb.add_vertex(new Vector3((float)x, (float)(0.006 + absf(ripple2) * 0.01), (float)(back_z + reach + ripple2 * 0.03)), Vector3.Up, new Vector2((float)(x / CANVAS_TILE), (float)(1.8 + reach / CANVAS_TILE)), new Color(0.22f, 0.0f, 0.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
+            b_in.Add((int)mb.add_vertex(new Vector3((float)x, 0.004f, (float)back_z), Vector3.Up, new Vector2((float)(x / CANVAS_TILE), 1.8f), new Color(0.0f, 0.0f, 0.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
+            b_out.Add((int)mb.add_vertex(new Vector3((float)x, (float)(0.006 + absf(ripple2) * 0.01), (float)(back_z + reach + ripple2 * 0.03)), Vector3.Up, new Vector2((float)(x / CANVAS_TILE), (float)(1.8 + reach / CANVAS_TILE)), new Color(0.0f, 0.0f, 0.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
         }
         for (long i5 = 0; i5 < segments; i5++)
         {
@@ -518,6 +533,12 @@ public partial class Tent : Node3D
         Vector3 ridge = new Vector3(0.0f, (float)(HEIGHT - 0.01), 0.0f);
         Vector3 hang = new Vector3(0.0f, (float)(HEIGHT - 0.22), 0.0f);
         lantern.build(false, Quality.Instance.current.lantern_shadows, false, hang);
+        // Light through the cloth: the omni alone lights the inner face, but
+        // canvas glows from within, brightest near the flame.
+        Vector3 flame = new Vector3(0.0f, (float)(HEIGHT - 0.32), (float)(-LENGTH * 0.5 + 0.45));
+        _canvas.SetShaderParameter("glow_position", IsInsideTree() ? ToGlobal(flame) : Transform * flame);
+        _canvas.SetShaderParameter("lantern_glow", lantern.lit ? 1.0 : 0.0);
+        lantern.toggled += on => _canvas.SetShaderParameter("lantern_glow", on ? 1.0 : 0.0);
         MeshBuilder mb = new MeshBuilder();
         PropMeshes.add_hang_link(mb, ridge, hang, 0.007);
         MeshInstance3D rope = new MeshInstance3D();
