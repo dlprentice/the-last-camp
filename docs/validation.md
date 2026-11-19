@@ -8,6 +8,17 @@ dev6 and beta1. On beta4 (November 19, 2026) the build has no warnings, the C# a
 contract and all content fingerprints match, and the 15-waypoint traversal passes on the GPU with no engine
 error, core dump or NVIDIA Xid.
 
+Open on beta4, November 19, 2026:
+
+- **An intermittent engine abort in headless runs.** Some headless traversals abort with `/root:
+  propagate_notification()` called from a non-main thread, followed by `FATAL: Condition "gchandle.is_released()"`
+  or a segmentation fault, on a native engine worker thread. It was about one run in nine before the paper UI and
+  more often after it; a fix that keeps every engine object off worker threads is being verified, and the engine's
+  symbol files are being used to name the faulting frames.
+- **Content fingerprints are pending a rebaseline.** The new places and paths change terrain, vegetation-plan,
+  grass, meadow and dressing keys, an expected group for this step. The fixtures are regenerated once the places'
+  full-size stills have been reviewed, as the rebaseline procedure requires. The scene contract passes.
+
 ## Checked without rendering
 
 | Check | Observed result |
