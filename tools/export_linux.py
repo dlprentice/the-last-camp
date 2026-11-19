@@ -26,8 +26,49 @@ RUNTIME_NOTICES = ("LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT")
 DIAGNOSTIC = re.compile(r"(?im)^\s*(?:ERROR:|SCRIPT ERROR:|Unhandled exception\b)")
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
+AUDIO = REPO / "audio/generated"
+EXPORT_AUDIO = re.compile(r"EXPORT_AUDIO sounds=(\d+)/(\d+) voice=(\d+)/(\d+)")
+
+
 class ExportFailure(RuntimeError):
     pass
+
+
+def missing_audio(audio: Path = AUDIO) -> tuple[list[str], int]:
+    """Licensed files the manifest and the voice script name that are not on disk."""
+    import json
+    names: list[str] = []
+    manifest = audio / "manifest.json"
+    if not manifest.is_file():
+        raise ExportFailure(f"no audio manifest at {manifest}")
+    for entry in json.loads(manifest.read_text(encoding="utf-8"))["sounds"].values():
+        names.extend(entry["files"])
+    voice = audio / "voice.json"
+    if voice.is_file():
+        names.extend(p["file"] for p in json.loads(voice.read_text(encoding="utf-8"))["paragraphs"] if p.get("file"))
+    return [name for name in names if not (audio / name).is_file()], len(names)
+
+
+def check_audio(missing: list[str], total: int, allow_silent: bool) -> None:
+    if not missing:
+        print(f"Audio: all {total} manifest files present", flush=True)
+        return
+    shown = ", ".join(missing[:5]) + (" ..." if len(missing) > 5 else "")
+    message = f"{len(missing)} of {total} licensed audio files are missing under audio/generated ({shown})"
+    if not allow_silent:
+        raise ExportFailure(message + "; pass --allow-silent to export a build without them")
+    print(f"Audio: {message}; exporting with --allow-silent", flush=True)
+
+
+def check_packaged_audio(text: str, allow_silent: bool) -> None:
+    """The package check reports how much of the manifest the exported build carries."""
+    match = EXPORT_AUDIO.search(text)
+    if not match:
+        raise ExportFailure("the package check did not report its audio")
+    sounds, sound_total, voice, voice_total = map(int, match.groups())
+    if (sounds, voice) != (sound_total, voice_total) and not allow_silent:
+        raise ExportFailure(f"the package carries {sounds}/{sound_total} sounds and {voice}/{voice_total} voice files")
+    print(f"Audio packaged: sounds {sounds}/{sound_total}, voice {voice}/{voice_total}", flush=True)
 
 
 def fresh_output(requested: str | None, repo: Path | None = None) -> Path:
@@ -142,6 +183,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", help="fresh directory beneath local-data/")
     parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"), help="Godot 4.8 beta4 .NET executable")
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument("--allow-silent", action="store_true",
+                        help="export even when licensed audio files named by the manifest are missing")
     args = parser.parse_args(argv)
     if not 1 <= args.timeout <= 7200:
         parser.error("timeout must be 1–7200 seconds")
@@ -149,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
         engine = shutil.which(args.godot)
         if engine is None or shutil.which("dotnet") is None:
             raise ExportFailure("Godot .NET and the .NET 10 SDK must be on PATH")
+        missing, total = missing_audio()
+        check_audio(missing, total, args.allow_silent)
         output = fresh_output(args.output_dir)
         game, logs = output / "game", output / "logs"
         game.mkdir(); logs.mkdir()
@@ -177,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
             "--", "--package-check", f"--notices={game / 'GODOT-NOTICES.txt'}"], game, logs, env)
         if "EXPORT_CHECK result=PASS" not in text or "PACKAGE_MODE world_children=0" not in text:
             raise ExportFailure(f"Package check did not prove its metadata-only path: {logs}")
+        check_packaged_audio(text, args.allow_silent)
         credits = ["# The Last Camp — credits\n\nEngine notices: GODOT-NOTICES.txt. "
                    ".NET notices: DOTNET-RUNTIME-LICENSE.TXT and DOTNET-RUNTIME-THIRD-PARTY-NOTICES.TXT.\n"]
         credits.extend((REPO / name).read_text() for name in
@@ -192,6 +238,9 @@ Keep the executable, data_LastCamp_linuxbsd_x86_64 directory, credits and all
 license/notice files together. The .NET runtime is included; no editor or SDK
 installation is needed. This package's automated check covers bundled resources
 and notices. It does not establish visual quality or gameplay performance.
+
+The game's audio is generated with ElevenLabs and licensed for this game only;
+it may not be extracted or redistributed separately from the game.
 """)
         print(f"EXPORT_PACKAGE PASS {executable}")
         return 0

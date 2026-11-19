@@ -258,6 +258,12 @@ start gameplay. It checks embedded credit tables and writes the actual engine's
 notices. Runtime licenses are copied from the exact .NET pack named in the build's
 `LastCamp.deps.json`; missing notices fail the build.
 
+The licensed audio under `audio/generated/` is not in Git, so the exporter first
+checks that every file named by `manifest.json` and `voice.json` is present, and
+after the export that the package carries them all (`EXPORT_AUDIO` in the package
+check). Either gap fails the export; `--allow-silent` builds a silent package
+deliberately, for example from a public clone.
+
 Distribute the complete `game/` directory, including
 `data_LastCamp_linuxbsd_x86_64/`, all licenses/notices and credits. The SDK/editor
 is not needed by players. Export success does not substitute for a subsequent
