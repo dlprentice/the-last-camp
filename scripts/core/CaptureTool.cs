@@ -334,6 +334,32 @@ public partial class CaptureTool : Node
         }
         Node3D stones = dock.GetNode<Node3D>("SkippingStones");
         views.Add(new Godot.Collections.Dictionary { { (StringName)"name", "skipping_stones" }, { (StringName)"pos", dock.ToGlobal(stones.Position + new Vector3(0.24f, 0.38f, 0.36f)) }, { (StringName)"look", stones.GlobalPosition - Vector3.Up * 0.04f }, { (StringName)"absolute", true }, { (StringName)"fov", 48.0 }, { (StringName)"hour", 17.8 } });
+        views.AddRange(_place_viewpoints());
+        return views;
+    }
+
+    /// Review views of the micro cut's places, ground-relative unless marked absolute.
+    public Godot.Collections.Array<Godot.Collections.Dictionary> _place_viewpoints()
+    {
+        Godot.Collections.Array<Godot.Collections.Dictionary> views = new();
+        void add(string name, Vector2 at, double eye, Vector2 target, double target_height, double hour, double fov = 55.0)
+        {
+            views.Add(new Godot.Collections.Dictionary { { (StringName)"name", name }, { (StringName)"pos", new Vector3(at.X, (float)eye, at.Y) }, { (StringName)"look", new Vector3(target.X, (float)target_height, target.Y) }, { (StringName)"fov", fov }, { (StringName)"hour", hour } });
+        }
+        Vector2 rock = PlacesLayout.TOMS_ROCK;
+        Vector2 face = PlacesLayout.FACE;
+        add("place_trailhead", PlacesLayout.TRAILHEAD_FACE_TOWARDS + new Vector2(-1.5f, 1.6f), 1.6, PlacesLayout.TRAILHEAD_POST, 0.9, 18.8);
+        add("place_old_ring", PlacesLayout.OLD_RING + new Vector2(4.5f, 3.5f), 1.6, PlacesLayout.OLD_RING, 0.2, 9.0);
+        add("place_steps", PlacesLayout.STEP_LINE[0] + (PlacesLayout.STEP_LINE[0] - rock).Normalized() * 3.0f, 1.6, rock, 2.5, 19.2);
+        add("place_lookout", PlacesLayout.BENCH - face * 0.2f, 1.6, PlacesLayout.BENCH + face * 60.0f, -2.0, 19.9, 60.0);
+        add("place_loose_step", PlacesLayout.LOOSE_STEP + PlacesLayout.RIGHT * 1.3f - face * 0.4f, 1.3, PlacesLayout.LOOSE_STEP, 0.0, 19.4, 45.0);
+        Places places = Game.Instance.camp.places;
+        if (places?.ring != null)
+        {
+            Vector3 notch = places.ring.notch_world;
+            Vector3 from = notch + places.ring.notch_face.Normalized() * 0.7f + Vector3.Up * 0.25f;
+            views.Add(new Godot.Collections.Dictionary { { (StringName)"name", "place_ring_notch" }, { (StringName)"pos", from }, { (StringName)"look", notch }, { (StringName)"absolute", true }, { (StringName)"fov", 40.0 }, { (StringName)"hour", 9.0 } });
+        }
         return views;
     }
 
