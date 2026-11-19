@@ -443,7 +443,11 @@ public static partial class G
                 GD.PushError($"GdRuntime expression failed to parse: {source}: {expression.GetErrorText()}");
             expressions[source] = expression;
         }
-        Variant result = expression.Execute(new Godot.Collections.Array(inputs), null, false, false);
+        // Keep the input array (and the Variants it was built from) alive across the native call.
+        var inputArray = new Godot.Collections.Array(inputs);
+        Variant result = expression.Execute(inputArray, null, false, false);
+        GC.KeepAlive(inputArray);
+        GC.KeepAlive(inputs);
         if (expression.HasExecuteFailed())
             GD.PushError($"GdRuntime expression failed: {source}: {expression.GetErrorText()}");
         return result;

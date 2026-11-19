@@ -103,7 +103,9 @@ public partial class Pond : Node3D
         {
             _ripples[(int)i] = new Vector4(0, 0, -100, 0);
         }
-        material.SetShaderParameter("ripples", Variant.From(_ripples.ToArray()));
+        Variant ripples = Variant.From(_ripples.ToArray());
+        material.SetShaderParameter("ripples", ripples);
+        GC.KeepAlive(ripples);
         _stone = new MeshInstance3D();
         _stone.Mesh = PropMeshes.rock(813, 0.035);
         _stone.MaterialOverride = PropMaterials.iron(new Color(0.20f, 0.23f, 0.22f));
@@ -622,8 +624,10 @@ public partial class Pond : Node3D
         }
         _ripples[(int)_ripple_cursor] = new Vector4(at.X, at.Z, (float)_ripple_clock, (float)strength);
         _ripple_cursor = (_ripple_cursor + 1) % RIPPLE_COUNT;
-        material.SetShaderParameter("ripples", Variant.From(_ripples.ToArray()));
-        underside_material.SetShaderParameter("ripples", Variant.From(_ripples.ToArray()));
+        Variant ripples = Variant.From(_ripples.ToArray());
+        material.SetShaderParameter("ripples", ripples);
+        underside_material.SetShaderParameter("ripples", ripples);
+        GC.KeepAlive(ripples);
     }
 
     public bool skip_stone(Vector3 origin, Vector3 direction)

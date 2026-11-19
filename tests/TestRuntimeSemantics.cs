@@ -13,7 +13,10 @@ public partial class TestRuntimeSemantics : TestCase
         using var expression = new Expression();
         if (expression.Parse(source, new[] { "a", "b", "c" }) != Error.Ok)
             throw new InvalidOperationException(expression.GetErrorText());
-        var result = expression.Execute(new Godot.Collections.Array(values), null, false, false);
+        var inputs = new Godot.Collections.Array(values);
+        var result = expression.Execute(inputs, null, false, false);
+        GC.KeepAlive(inputs);
+        GC.KeepAlive(values);
         if (expression.HasExecuteFailed()) throw new InvalidOperationException(expression.GetErrorText());
         return result;
     }

@@ -155,12 +155,20 @@ public static partial class G
                 }
             case Variant.Type.Object:
                 container.AsGodotObject().Set(key.AsStringName(), value);
+                GC.KeepAlive(value);
                 return container;
         }
         throw new NotSupportedException($"Indexed assignment is not supported for {container.VariantType}");
     }
 
     public static Variant Call(Variant target, string method, params Variant[] args)
+    {
+        // The arguments may hold collections; keep them alive until the native call returns.
+        try { return CallCore(target, method, args); }
+        finally { GC.KeepAlive(args); }
+    }
+
+    private static Variant CallCore(Variant target, string method, Variant[] args)
     {
         if (target.VariantType == Variant.Type.Object)
         {
@@ -293,13 +301,13 @@ public static partial class G
     // -- callables as C# delegates (an empty Callable becomes null, as the C# APIs expect for "none")
     public static Func<TResult>? Func<[MustBeVariant] TResult>(Callable c) => c.Target == null && c.Delegate == null ? null : () => c.Call().As<TResult>();
     public static Func<T1, TResult>? Func<[MustBeVariant] T1, [MustBeVariant] TResult>(Callable c) =>
-        c.Target == null && c.Delegate == null ? null : (a) => c.Call(Variant.From(a)).As<TResult>();
+        c.Target == null && c.Delegate == null ? null : (a) => { Variant va = Variant.From(a); Variant r = c.Call(va); GC.KeepAlive(va); return r.As<TResult>(); };
     public static Func<T1, T2, TResult>? Func<[MustBeVariant] T1, [MustBeVariant] T2, [MustBeVariant] TResult>(Callable c) =>
-        c.Target == null && c.Delegate == null ? null : (a, b) => c.Call(Variant.From(a), Variant.From(b)).As<TResult>();
+        c.Target == null && c.Delegate == null ? null : (a, b) => { Variant va = Variant.From(a), vb = Variant.From(b); Variant r = c.Call(va, vb); GC.KeepAlive(va); GC.KeepAlive(vb); return r.As<TResult>(); };
     public static Action? Action(Callable c) => c.Target == null && c.Delegate == null ? null : () => c.Call();
-    public static Action<T1>? Action<[MustBeVariant] T1>(Callable c) => c.Target == null && c.Delegate == null ? null : (a) => c.Call(Variant.From(a));
+    public static Action<T1>? Action<[MustBeVariant] T1>(Callable c) => c.Target == null && c.Delegate == null ? null : (a) => { Variant va = Variant.From(a); c.Call(va); GC.KeepAlive(va); };
     public static Action<T1, T2>? Action<[MustBeVariant] T1, [MustBeVariant] T2>(Callable c) =>
-        c.Target == null && c.Delegate == null ? null : (a, b) => c.Call(Variant.From(a), Variant.From(b));
+        c.Target == null && c.Delegate == null ? null : (a, b) => { Variant va = Variant.From(a), vb = Variant.From(b); c.Call(va, vb); GC.KeepAlive(va); GC.KeepAlive(vb); };
 
     // -- callables
     public static Variant callv(Callable callable, Godot.Collections.Array args)
@@ -307,7 +315,9 @@ public static partial class G
         var list = new Variant[args.Count];
         for (int i = 0; i < list.Length; i++)
             list[i] = args[i];
-        return callable.Call(list);
+        Variant result = callable.Call(list);
+        GC.KeepAlive(list);
+        return result;
     }
 
     /// <summary>Callable.bind(): a C# callable that calls the target with the call's arguments, then the values. The
@@ -321,13 +331,21 @@ public static partial class G
             var all = new Variant[args.Length + bound.Length];
             args.CopyTo(all, 0);
             bound.CopyTo(all, args.Length);
-            return callable.Call(all);
+            Variant result = callable.Call(all);
+            GC.KeepAlive(all);
+            return result;
         });
     }
 
     /// <summary>Callable.unbind(): a C# callable that drops the call's last count arguments.</summary>
     public static Callable unbind(Callable callable, int count) =>
-        Variadic(args => callable.Call(args[..Math.Max(0, args.Length - count)]));
+        Variadic(args =>
+        {
+            Variant[] kept = args[..Math.Max(0, args.Length - count)];
+            Variant result = callable.Call(kept);
+            GC.KeepAlive(kept);
+            return result;
+        });
 
     /// <summary>source.signal.connect(callable.bind(values), flags) through the engine, which keeps its own bound
     /// callable: a scene built in code and packed keeps the connection and its binds, as its .tscn did.</summary>
@@ -342,7 +360,10 @@ public static partial class G
             args.Append(i == 0 ? "" : ", ").Append(i + 1 < 3 ? ((char)('a' + i + 1)).ToString() : $"x{i + 1}");
         }
         Variant bound = Eval($"a.bind({args})", inputs);
-        return (Error)source.Call(GodotObject.MethodName.Connect, signal, bound, flags).AsInt64();
+        var error = (Error)source.Call(GodotObject.MethodName.Connect, signal, bound, flags).AsInt64();
+        GC.KeepAlive(bound);
+        GC.KeepAlive(inputs);
+        return error;
     }
     public static bool is_valid(Callable callable) => Eval("a.is_valid()", callable).AsBool();
 }

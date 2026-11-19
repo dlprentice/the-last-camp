@@ -165,6 +165,9 @@ public static partial class G
             return;
         }
         if (target is GodotObject godot)
+        {
             godot.Set(name, value);
+            GC.KeepAlive(value);
+        }
     }
 }

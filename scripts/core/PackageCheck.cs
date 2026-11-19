@@ -64,8 +64,12 @@ public partial class PackageCheck
         }
         file.StoreString(G.op("+", G.op("+", "Godot Engine ", Engine.GetVersionInfo()["string"]), "\nhttps://godotengine.org/license/\n\n").AsString());
         file.StoreString(Engine.GetLicenseText() + "\n\nThird-party copyrights and component licenses\n\n");
-        file.StoreString(Json.Stringify(Engine.GetCopyrightInfo(), "\t") + "\n\nLicense texts\n\n");
-        file.StoreString(Json.Stringify(Engine.GetLicenseInfo(), "\t") + "\n");
+        var copyright = Engine.GetCopyrightInfo();
+        file.StoreString(Json.Stringify(copyright, "\t") + "\n\nLicense texts\n\n");
+        GC.KeepAlive(copyright);
+        var licenses = Engine.GetLicenseInfo();
+        file.StoreString(Json.Stringify(licenses, "\t") + "\n");
+        GC.KeepAlive(licenses);
         file.Close();
         G.print(G.format("EXPORT_AUDIO sounds=%d/%d voice=%d/%d", new Godot.Collections.Array { sound_present, sound_files, voice_present, voice_files }));
         G.print("EXPORT_CHECK result=PASS surfaces=9 models=35 notices=complete");

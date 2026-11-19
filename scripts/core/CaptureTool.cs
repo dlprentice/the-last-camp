@@ -204,7 +204,9 @@ public partial class CaptureTool : Node
             if (Game.Instance.has_flag("dump-environment"))
             {
                 Environment env = Game.Instance.world.environment;
-                G.print("ENV ", Json.Stringify(new Godot.Collections.Dictionary { { (StringName)"shot", name2 }, { (StringName)"hour", Game.Instance.world.hour }, { (StringName)"underwater", Game.Instance.world.underwater }, { (StringName)"camera", G.str(camera.GlobalPosition) }, { (StringName)"fog", G.str(env.FogLightColor) }, { (StringName)"density", env.FogDensity }, { (StringName)"volume_density", env.VolumetricFogDensity }, { (StringName)"volume_albedo", G.str(env.VolumetricFogAlbedo) }, { (StringName)"history", env.VolumetricFogTemporalReprojectionAmount } }));
+                Godot.Collections.Dictionary env_state = new Godot.Collections.Dictionary { { (StringName)"shot", name2 }, { (StringName)"hour", Game.Instance.world.hour }, { (StringName)"underwater", Game.Instance.world.underwater }, { (StringName)"camera", G.str(camera.GlobalPosition) }, { (StringName)"fog", G.str(env.FogLightColor) }, { (StringName)"density", env.FogDensity }, { (StringName)"volume_density", env.VolumetricFogDensity }, { (StringName)"volume_albedo", G.str(env.VolumetricFogAlbedo) }, { (StringName)"history", env.VolumetricFogTemporalReprojectionAmount } };
+                G.print("ENV ", Json.Stringify(env_state));
+                GC.KeepAlive(env_state);
             }
             if (Game.Instance.has_flag("dump-reflection") && Game.Instance.camp.pond != null)
             {
@@ -300,6 +302,7 @@ public partial class CaptureTool : Node
         FileAccess file = FileAccess.Open(dir.PathJoin("report.json"), FileAccess.ModeFlags.Write);
         file.StoreString(Json.Stringify(report, "\t"));
         G.print("POND_CHECK ", Json.Stringify(report));
+        GC.KeepAlive(report);
         foreach (Godot.Collections.Dictionary view in _prop_viewpoints())
         {
             camera.GlobalPosition = view["pos"].AsVector3();
@@ -443,6 +446,7 @@ public partial class CaptureTool : Node
         {
             Godot.Collections.Dictionary payload = new Godot.Collections.Dictionary { { (StringName)"engine", Engine.GetVersionInfo()["string"] }, { (StringName)"gpu", RenderingServer.GetVideoAdapterName() }, { (StringName)"resolution", G.format("%dx%d", new Godot.Collections.Array { G.Index(GetViewport().Get("size"), "x"), G.Index(GetViewport().Get("size"), "y") }) }, { (StringName)"route", route_name == "" ? "bench" : route_name }, { (StringName)"route_seconds", route.route_seconds }, { (StringName)"tiered_compilation", tiered_compilation_setting() }, { (StringName)"results", results } };
             file.StoreString(Json.Stringify(payload, "  "));
+            GC.KeepAlive(payload);
             G.print("BENCH_WRITTEN ", ProjectSettings.GlobalizePath(out_path));
         }
         G.print("BENCH_DONE");
@@ -855,6 +859,7 @@ public partial class CaptureTool : Node
         if (file != null)
         {
             file.StoreString(Json.Stringify(report, "  "));
+            GC.KeepAlive(report);
         }
         G.print("PROFILE_DONE");
         Game.Instance.quit_cleanly();

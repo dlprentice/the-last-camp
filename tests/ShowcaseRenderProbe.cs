@@ -225,8 +225,12 @@ public partial class ShowcaseRenderProbe : SceneTree
         int darkened = before.Zip(after).Count(pair => pair.First > pair.Second + 2);
         bool passed = error > 0.01 && error < 10 && darkened > 100;
         using (var file = Godot.FileAccess.Open(output.PathJoin("contact-shadows.json"), Godot.FileAccess.ModeFlags.Write))
-            file.StoreString(Json.Stringify(new Godot.Collections.Dictionary { { "mean_byte_difference", error },
-                { "darkened_channels", darkened }, { "passed", passed } }, "  "));
+        {
+            var contact = new Godot.Collections.Dictionary { { "mean_byte_difference", error },
+                { "darkened_channels", darkened }, { "passed", passed } };
+            file.StoreString(Json.Stringify(contact, "  "));
+            GC.KeepAlive(contact);
+        }
         GD.Print($"CONTACT_SHADOW_PROBE difference={error:F5}, darkened={darkened}: {(passed ? "PASS" : "FAIL")}");
         foreach (Image image in images) image.Dispose();
         view.Free();
@@ -311,7 +315,10 @@ public partial class ShowcaseRenderProbe : SceneTree
             { "restored_bytes", restored }, { "restoration_ms", restorationMs }, { "mean_byte_error", error },
             { "initial_full_source_error", initialError }, { "passed", passed } };
         using (var file = Godot.FileAccess.Open(output.PathJoin("texture-streaming.json"), Godot.FileAccess.ModeFlags.Write))
+        {
             file.StoreString(Json.Stringify(report, "  "));
+            GC.KeepAlive(report);
+        }
         GD.Print($"TEXTURE_STREAMING_PROBE {resident}->{inactive}->{restored} bytes, restored {restorationMs}ms, error {error:F5}, initial {initialError:F5}: {(passed ? "PASS" : "FAIL")}");
         view.Free();
         G.drain_finalizers();
@@ -448,6 +455,7 @@ public partial class ShowcaseRenderProbe : SceneTree
         }
         using var file = Godot.FileAccess.Open(output.PathJoin("canopy-batches.json"), Godot.FileAccess.ModeFlags.Write);
         file.StoreString(Json.Stringify(rows, "  "));
+        GC.KeepAlive(rows);
         view.Free();
         G.drain_finalizers();
         await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
@@ -525,6 +533,7 @@ public partial class ShowcaseRenderProbe : SceneTree
         }
         using var file = Godot.FileAccess.Open(output.PathJoin("grass-density.json"), Godot.FileAccess.ModeFlags.Write);
         file.StoreString(Json.Stringify(report, "  "));
+        GC.KeepAlive(report);
         view.Free();
         G.drain_finalizers();
         await ToSignal(CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
@@ -650,7 +659,9 @@ public partial class ShowcaseRenderProbe : SceneTree
             GD.Print($"PARALLAX_PROBE steps={steps} max_uv_error={maxError:F7} passed={ok}");
         }
         using var reportFile = Godot.FileAccess.Open(output.PathJoin("parallax.json"), Godot.FileAccess.ModeFlags.Write);
-        reportFile.StoreString(Json.Stringify(new Godot.Collections.Dictionary { { "passed", passed }, { "samples", rows } }, "  "));
+        var parallax = new Godot.Collections.Dictionary { { "passed", passed }, { "samples", rows } };
+        reportFile.StoreString(Json.Stringify(parallax, "  "));
+        GC.KeepAlive(parallax);
         GD.Print($"PARALLAX_PROBE_DONE passed={passed}");
         if (passed && OS.GetCmdlineUserArgs().Contains("--probe-termination"))
         {
