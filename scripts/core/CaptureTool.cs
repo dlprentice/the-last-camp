@@ -375,12 +375,20 @@ public partial class CaptureTool : Node
         Places places = Game.Instance.camp.places;
         if (places?.ring != null)
         {
-            // Close on the notch from a little to one side, as someone crouching to
-            // it would: near enough that its walls and depth read.
+            // The notch on the log's top at arm's length, from a little to one side,
+            // as someone bending over it would see it; then from 5 m, standing.
             Vector3 notch = places.ring.notch_world;
             Vector3 out_flat = new Vector3(places.ring.notch_face.X, 0, places.ring.notch_face.Z).Normalized();
             Vector3 aside = out_flat.Cross(Vector3.Up).Normalized();
-            add_absolute("place_ring_notch", notch + out_flat * 0.5f + aside * 0.2f + Vector3.Up * 0.42f, notch, 10.0, 30.0);
+            add_absolute("place_ring_notch", notch + out_flat * 0.45f + aside * 0.2f + Vector3.Up * 0.55f, notch, 10.0, 40.0);
+            add_absolute("place_ring_notch_far", notch + out_flat * 4.8f + aside * 0.8f + Vector3.Up * 1.3f, notch, 10.0, 50.0);
+        }
+        if (places != null && places.blazes.Count > 1)
+        {
+            // The first tree blaze on Tom's route at arm's length, standing beside it.
+            Places.Blaze blaze = places.blazes[1];
+            Vector3 aside = blaze.face.Cross(Vector3.Up).Normalized();
+            add_absolute("place_tree_notch", blaze.position + blaze.face * 0.8f + aside * 0.3f + Vector3.Up * 0.2f, blaze.position, 10.0, 40.0);
         }
         return views;
     }

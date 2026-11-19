@@ -103,17 +103,17 @@ public partial class Places : Node3D
             Vector3 axis = BlazeNotch.trunk_axis(mesh, local_y);
             Basis inv = xform.Basis.Inverse();
             Vector3 face = new Vector3(sites[i].face.X, 0, sites[i].face.Y);
-            ArrayMesh notch = BlazeNotch.build(mesh, 0, axis, (inv * face).Normalized(), (inv * Vector3.Up).Normalized(), out Vector3 surface);
+            // The notch is cut into this tree's own copy of its trunk; the faces
+            // take the cut's material and everything else keeps the bark's.
+            BlazeNotch.Carved notch = BlazeNotch.carve(mesh, 0, axis, (inv * face).Normalized(), (inv * Vector3.Up).Normalized(), scale, (ulong)(i + 1) * 7919UL);
             if (notch == null) continue;
-            var mi = new MeshInstance3D { Name = $"Blaze_{i + 1}", Mesh = notch, Transform = xform, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, VisibilityRangeEnd = 40.0f };
-            mi.SetSurfaceOverrideMaterial(0, bark.MaterialOverride);
-            if (notch.GetSurfaceCount() > 1) mi.SetSurfaceOverrideMaterial(1, cut);
-            mi.SetInstanceShaderParameter("tree_height", bark.GetInstanceShaderParameter("tree_height"));
-            mi.SetInstanceShaderParameter("tint", bark.GetInstanceShaderParameter("tint"));
-            AddChild(mi);
+            Material bark_material = bark.MaterialOverride;
+            bark.Mesh = notch.mesh;
+            bark.MaterialOverride = null;
+            for (int s = 0; s < notch.mesh.GetSurfaceCount(); s++) bark.SetSurfaceOverrideMaterial(s, s == notch.cut_surface ? cut : bark_material);
             // Keep the notched trunk at full detail where the notch can be seen.
             bark.LodBias = Math.Max(bark.LodBias, 4.0f);
-            blazes.Add(new Blaze { position = xform * surface, face = face });
+            blazes.Add(new Blaze { position = xform * notch.surface_centre, face = face });
         }
     }
 

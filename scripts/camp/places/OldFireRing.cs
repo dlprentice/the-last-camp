@@ -16,6 +16,8 @@ public partial class OldFireRing : Node3D
     public const double LOG_SINK = 0.025;
     /// Where on the log Tom cut his first notch, from its south-west end.
     public const double NOTCH_FROM_END = 0.55;
+    /// How steeply the notch faces up: on the log's top, leaning to the route.
+    public const double NOTCH_RISE = 2.4;
 
     public TerrainField field;
     public MeshInstance3D log;
@@ -147,10 +149,13 @@ public partial class OldFireRing : Node3D
 
         ArrayMesh mesh = log_mesh();
         Transform3D pose = log_pose(field, mesh);
+        BlazeNotch.Carved notch = _carve_notch(mesh, pose);
+        if (notch != null) mesh = notch.mesh;
         ShaderMaterial bark = PropMaterials.bark("bark_oak", 0.42);
         ShaderMaterial grain = PropMaterials.wood(new Color(0.62f, 0.58f, 0.52f), 0.9, 0.0, 1.1);
         mesh.SurfaceSetMaterial(0, bark);
         mesh.SurfaceSetMaterial(1, grain);
+        if (notch != null) mesh.SurfaceSetMaterial(notch.cut_surface, BlazeNotch.cut_material(false));
         log = new MeshInstance3D { Name = "FallenLog", Mesh = mesh, Transform = pose, CastShadow = GeometryInstance3D.ShadowCastingSetting.On, GIMode = GeometryInstance3D.GIModeEnum.Static };
         AddChild(log);
         var log_body = new StaticBody3D { Name = "FallenLogBody", CollisionLayer = 1, CollisionMask = 0, Transform = pose };
@@ -158,30 +163,28 @@ public partial class OldFireRing : Node3D
         double length = PlacesLayout.OLD_LOG_A.DistanceTo(PlacesLayout.OLD_LOG_B);
         log_body.AddChild(new CollisionShape3D { Shape = new CylinderShape3D { Radius = (float)PlacesLayout.OLD_LOG_RADIUS, Height = (float)length }, Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f) });
         AddChild(log_body);
-        _build_notch(mesh, pose, bark);
     }
 
-    /// Tom's first notch: on the log's outer flank near its south-west end,
-    /// turned to someone leaving the ring along his route.
-    public void _build_notch(ArrayMesh mesh, Transform3D pose, Material bark)
+    /// Tom's first notch: cut into the top of the log near its south-west end,
+    /// leaning a little to someone leaving the ring along his route, its crease
+    /// running across the log.
+    public BlazeNotch.Carved _carve_notch(ArrayMesh mesh, Transform3D pose)
     {
         double length = PlacesLayout.OLD_LOG_A.DistanceTo(PlacesLayout.OLD_LOG_B);
         Vector3 centre = new((float)(-length * 0.5 + NOTCH_FROM_END), 0.0f, 0.0f);
         Vector2 away2 = (PlacesLayout.TOMS_ROUTE[1] - PlacesLayout.OLD_RING).Normalized();
-        Vector3 away = new Vector3(away2.X, 0.55f, away2.Y).Normalized();
         Basis inv = pose.Basis.Inverse();
-        ArrayMesh notch = BlazeNotch.build(mesh, 0, centre, inv * away, inv * Vector3.Up, out Vector3 surface);
+        // Square to the log's axis (its local x), so the cut faces straight out of it.
+        Vector3 outward = inv * new Vector3(away2.X, (float)NOTCH_RISE, away2.Y).Normalized();
+        outward = new Vector3(0.0f, outward.Y, outward.Z).Normalized();
+        BlazeNotch.Carved notch = BlazeNotch.carve(mesh, 0, centre, outward, Vector3.Right, 1.0, 1974);
         if (notch == null)
         {
             GD.PushWarning("Old ring: no log surface for Tom's first notch");
-            return;
+            return null;
         }
-        var mi = new MeshInstance3D { Name = "FirstNotch", Mesh = notch, Transform = pose, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-        mi.SetSurfaceOverrideMaterial(0, bark);
-        if (notch.GetSurfaceCount() > 1) mi.SetSurfaceOverrideMaterial(1, BlazeNotch.cut_material(false));
-        mi.VisibilityRangeEnd = 40.0f;
-        AddChild(mi);
-        notch_world = pose * surface;
-        notch_face = away;
+        notch_world = pose * notch.surface_centre;
+        notch_face = (pose.Basis * outward).Normalized();
+        return notch;
     }
 }
