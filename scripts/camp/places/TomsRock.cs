@@ -28,31 +28,36 @@ public partial class TomsRock : Node3D
     public const double STEP_SINK = 0.05;
     public const double STEP_MIN_THICKNESS = 0.14;
     public const double STEP_MIN_GAP = 0.62;
-    public const double STEP_MAX_GAP = 1.7;
+    public const double STEP_MAX_GAP = 2.6;
     public const double TURN_CLEARANCE = 1.0;
+    public const double STEP_MAX_RISER = 0.24;
     /// The loose footstone: its size, how far it tips and turns, its offset.
-    public static readonly Vector3 LOOSE_SIZE = new(0.62f, 0.10f, 0.42f);
+    public static readonly Vector3 LOOSE_SIZE = new(0.80f, 0.13f, 0.46f);
     public const double LOOSE_TILT_DEG = 3.0;
     public const double LOOSE_YAW_DEG = 2.2;
     public const double LOOSE_SHIFT = 0.008;
     /// How far its back edge has settled into the ground.
     public const double LOOSE_SETTLE = 0.016;
-    public const double LOOSE_LID = 0.045;
+    /// The hollow under it: how deep, and how wide a rim it rests on.
+    public const double LOOSE_HOLLOW = 0.06;
+    public const double LOOSE_RIM = 0.075;
     public static readonly Vector3 TIN_SIZE = new(0.17f, 0.03f, 0.11f);
     public const double TIN_SINK = 0.006;
 
-    public static readonly Vector3 BENCH_SEAT = new(1.25f, 0.09f, 0.40f);
-    public static readonly Vector3 BENCH_SUPPORT = new(0.22f, 0.0f, 0.34f);
+    public static readonly Vector3 BENCH_SEAT = new(1.32f, 0.13f, 0.46f);
+    public static readonly Vector3 BENCH_SUPPORT = new(0.30f, 0.0f, 0.40f);
     public const double BENCH_SUPPORT_X = 0.42;
     public const double BENCH_SUPPORT_SINK = 0.08;
 
-    /// Granite boulders breaking the outcrop's flanks: (distance, bearing, size).
-    public static readonly Vector3[] BOULDERS =
+    /// Exposed bedrock: ledges this far from the summit, along rings of the outcrop.
+    public const double LEDGE_INNER = 2.6;
+    public const double LEDGE_OUTER = 13.5;
+
+    public struct Ledge
     {
-        new(3.9f, 150f, 1.25f), new(5.6f, 112f, 1.7f), new(7.2f, 160f, 2.3f), new(4.9f, 195f, 1.5f),
-        new(8.6f, 222f, 1.9f), new(11.0f, 248f, 2.4f), new(6.3f, 268f, 1.35f), new(11.6f, 178f, 2.1f),
-        new(9.4f, 92f, 1.6f), new(12.6f, 128f, 1.9f), new(10.2f, 292f, 1.3f), new(3.6f, 228f, 1.1f),
-    };
+        public GraniteSlab.Shape shape;
+        public Transform3D pose;
+    }
 
     public TerrainField field;
     public Node3D loose_step;
@@ -132,39 +137,57 @@ public partial class TomsRock : Node3D
 
         var rng = new RandomNumberGenerator { Seed = 2014 };
         var result = new List<Slab>();
+        double previous = double.NegativeInfinity;
         for (int k = 0; k < count; k++)
         {
-            Vector2 a = PlacesLayout.point_at(line, Math.Max(along[k] - 0.3, 0.0), out _);
-            Vector2 b = PlacesLayout.point_at(line, Math.Min(along[k] + 0.3, total), out _);
-            Vector2 centre = PlacesLayout.point_at(line, along[k], out _);
-            Vector2 forward = (b - a).Normalized();
-            double yaw = Math.Atan2(-forward.X, -forward.Y) + rng.RandfRange(-0.05f, 0.05f);
+            double jitter = rng.RandfRange(-0.05f, 0.05f);
             Vector3 size = new(rng.RandfRange(0.84f, 0.98f), 0.0f, rng.RandfRange(0.44f, 0.52f));
-            Basis basis = new(Vector3.Up, (float)yaw);
-            // Level top just proud of the highest ground under it, bottom below the lowest.
-            double high = double.NegativeInfinity, low = double.PositiveInfinity;
-            for (int i = -2; i <= 2; i++)
+            // Tom set each stone where the ground let it sit low: nudge it along the
+            // line to the nearest spot where its front stands no more than a step.
+            Slab best = default;
+            double best_score = double.PositiveInfinity;
+            for (int o = 0; o <= 12; o++)
             {
-                for (int j = -2; j <= 2; j++)
-                {
-                    Vector3 q = basis * new Vector3(size.X * 0.5f * i / 2.0f, 0, size.Z * 0.5f * j / 2.0f);
-                    double g = field.height(centre.X + q.X, centre.Y + q.Z);
-                    // The back edge may sit into the bank; the tread and front stand proud.
-                    if (j >= 0) high = Math.Max(high, g);
-                    low = Math.Min(low, g);
-                }
+                double offset = (o % 2 == 0 ? 1 : -1) * ((o + 1) / 2) * 0.1;
+                double s = along[k] + offset;
+                if (s < previous + STEP_MIN_GAP || s > last || s < first) continue;
+                Slab slab = make_slab(field, line, total, s, size, jitter);
+                double r = riser(field, slab);
+                double score = (r > STEP_MAX_RISER ? 10.0 + r : 0.0) + Math.Abs(offset);
+                if (score < best_score) { best_score = score; best = slab; }
             }
-            double top = high + STEP_PROUD;
-            double thickness = Math.Max(top - (low - STEP_SINK), STEP_MIN_THICKNESS);
-            size.Y = (float)thickness;
-            result.Add(new Slab
-            {
-                xform = new Transform3D(basis, new Vector3(centre.X, (float)(top - thickness * 0.5), centre.Y)),
-                size = size,
-                along = along[k],
-            });
+            if (double.IsPositiveInfinity(best_score)) best = make_slab(field, line, total, Math.Max(along[k], previous + STEP_MIN_GAP), size, jitter);
+            previous = best.along;
+            result.Add(best);
         }
         return result;
+    }
+
+    static Slab make_slab(TerrainField field, Vector2[] line, double total, double along, Vector3 size, double jitter)
+    {
+        Vector2 a = PlacesLayout.point_at(line, Math.Max(along - 0.3, 0.0), out _);
+        Vector2 b = PlacesLayout.point_at(line, Math.Min(along + 0.3, total), out _);
+        Vector2 centre = PlacesLayout.point_at(line, along, out _);
+        Vector2 forward = (b - a).Normalized();
+        double yaw = Math.Atan2(-forward.X, -forward.Y) + jitter;
+        Basis basis = new(Vector3.Up, (float)yaw);
+        // Level top just proud of the highest ground under its tread, bottom below the lowest.
+        double high = double.NegativeInfinity, low = double.PositiveInfinity;
+        for (int i = -2; i <= 2; i++)
+        {
+            for (int j = -2; j <= 2; j++)
+            {
+                Vector3 q = basis * new Vector3(size.X * 0.5f * i / 2.0f, 0, size.Z * 0.5f * j / 2.0f);
+                double g = field.height(centre.X + q.X, centre.Y + q.Z);
+                // The back edge may sit into the bank; the tread and front stand proud.
+                if (j >= 0) high = Math.Max(high, g);
+                low = Math.Min(low, g);
+            }
+        }
+        double top = high + STEP_PROUD;
+        double thickness = Math.Max(top - (low - STEP_SINK), STEP_MIN_THICKNESS);
+        size.Y = (float)thickness;
+        return new Slab { xform = new Transform3D(basis, new Vector3(centre.X, (float)(top - thickness * 0.5), centre.Y)), size = size, along = along };
     }
 
     /// The footstone as Tom left it, before it settled wrong.
@@ -188,72 +211,154 @@ public partial class TomsRock : Node3D
 
     public void build()
     {
-        ShaderMaterial granite = PropMaterials.triplanar("rock", new Color(0.97f, 0.95f, 0.91f), 0.5, 0.32);
-        ShaderMaterial worn = PropMaterials.triplanar("rock", new Color(0.93f, 0.91f, 0.87f), 0.6, 0.12);
-        _build_boulders(granite);
-        _build_steps(worn);
-        _build_bench(worn);
-        _build_loose_step(worn);
+        Material granite = GraniteSlab.material();
+        _build_ledges(granite);
+        _build_steps(granite);
+        _build_bench(granite);
+        _build_loose_step(granite);
     }
 
-    public static bool boulder_clear(Vector2 at, double size)
+    /// Clear of the steps, the paths, the bench and the bench's view.
+    public static bool ledge_clear(TerrainField field, Vector2 at, double reach, double top)
     {
-        double keep = size * 1.3 + 0.8;
-        return PlacesLayout.distance_to(at, PlacesLayout.STEP_LINE, out _) > keep
-            && PlacesLayout.distance_to(at, PlacesLayout.PAINTED_PATH, out _) > keep
-            && PlacesLayout.distance_to(at, PlacesLayout.TOMS_ROUTE, out _) > keep
-            && at.DistanceTo(PlacesLayout.BENCH) > keep + 0.6
-            && !PlacesLayout.in_lookout_view(at, 0.0);
-    }
-
-    /// Where each boulder sits: sunk so its widest part is near the ground and
-    /// its underside is buried all round.
-    public static List<Transform3D> boulder_poses(TerrainField field)
-    {
-        var poses = new List<Transform3D>();
-        var rng = new RandomNumberGenerator { Seed = 40 };
-        foreach (Vector3 b in BOULDERS)
+        double keep = reach + 0.7;
+        if (PlacesLayout.distance_to(at, PlacesLayout.STEP_LINE, out _) < keep) return false;
+        if (PlacesLayout.distance_to(at, PlacesLayout.PAINTED_PATH, out _) < keep) return false;
+        if (PlacesLayout.distance_to(at, PlacesLayout.TOMS_ROUTE, out _) < keep) return false;
+        if (at.DistanceTo(PlacesLayout.BENCH) < keep + 0.9 || at.DistanceTo(PlacesLayout.LOOSE_STEP) < keep + 0.9) return false;
+        // In front of the bench a ledge may stand, but only below the seated sight line.
+        if (PlacesLayout.lookout_openness(at) > 0.0)
         {
-            Vector2 at = PlacesLayout.polar(b.X, b.Y);
-            double yaw = rng.Randf() * Math.Tau;
-            if (!boulder_clear(at, b.Z)) continue;
-            double low = double.PositiveInfinity;
-            for (int i = 0; i < 12; i++)
-            {
-                double a = i / 12.0 * Math.Tau;
-                low = Math.Min(low, field.height(at.X + Math.Cos(a) * b.Z * 0.8, at.Y + Math.Sin(a) * b.Z * 0.8));
-            }
-            Basis basis = new Basis(Vector3.Up, (float)yaw).Scaled(new Vector3(b.Z, b.Z * 0.62f, b.Z * 1.08f));
-            poses.Add(new Transform3D(basis, new Vector3(at.X, (float)(low - b.Z * 0.18), at.Y)));
+            double eye = field.height(PlacesLayout.BENCH.X, PlacesLayout.BENCH.Y) + PlacesLayout.SEATED_EYE;
+            double d = at.DistanceTo(PlacesLayout.BENCH);
+            double line = eye - (eye - TerrainField.WATER_LEVEL) * d / PlacesLayout.BENCH.DistanceTo(TerrainField.POND_CENTRE);
+            if (top > line - 0.8) return false;
         }
-        return poses;
+        return true;
     }
 
-    public void _build_boulders(Material granite)
+    /// The outcrop's bedrock: broad, low granite ledges laid along its contours,
+    /// tipped with the slope and settled so no part of their lower half stands
+    /// above the ground. Seeded; the same field always gives the same rock.
+    public static List<Ledge> ledges(TerrainField field)
     {
-        int i = 0;
-        foreach (Transform3D pose in boulder_poses(field))
+        var rng = new RandomNumberGenerator { Seed = 1971 };
+        var list = new List<Ledge>();
+        int index = 0;
+        for (double r = LEDGE_INNER; r <= LEDGE_OUTER; r += 1.75)
         {
-            var mesh = new MeshInstance3D
+            double circumference = Math.Tau * r;
+            int count = Math.Max(3, (int)(circumference / 3.1));
+            double offset = rng.Randf() * 360.0;
+            for (int i = 0; i < count; i++)
             {
-                Name = $"Granite_{i}", Mesh = PropMeshes.rock(5100 + i * 37, 1.0), MaterialOverride = granite, Transform = pose,
+                double bearing = offset + i * 360.0 / count + rng.RandfRange(-8f, 8f);
+                double rr = r + rng.RandfRange(-0.5f, 0.5f);
+                Vector2 at = PlacesLayout.polar(rr, bearing);
+                double scale = Mathf.Lerp(1.0f, 0.7f, (float)((rr - LEDGE_INNER) / (LEDGE_OUTER - LEDGE_INNER)));
+                Vector3 size = new(rng.RandfRange(2.0f, 3.6f) * (float)scale, rng.RandfRange(0.7f, 1.3f) * (float)scale, rng.RandfRange(1.4f, 2.4f) * (float)scale);
+                long seed = 900 + index++;
+                double roundness = rng.RandfRange(0.22f, 0.36f);
+                double yaw_jitter = rng.RandfRange(-0.35f, 0.35f);
+                // Long axis along the contour; up leans halfway to the slope's normal.
+                Vector2 radial = (at - PlacesLayout.TOMS_ROCK).Normalized();
+                Vector3 tangent = new(-radial.Y, 0, radial.X);
+                Vector3 normal = field.normal(at.X, at.Y, 1.0);
+                Vector3 up = (Vector3.Up + normal).Normalized();
+                Vector3 x_axis = (tangent - up * tangent.Dot(up)).Normalized().Rotated(up, (float)yaw_jitter);
+                Vector3 z_axis = x_axis.Cross(up).Normalized();
+                Basis basis = new(x_axis, up, z_axis);
+                double origin_y = double.PositiveInfinity;
+                for (int k = 0; k < 16; k++)
+                {
+                    double a = k / 16.0 * Math.Tau;
+                    Vector3 local = new((float)(Math.Cos(a) * size.X * 0.45), -size.Y * 0.2f, (float)(Math.Sin(a) * size.Z * 0.45));
+                    Vector3 w = basis * local;
+                    origin_y = Math.Min(origin_y, field.height(at.X + w.X, at.Y + w.Z) - w.Y);
+                }
+                double top = origin_y + size.Y * 0.5;
+                double reach = Math.Max(size.X, size.Z) * 0.5;
+                if (!ledge_clear(field, at, reach, top)) continue;
+                list.Add(new Ledge
+                {
+                    shape = new GraniteSlab.Shape { size = size, roundness = roundness, rough = 0.16, seed = seed },
+                    pose = new Transform3D(basis, new Vector3(at.X, (float)origin_y, at.Y)),
+                });
+            }
+        }
+        return list;
+    }
+
+    /// The summit's own rock: low, broad slabs of the bedrock showing through the
+    /// thin soil round the bench, a few centimetres proud, walkable, clear of the
+    /// bench, its footstone and the steps.
+    public static List<Ledge> pavement(TerrainField field)
+    {
+        var rng = new RandomNumberGenerator { Seed = 1972 };
+        var list = new List<Ledge>();
+        int index = 0;
+        foreach (double r in new[] { 1.5, 2.5, 3.5 })
+        {
+            int count = (int)(Math.Tau * r / 1.6);
+            double offset = rng.Randf() * 360.0;
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 at = PlacesLayout.polar(r + rng.RandfRange(-0.25f, 0.25f), offset + i * 360.0 / count);
+                Vector3 size = new(rng.RandfRange(1.0f, 1.6f), rng.RandfRange(0.28f, 0.4f), rng.RandfRange(0.7f, 1.1f));
+                double yaw = rng.Randf() * Math.Tau;
+                long seed = 1300 + index++;
+                double keep = Math.Max(size.X, size.Z) * 0.5 + 0.35;
+                if (PlacesLayout.distance_to(at, PlacesLayout.STEP_LINE, out _) < keep) continue;
+                if (PlacesLayout.distance_to(at, PlacesLayout.PAINTED_PATH, out _) < keep) continue;
+                if (at.DistanceTo(PlacesLayout.BENCH) < keep + 0.85 || at.DistanceTo(PlacesLayout.LOOSE_STEP) < keep + 0.5) continue;
+                Basis basis = new(Vector3.Up, (float)yaw);
+                double low = double.PositiveInfinity;
+                for (int k = 0; k < 12; k++)
+                {
+                    double a = k / 12.0 * Math.Tau;
+                    Vector3 w = basis * new Vector3((float)(Math.Cos(a) * size.X * 0.48), 0, (float)(Math.Sin(a) * size.Z * 0.48));
+                    low = Math.Min(low, field.height(at.X + w.X, at.Y + w.Z));
+                }
+                double proud = rng.RandfRange(0.04f, 0.07f);
+                list.Add(new Ledge
+                {
+                    shape = new GraniteSlab.Shape { size = size, roundness = 0.3, rough = 0.18, flat_top = true, seed = seed },
+                    pose = new Transform3D(basis, new Vector3(at.X, (float)(low + proud - size.Y * 0.5), at.Y)),
+                });
+            }
+        }
+        return list;
+    }
+
+    public void _build_ledges(Material granite)
+    {
+        var holder = new Node3D { Name = "Bedrock" };
+        AddChild(holder);
+        int i = 0;
+        var all = ledges(field);
+        all.AddRange(pavement(field));
+        foreach (Ledge l in all)
+        {
+            ArrayMesh mesh = GraniteSlab.build(l.shape, l.pose, field.height);
+            holder.AddChild(new MeshInstance3D
+            {
+                Name = $"Ledge_{i}", Mesh = mesh, MaterialOverride = granite, Transform = l.pose,
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.On, GIMode = GeometryInstance3D.GIModeEnum.Static,
-            };
-            AddChild(mesh);
-            // The hull of the stretched stone itself, baked into world-scaled points
-            // (a scaled collision shape is not a reliable physics primitive).
-            var hull = (ConvexPolygonShape3D)((ArrayMesh)mesh.Mesh).CreateConvexShape(true, true);
-            Vector3[] points = hull.Points;
-            for (int k = 0; k < points.Length; k++) points[k] = pose.Basis * points[k];
-            var body = new StaticBody3D { Name = $"GraniteBody_{i}", CollisionLayer = 1, CollisionMask = 0, Position = pose.Origin };
+            });
+            var body = new StaticBody3D { Name = $"LedgeBody_{i}", CollisionLayer = 1, CollisionMask = 0, Position = l.pose.Origin };
             body.SetMeta("surface", (StringName)"rock");
-            var shape_250 = new ConvexPolygonShape3D { Points = points };
-            body.AddChild(new CollisionShape3D { Shape = shape_250 });
-            GC.KeepAlive(shape_250);
-            AddChild(body);
+            var hull = GraniteSlab.hull(mesh, l.pose.Basis);
+            body.AddChild(new CollisionShape3D { Shape = hull });
+            GC.KeepAlive(hull);
+            holder.AddChild(body);
             i++;
         }
     }
+
+    public static GraniteSlab.Shape step_shape(Slab s, int index) => new()
+    {
+        size = s.size, roundness = 0.16, rough = 0.10, flat_top = true, seed = 2000 + index,
+    };
 
     public void _build_steps(Material stone)
     {
@@ -264,10 +369,9 @@ public partial class TomsRock : Node3D
         for (int i = 0; i < steps.Count; i++)
         {
             Slab s = steps[i];
-            MeshInstance3D mesh = FieldKit.add(holder, FieldKit.rounded_box(s.size, 0.035), stone, Vector3.Zero, $"Step_{i + 1}");
-            mesh.Transform = s.xform;
-            mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
-            mesh.GIMode = GeometryInstance3D.GIModeEnum.Static;
+            ArrayMesh mesh = GraniteSlab.build(step_shape(s, i), s.xform, field.height);
+            var mi = new MeshInstance3D { Name = $"Step_{i + 1}", Mesh = mesh, MaterialOverride = stone, Transform = s.xform, CastShadow = GeometryInstance3D.ShadowCastingSetting.On, GIMode = GeometryInstance3D.GIModeEnum.Static };
+            holder.AddChild(mi);
             var body = new StaticBody3D { Name = $"StepBody_{i + 1}", CollisionLayer = 1, CollisionMask = 0 };
             body.SetMeta("surface", (StringName)"rock");
             var shape_271 = new ConvexPolygonShape3D { Points = step_collision(field, s) };
@@ -316,20 +420,32 @@ public partial class TomsRock : Node3D
         return pts.ToArray();
     }
 
+    public static GraniteSlab.Shape loose_shape() => new()
+    {
+        size = LOOSE_SIZE, roundness = 0.16, rough = 0.10, flat_top = true, seed = 2019, hollow = LOOSE_HOLLOW, hollow_inset = LOOSE_RIM,
+    };
+
     public void _build_bench(Material stone)
     {
         double ground = field.height(PlacesLayout.BENCH.X, PlacesLayout.BENCH.Y);
-        var bench = new Node3D { Name = "StoneBench", Transform = new Transform3D(summit_basis(), new Vector3(PlacesLayout.BENCH.X, (float)ground, PlacesLayout.BENCH.Y)) };
+        Transform3D frame = new(summit_basis(), new Vector3(PlacesLayout.BENCH.X, (float)ground, PlacesLayout.BENCH.Y));
+        var bench = new Node3D { Name = "StoneBench", Transform = frame };
         AddChild(bench);
         float seat_bottom = (float)PlacesLayout.BENCH_SEAT_HEIGHT - BENCH_SEAT.Y;
         float support_h = seat_bottom + (float)BENCH_SUPPORT_SINK;
-        MeshInstance3D seat = FieldKit.add(bench, FieldKit.rounded_box(BENCH_SEAT, 0.03), stone, new Vector3(0, seat_bottom + BENCH_SEAT.Y * 0.5f, 0), "Seat");
-        seat.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+        void stone_at(string name, GraniteSlab.Shape shape, Vector3 at)
+        {
+            Transform3D local = new(Basis.Identity, at);
+            ArrayMesh mesh = GraniteSlab.build(shape, frame * local, field.height);
+            bench.AddChild(new MeshInstance3D { Name = name, Mesh = mesh, MaterialOverride = stone, Transform = local, CastShadow = GeometryInstance3D.ShadowCastingSetting.On, GIMode = GeometryInstance3D.GIModeEnum.Static });
+        }
+        stone_at("Seat", new GraniteSlab.Shape { size = BENCH_SEAT, roundness = 0.18, rough = 0.09, flat_top = true, seed = 2101 }, new Vector3(0, seat_bottom + BENCH_SEAT.Y * 0.5f, 0));
+        int n = 0;
         foreach (float x in new[] { -(float)BENCH_SUPPORT_X, (float)BENCH_SUPPORT_X })
         {
-            MeshInstance3D support = FieldKit.add(bench, FieldKit.rounded_box(new Vector3(BENCH_SUPPORT.X, support_h, BENCH_SUPPORT.Z), 0.03), stone,
-                new Vector3(x, seat_bottom - support_h * 0.5f, 0.02f), "Support");
-            support.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+            stone_at($"Support_{n}", new GraniteSlab.Shape { size = new Vector3(BENCH_SUPPORT.X, support_h + 0.02f, BENCH_SUPPORT.Z), roundness = 0.24, rough = 0.14, seed = 2102 + n },
+                new Vector3(x, seat_bottom - support_h * 0.5f + 0.01f, 0.02f));
+            n++;
         }
         bench_body = new StaticBody3D { Name = "BenchBody", CollisionLayer = 1, CollisionMask = 0 };
         bench_body.SetMeta("surface", (StringName)"rock");
@@ -350,27 +466,14 @@ public partial class TomsRock : Node3D
         loose_rest = loose_pose(field);
         loose_step = new Node3D { Name = "LooseStep", Transform = loose_rest };
         AddChild(loose_step);
-        // A lid with a rim under it: from above and the side it is one stone, but
-        // it rests on its rim, so the tin under it has room.
-        Vector3 s = LOOSE_SIZE;
-        float lid = (float)LOOSE_LID;
-        float rim_h = s.Y - lid;
-        float rim_x = 0.08f, rim_z = 0.075f;
-        void part(Vector3 size, Vector3 at, string name)
-        {
-            MeshInstance3D m = FieldKit.add(loose_step, FieldKit.rounded_box(size, Math.Min(0.02f, size.Y * 0.4f)), stone, at, name);
-            m.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
-        }
-        part(new Vector3(s.X, lid, s.Z), new Vector3(0, s.Y * 0.5f - lid * 0.5f, 0), "Lid");
-        float rim_y = -s.Y * 0.5f + rim_h * 0.5f + 0.001f;
-        part(new Vector3(s.X, rim_h, rim_z), new Vector3(0, rim_y, s.Z * 0.5f - rim_z * 0.5f), "RimBack");
-        part(new Vector3(s.X, rim_h, rim_z), new Vector3(0, rim_y, -s.Z * 0.5f + rim_z * 0.5f), "RimFront");
-        part(new Vector3(rim_x, rim_h, s.Z - 2 * rim_z), new Vector3(s.X * 0.5f - rim_x * 0.5f, rim_y, 0), "RimRight");
-        part(new Vector3(rim_x, rim_h, s.Z - 2 * rim_z), new Vector3(-s.X * 0.5f + rim_x * 0.5f, rim_y, 0), "RimLeft");
+        // One stone, like the others, but hollowed underneath: it rests on its
+        // rim, so the tin under it has room.
+        ArrayMesh mesh = GraniteSlab.build(loose_shape(), loose_rest, field.height);
+        loose_step.AddChild(new MeshInstance3D { Name = "Stone", Mesh = mesh, MaterialOverride = stone, CastShadow = GeometryInstance3D.ShadowCastingSetting.On });
         loose_body = new StaticBody3D { Name = "LooseStepBody", CollisionLayer = 1, CollisionMask = 0 };
         // It sounds hollow underfoot: the footstep on it is the hollow step.
         loose_body.SetMeta("surface", (StringName)"hollow");
-        var shape_362 = new BoxShape3D { Size = s };
+        var shape_362 = new BoxShape3D { Size = LOOSE_SIZE };
         loose_body.AddChild(new CollisionShape3D { Shape = shape_362 });
         GC.KeepAlive(shape_362);
         loose_step.AddChild(loose_body);

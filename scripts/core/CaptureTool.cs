@@ -349,19 +349,35 @@ public partial class CaptureTool : Node
         {
             views.Add(new Godot.Collections.Dictionary { { (StringName)"name", name }, { (StringName)"pos", new Vector3(at.X, (float)eye, at.Y) }, { (StringName)"look", new Vector3(target.X, (float)target_height, target.Y) }, { (StringName)"fov", fov }, { (StringName)"hour", hour } });
         }
-        Vector2 rock = PlacesLayout.TOMS_ROCK;
         Vector2 face = PlacesLayout.FACE;
-        add("place_trailhead", PlacesLayout.TRAILHEAD_FACE_TOWARDS + new Vector2(-1.5f, 1.6f), 1.6, PlacesLayout.TRAILHEAD_POST, 0.9, 18.8);
-        add("place_old_ring", PlacesLayout.OLD_RING + new Vector2(4.5f, 3.5f), 1.6, PlacesLayout.OLD_RING, 0.2, 9.0);
-        add("place_steps", PlacesLayout.STEP_LINE[0] + (PlacesLayout.STEP_LINE[0] - rock).Normalized() * 3.0f, 1.6, rock, 2.5, 19.2);
-        add("place_lookout", PlacesLayout.BENCH - face * 0.2f, 1.6, PlacesLayout.BENCH + face * 60.0f, -2.0, 19.9, 60.0);
-        add("place_loose_step", PlacesLayout.LOOSE_STEP + PlacesLayout.RIGHT * 1.3f - face * 0.4f, 1.3, PlacesLayout.LOOSE_STEP, 0.0, 19.4, 45.0);
+        TerrainField field = Game.Instance.camp.field;
+        void add_absolute(string name, Vector3 pos, Vector3 look, double hour, double fov)
+        {
+            views.Add(new Godot.Collections.Dictionary { { (StringName)"name", name }, { (StringName)"pos", pos }, { (StringName)"look", look }, { (StringName)"absolute", true }, { (StringName)"fov", fov }, { (StringName)"hour", hour } });
+        }
+        // The post from 3 m in front of its lettered face, in afternoon light.
+        Vector2 post = PlacesLayout.TRAILHEAD_POST;
+        Vector2 post_face = (PlacesLayout.TRAILHEAD_FACE_TOWARDS - post).Normalized();
+        add("place_trailhead", post + post_face * 3.0f, 1.6, post, 0.8, 16.5, 45.0);
+        // The ring from where June's footpath arrives, standing, looking down into it.
+        Vector2 ring_dir = (PlacesLayout.OLD_RING - PlacesLayout.JUNE_FOOTPATH[^1]).Normalized();
+        add("place_old_ring", PlacesLayout.OLD_RING - ring_dir * 3.4f, 1.65, PlacesLayout.OLD_RING, 0.0, 10.0, 48.0);
+        // The flight from the end of Tom's route, looking up it as he would arrive.
+        Vector2 route_end = PlacesLayout.TOMS_ROUTE[^2] + (PlacesLayout.TOMS_ROUTE[^2] - PlacesLayout.TOMS_ROUTE[^1]).Normalized() * 1.2f;
+        add("place_steps", route_end, 1.75, PlacesLayout.polar(9.0, 10.0), 0.4, 18.6, 58.0);
+        // The bench's view at the seated eye: over the slope to the pond and the sunset.
+        Vector2 bench = PlacesLayout.BENCH;
+        Vector3 eye = new(bench.X, (float)(field.height(bench.X, bench.Y) + PlacesLayout.SEATED_EYE), bench.Y);
+        Vector2 out_to = bench + PlacesLayout.bearing(PlacesLayout.LOOKOUT_BEARING_DEG) * 80.0f;
+        add_absolute("place_lookout", eye, new Vector3(out_to.X, (float)(TerrainField.WATER_LEVEL + 3.0), out_to.Y), 19.9, 62.0);
+        add("place_loose_step", PlacesLayout.LOOSE_STEP + PlacesLayout.RIGHT * 1.05f + face * 0.75f, 1.2, PlacesLayout.LOOSE_STEP, 0.02, 18.4, 45.0);
         Places places = Game.Instance.camp.places;
         if (places?.ring != null)
         {
+            // Close on the notch from above the grass, as someone bending to it would.
             Vector3 notch = places.ring.notch_world;
-            Vector3 from = notch + places.ring.notch_face.Normalized() * 0.7f + Vector3.Up * 0.25f;
-            views.Add(new Godot.Collections.Dictionary { { (StringName)"name", "place_ring_notch" }, { (StringName)"pos", from }, { (StringName)"look", notch }, { (StringName)"absolute", true }, { (StringName)"fov", 40.0 }, { (StringName)"hour", 9.0 } });
+            Vector3 out_flat = new Vector3(places.ring.notch_face.X, 0, places.ring.notch_face.Z).Normalized();
+            add_absolute("place_ring_notch", notch + out_flat * 0.38f + Vector3.Up * 0.72f, notch, 10.0, 34.0);
         }
         return views;
     }

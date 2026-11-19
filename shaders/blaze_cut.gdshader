@@ -19,7 +19,7 @@ global uniform int impostor_bake;
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D orm_tex : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
-uniform vec3 age_tint : source_color = vec3(0.60, 0.57, 0.52);
+uniform vec3 age_tint : source_color = vec3(0.82, 0.78, 0.70);
 uniform float wind_response : hint_range(0.0, 1.0) = 1.0;
 instance uniform float tree_height = 12.0;
 

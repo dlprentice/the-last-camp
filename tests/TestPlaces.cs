@@ -52,31 +52,21 @@ public partial class TestPlaces : TestCase
         Vector3 eye = Places.BenchSeat(land) + Vector3.Up * (float)(PlacesLayout.SEATED_EYE - PlacesLayout.BENCH_SEAT_HEIGHT);
         Vector2 from = new(eye.X, eye.Z);
         double terrain = PlacesProbe.pond_view(land, from, eye.Y);
-        assert_gt(terrain, 0.5, $"from the bench the land hides less than half the pond ({terrain:F2} seen)");
-        // The trees as well: a sight line is blocked by a trunk, or above 2.5 m by a crown.
-        int seen = 0, total = 0;
-        for (int i = 0; i < 24; i++)
+        assert_gt(terrain, 0.7, $"from the bench the land hides little of the pond ({terrain:F2} seen)");
+        // A fan of sight lines from the seated eye to the pond's water, past the land
+        // and every planned tree (trunks, and crowns from their lowest limbs up).
+        double view = PlacesProbe.lookout_view(land, scene.trees, eye);
+        assert_gt(view, 0.6, $"from the bench the sight lines reach at least 60% of the pond past land and trees ({view:F2})");
+        // The opening has an edge, not a wall: trees thin through it.
+        int edge_trees = 0;
+        foreach (ScenePlan.TreeEntry t in scene.trees)
         {
-            double a = i / 24.0 * Math.Tau;
-            for (double r = 0.2; r < 0.85; r += 0.3)
-            {
-                Vector2 target = TerrainField.POND_CENTRE + new Vector2((float)Math.Cos(a), (float)Math.Sin(a)) * (float)(TerrainField.pond_radius_at(a) * r);
-                total++;
-                if (!PlacesProbe.sight_clear(land, from, eye.Y, target, TerrainField.WATER_LEVEL)) continue;
-                bool clear = true;
-                foreach (ScenePlan.TreeEntry t in scene.trees)
-                {
-                    Vector2 c = PlacesLayout.closest_on_segment(t.position, from, target);
-                    double k = from.DistanceTo(c) / from.DistanceTo(target);
-                    double above = Mathf.Lerp(eye.Y, (float)TerrainField.WATER_LEVEL, (float)k) - land.height(c.X, c.Y);
-                    double reach = (above > 2.5 ? 2.4 : 0.5) * t.scale;
-                    if (t.kind == TreeSpecies.Kind.SAPLING) reach = above > 4.0 ? 0.0 : 0.8 * t.scale;
-                    if (c.DistanceTo(t.position) < reach) { clear = false; break; }
-                }
-                if (clear) seen++;
-            }
+            double open = PlacesLayout.lookout_openness(t.position);
+            if (open > 0.05 && open < 0.95) edge_trees++;
         }
-        assert_gt(seen / (double)total, 0.3, $"from the bench the trees leave a clear view of the pond ({seen}/{total} sight lines)");
+        assert_gt(edge_trees, 5, $"trees stand thinned through the view's edge ({edge_trees})");
+        double sunset = Math.Abs(PlacesLayout.LOOKOUT_BEARING_DEG - 289.0);
+        assert_lt(sunset, PlacesLayout.LOOKOUT_CORE_DEG, "the sunset lies inside the open view");
         Vector2 to_pond = TerrainField.POND_CENTRE - PlacesLayout.BENCH;
         double off = Mathf.RadToDeg(Math.Abs(PlacesLayout.FACE.AngleTo(to_pond)));
         assert_lt(off, 25.0, $"the bench faces the pond ({off:F0} degrees off)");
@@ -96,7 +86,7 @@ public partial class TestPlaces : TestCase
             if (previous_along >= 0.0)
             {
                 double gap = s.along - previous_along;
-                assert_true(gap > TomsRock.STEP_MIN_GAP - 0.01 && gap < 3.2, $"steps at {previous_along:F1} and {s.along:F1} m are a tread to a landing apart");
+                assert_true(gap > TomsRock.STEP_MIN_GAP - 0.01 && gap < 4.5, $"steps at {previous_along:F1} and {s.along:F1} m are a tread to a landing apart");
             }
             max_riser = Math.Max(max_riser, TomsRock.riser(land, s));
             previous_top = top;
@@ -162,8 +152,9 @@ public partial class TestPlaces : TestCase
             foreach (float z in new[] { -t.Z, t.Z })
             {
                 Vector3 corner = pose.AffineInverse() * (tin * new Vector3(x, t.Y, z));
-                assert_true(Math.Abs(corner.X) < h.X - 0.08 && Math.Abs(corner.Z) < h.Z - 0.075, "the tin lies inside the stone's hollow");
-                assert_lt(corner.Y, h.Y - (float)TomsRock.LOOSE_LID - 0.003, "the stone's lid clears the tin");
+                double lift = GraniteSlab.hollow_lift(TomsRock.loose_shape(), corner.X, corner.Z);
+                assert_gt(lift, TomsRock.LOOSE_HOLLOW * 0.95, "the tin lies inside the stone's hollow");
+                assert_lt(corner.Y, -h.Y + lift - 0.003, "the hollow clears the tin");
             }
         }
     }
@@ -192,19 +183,31 @@ public partial class TestPlaces : TestCase
 
     public void test_outcrop_boulders_and_old_ring_are_grounded()
     {
-        List<Transform3D> boulders = TomsRock.boulder_poses(land);
-        assert_gt(boulders.Count, 5, "the outcrop shows granite");
-        foreach (Transform3D pose in boulders)
+        List<TomsRock.Ledge> ledges = TomsRock.ledges(land);
+        assert_gt(ledges.Count, 14, $"the outcrop shows its granite bedrock ({ledges.Count} ledges)");
+        foreach (TomsRock.Ledge l in ledges)
         {
-            Vector2 at = new(pose.Origin.X, pose.Origin.Z);
-            assert_lt(pose.Origin.Y, land.height(at.X, at.Y), "a boulder's widest part sits in the ground (no floating)");
-            assert_gt(PlacesLayout.distance_to(at, PlacesLayout.STEP_LINE, out _), pose.Basis.X.Length() * 1.2, "boulders keep off the steps");
+            // The lower part of every ledge is in the ground all round (no floating).
+            for (int k = 0; k < 16; k++)
+            {
+                double a = k / 16.0 * Math.Tau;
+                Vector3 w = l.pose * new Vector3((float)(Math.Cos(a) * l.shape.size.X * 0.45), -l.shape.size.Y * 0.2f, (float)(Math.Sin(a) * l.shape.size.Z * 0.45));
+                assert_lt(w.Y, land.height(w.X, w.Z) + 0.001, "a ledge's lower part is buried");
+            }
+            Vector2 at = new(l.pose.Origin.X, l.pose.Origin.Z);
+            double reach = Math.Max(l.shape.size.X, l.shape.size.Z) * 0.5;
+            assert_gt(PlacesLayout.distance_to(at, PlacesLayout.STEP_LINE, out _), reach + 0.6, "ledges keep off the steps");
         }
+        assert_lt(land.grass_suitability(PlacesLayout.TOMS_ROCK.X + 4.0, PlacesLayout.TOMS_ROCK.Y + 3.0), 0.2, "little grass grows on the outcrop");
         foreach (OldFireRing.Stone s in OldFireRing.stones(land))
         {
-            assert_lt(s.pose.Origin.Y, land.height(s.pose.Origin.X, s.pose.Origin.Z) - s.size * 0.1, "ring stones are sunk");
+            double g = land.height(s.pose.Origin.X, s.pose.Origin.Z);
+            assert_true(s.size >= 0.17 && s.size <= 0.33, $"a ring stone is two fists to a loaf across ({s.size:F2} m)");
+            assert_true(s.pose.Origin.Y < g && s.pose.Origin.Y + s.shape.size.Y * 0.5 > g + s.shape.size.Y * 0.3, "ring stones are half sunk, and show");
         }
         assert_eq(OldFireRing.stones(land).Count, OldFireRing.STONES - 1, "one ring stone is long gone");
+        foreach (Transform3D c in OldFireRing.charcoal(land))
+            assert_lt(new Vector2(c.Origin.X, c.Origin.Z).DistanceTo(PlacesLayout.OLD_RING), PlacesLayout.OLD_RING_RADIUS, "old charcoal lies inside the ring");
         double grass = land.grass_suitability(PlacesLayout.OLD_RING.X, PlacesLayout.OLD_RING.Y);
         assert_gt(grass, 0.3, $"grass grows through the old ring ({grass:F2})");
 
@@ -241,6 +244,16 @@ public partial class TestPlaces : TestCase
         var (a, b) = strokes[0];
         assert_gt(TrailheadPost.carve_depth((a + b) * 0.5f, strokes), TrailheadPost.GROOVE_DEPTH * 0.9, "a stroke is a groove");
         assert_near(TrailheadPost.carve_depth(new Vector2(0.075f, 0.1f), strokes), 0.0, 1e-9, "the face is whole between letters");
+        // A squared cedar post, about 1.3 m by 15 cm, lettered large enough to read
+        // from 3 m: cap height subtends well over a degree there.
+        assert_near(TrailheadPost.ABOVE_GROUND, 1.3, 0.05, "the post stands about 1.3 m");
+        assert_near(TrailheadPost.WIDTH, 0.15, 0.01, "the post is about 15 cm across");
+        assert_gt(Mathf.RadToDeg(Math.Atan2(TrailheadPost.LETTER_HEIGHT, 3.0)), 1.6, "the letters read from 3 m");
+        foreach (var (p, q) in strokes)
+        {
+            assert_lt(Math.Max(Math.Abs(p.X), Math.Abs(q.X)), TrailheadPost.WIDTH * 0.5 - 0.01, "the letters fit the face");
+            assert_gt(Math.Min(p.Y, q.Y), 0.25, "the letters stand clear of the grass at the post's foot");
+        }
     }
 
     public void test_paths_lengths_match_the_design()

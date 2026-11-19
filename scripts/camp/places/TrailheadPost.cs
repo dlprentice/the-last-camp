@@ -6,22 +6,24 @@ using Godot;
 namespace LastCamp;
 
 /// The post Tom carved at the trailhead: a square cedar post with HALLOWAY 1974
-/// cut into its face, letters stacked one above another, the seven turned the
+/// cut into its face, running down it like a book spine, the seven turned the
 /// wrong way round (he said it was on purpose), and a small register box on its
 /// side. The letters are real grooves in the face's geometry, not a texture.
 public partial class TrailheadPost : Node3D
 {
-    public const double WIDTH = 0.17;
-    public const double ABOVE_GROUND = 1.38;
+    public const double WIDTH = 0.15;
+    public const double ABOVE_GROUND = 1.3;
     public const double BURIED = 0.4;
     public const string TEXT = "HALLOWAY 1974";
-    public const double LETTER_HEIGHT = 0.062;
-    public const double LETTER_WIDTH = 0.050;
-    public const double ROW_PITCH = 0.079;
-    public const double WORD_GAP = 0.045;
-    public const double TOP_MARGIN = 0.11;
-    public const double GROOVE_HALF_WIDTH = 0.0058;
-    public const double GROOVE_DEPTH = 0.0065;
+    /// Cap height, across the face.
+    public const double LETTER_HEIGHT = 0.095;
+    /// Letter width, down the face.
+    public const double LETTER_WIDTH = 0.060;
+    public const double ROW_PITCH = 0.072;
+    public const double WORD_GAP = 0.05;
+    public const double TOP_MARGIN = 0.09;
+    public const double GROOVE_HALF_WIDTH = 0.0075;
+    public const double GROOVE_DEPTH = 0.009;
     /// Grid spacing of the carved face.
     public const double CARVE_STEP = 0.0025;
 
@@ -84,12 +86,13 @@ public partial class TrailheadPost : Node3D
                 gap += WORD_GAP;
                 continue;
             }
+            // The words run down the face, letters turned a quarter so their tops
+            // face right, as on a book's spine: big enough to read from the trail.
             double top = y_top - row * ROW_PITCH - gap;
-            Vector2 origin = new((float)(-LETTER_WIDTH * 0.5), (float)(top - LETTER_HEIGHT));
-            Vector2 scale = new((float)LETTER_WIDTH, (float)LETTER_HEIGHT);
+            Vector2 place(Vector2 g) => new((float)(-LETTER_HEIGHT * 0.5 + g.Y * LETTER_HEIGHT), (float)(top - g.X * LETTER_WIDTH));
             foreach (Vector2[] line in glyph(c))
             {
-                for (int i = 0; i + 1 < line.Length; i++) result.Add((origin + line[i] * scale, origin + line[i + 1] * scale));
+                for (int i = 0; i + 1 < line.Length; i++) result.Add((place(line[i]), place(line[i + 1])));
             }
             row++;
         }
@@ -159,7 +162,7 @@ public partial class TrailheadPost : Node3D
                 Vector3 dy = pts[Math.Min(j + 1, rows) * (cols + 1) + i] - pts[Math.Max(j - 1, 0) * (cols + 1) + i];
                 Vector3 n = dx.Cross(dy).Normalized();
                 // Dirt and shadow settle in the grooves.
-                float shade = (float)(1.0 - 0.45 * Math.Min(depth[k] / GROOVE_DEPTH, 1.0));
+                float shade = (float)(1.0 - 0.62 * Math.Min(depth[k] / GROOVE_DEPTH, 1.0));
                 idx[k] = mb.add_vertex(pts[k], n, new Vector2(pts[k].X + h, pts[k].Y * 0.5f), plain * shade, new Vector4(1, 0, 0, 1));
             }
         }
