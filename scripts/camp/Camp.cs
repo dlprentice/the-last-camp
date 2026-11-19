@@ -91,14 +91,12 @@ public partial class Camp : Node3D
 
         terrain_material = _make_terrain_material();
         TerrainBuilder terrain_builder = new TerrainBuilder(field);
+        // The worker computes plain arrays only. Engine objects (meshes, shapes,
+        // nodes) are created and released on the main thread: one created or
+        // disposed on a worker can be finalized or freed there, off the main loop.
+        TerrainBuilder.Grid ground = null;
         _terrain_thread = new GodotThread();
-        _terrain_thread.Start(Callable.From(() =>
-        {
-            using ArrayMesh groundMesh = terrain_builder.build_mesh(terrain_material);
-            return new Godot.Collections.Dictionary {
-                { "chunks", TerrainBuilder.split_render_mesh(groundMesh) }, { "collision", new CollisionShape3D {
-                    Name = "TerrainCollision", Shape = groundMesh.CreateTrimeshShape() } } };
-        }));
+        _terrain_thread.Start(Callable.From(() => { ground = terrain_builder.build_grid(); }));
         GrassPlanter planter = new GrassPlanter(field, Quality.Instance.current.grass_distance + GrassPlanter.CHUNK_SIZE, Quality.Instance.current.grass_density);
         _grass_thread = new GodotThread();
         _grass_thread.Start(Callable.From(() => planter.plan()));
@@ -117,13 +115,14 @@ public partial class Camp : Node3D
         AddChild(new WoodlandCollision(forest));
 
         await _stage("Shaping the land");
-        Variant terrain_data = await _join(_terrain_thread);
+        await _join(_terrain_thread);
         _terrain_thread = null;
-        if (!IsInsideTree() || terrain_data.VariantType == Variant.Type.Nil)
+        if (!IsInsideTree() || ground == null)
         {
             return;
         }
-        _place_terrain(G.Index(terrain_data, "chunks").AsGodotArray<ArrayMesh>(), G.Index(terrain_data, "collision").As<CollisionShape3D>());
+        _place_terrain(TerrainBuilder.split_render_grid(ground, terrain_material),
+            new CollisionShape3D { Name = "TerrainCollision", Shape = TerrainBuilder.collision_from(ground) });
 
         await _stage("Planting the understory");
         if (!IsInsideTree())
@@ -341,7 +340,9 @@ public partial class Camp : Node3D
 
     public void _on_footstep(StringName surface, bool running)
     {
-        if (audio != null)
+        // The loose step sounds once, hollow, as it takes the weight (Places raises
+        // that); a stride on it adds no second footstep.
+        if (audio != null && surface != "hollow")
         {
             audio.footstep(surface, running);
         }

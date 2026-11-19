@@ -127,7 +127,7 @@ public partial class Understory : Node3D
         G.print(G.format("Groundcover hills: %d clumps in %d batches, %d shrubs, extent %.0f m", new Godot.Collections.Array { distant_clump_count, (long)planter.distant_chunks.Count, distant_shrub_count, GrassPlanter.DISTANT_EXTENT }));
     }
 
-    public void _upload_grass(Godot.Collections.Array<GrassPlanter.Chunk> chunks, ArrayMesh mesh, ShaderMaterial material, string prefix)
+    public void _upload_grass(List<GrassPlanter.Chunk> chunks, ArrayMesh mesh, ShaderMaterial material, string prefix)
     {
         foreach (GrassPlanter.Chunk chunk in chunks)
         {

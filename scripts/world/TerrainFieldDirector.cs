@@ -56,8 +56,10 @@ public partial class TerrainFieldDirector : Node
         {
             return;
         }
+        // The worker fills plain floats; the Image and texture are made on the main thread.
+        _rain_heights = null;
         _rain_thread = new GodotThread();
-        Error error = _rain_thread.Start(Callable.From(() => _build_rain_height_image(field)));
+        Error error = _rain_thread.Start(Callable.From(() => { _rain_heights = _rain_height_values(field); }));
         if (error != Error.Ok)
         {
             G.push_warning(G.format("Could not start enhanced rain-height bake: %s", error_string((long)error)));
@@ -78,8 +80,10 @@ public partial class TerrainFieldDirector : Node
         {
             return;
         }
-        Image image = _rain_thread.WaitToFinish().As<Image>();
+        _rain_thread.WaitToFinish();
         _rain_thread = null;
+        using Image image = _rain_heights != null ? _rain_height_image(_rain_heights) : null;
+        _rain_heights = null;
         if (GodotObject.IsInstanceValid(_rain_material) && image != null && !image.IsEmpty())
         {
             _rain_material.SetShaderParameter("ground_height", ImageTexture.CreateFromImage(image));
@@ -87,19 +91,34 @@ public partial class TerrainFieldDirector : Node
         SetProcess(false);
     }
 
-    public static Image _build_rain_height_image(TerrainField field)
+    private float[] _rain_heights;
+
+    public static Image _build_rain_height_image(TerrainField field) => _rain_height_image(_rain_height_values(field));
+
+    /// The rain-height samples, row by row: plain data, safe on a worker thread.
+    public static float[] _rain_height_values(TerrainField field)
     {
-        Image heights = Image.CreateEmpty((int)RAIN_HEIGHT_RESOLUTION, (int)RAIN_HEIGHT_RESOLUTION, false, Image.Format.Rf);
+        int n = (int)RAIN_HEIGHT_RESOLUTION;
+        var values = new float[n * n];
         double span = RAIN_HEIGHT_EXTENT * 2.0;
         for (long y = 0; y < RAIN_HEIGHT_RESOLUTION; y++)
         {
             for (long x = 0; x < RAIN_HEIGHT_RESOLUTION; x++)
             {
                 Vector2 pos = new Vector2(x, y) / (float)(double)(RAIN_HEIGHT_RESOLUTION - 1) * (float)span - Vector2.One * (float)RAIN_HEIGHT_EXTENT;
-                heights.SetPixel((int)x, (int)y, new Color((float)field.height(pos.X, pos.Y), 0.0f, 0.0f));
+                values[y * n + x] = (float)field.height(pos.X, pos.Y);
             }
         }
-        return heights;
+        return values;
+    }
+
+    /// The samples as a single-channel float image (main thread).
+    public static Image _rain_height_image(float[] values)
+    {
+        int n = (int)RAIN_HEIGHT_RESOLUTION;
+        var bytes = new byte[values.Length * 4];
+        Buffer.BlockCopy(values, 0, bytes, 0, bytes.Length);
+        return Image.CreateFromData(n, n, false, Image.Format.Rf, bytes);
     }
 
     public override void _ExitTree()

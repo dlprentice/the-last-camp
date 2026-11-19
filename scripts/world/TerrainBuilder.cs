@@ -74,7 +74,50 @@ public partial class TerrainBuilder
         return (long)_axis.Count;
     }
 
-    public ArrayMesh build_mesh(Material material)
+    /// The terrain grid as plain arrays: safe to build on a worker thread, since it
+    /// creates no engine object. The main thread turns it into meshes and shapes.
+    public sealed class Grid
+    {
+        public Vector3[] positions = Array.Empty<Vector3>();
+        public Vector3[] normals = Array.Empty<Vector3>();
+        public Vector2[] uvs = Array.Empty<Vector2>();
+        public Color[] colors = Array.Empty<Color>();
+        public int[] indices = Array.Empty<int>();
+
+        /// The triangles as a flat face list, in index order (what a trimesh shape takes).
+        public Vector3[] faces()
+        {
+            var result = new Vector3[indices.Length];
+            for (int i = 0; i < indices.Length; i++) result[i] = positions[indices[i]];
+            return result;
+        }
+    }
+
+    /// One mesh of the whole grid (main thread).
+    public ArrayMesh build_mesh(Material material) => mesh_from(build_grid(), material);
+
+    public static ArrayMesh mesh_from(Grid grid, Material material)
+    {
+        using var arrays = new Godot.Collections.Array();
+        arrays.Resize((int)Mesh.ArrayType.Max);
+        arrays[(int)Mesh.ArrayType.Vertex] = grid.positions;
+        arrays[(int)Mesh.ArrayType.Normal] = grid.normals;
+        arrays[(int)Mesh.ArrayType.TexUV] = grid.uvs;
+        arrays[(int)Mesh.ArrayType.Color] = grid.colors;
+        arrays[(int)Mesh.ArrayType.Index] = grid.indices;
+        ArrayMesh mesh = new ArrayMesh();
+        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+        if (material != null)
+        {
+            mesh.SurfaceSetMaterial(0, material);
+        }
+        return mesh;
+    }
+
+    /// The terrain's collision (main thread): the same triangles as the render grid.
+    public static ConcavePolygonShape3D collision_from(Grid grid) => new ConcavePolygonShape3D { Data = grid.faces() };
+
+    public Grid build_grid()
     {
         long n = (long)_axis.Count;
         long count = n * n;
@@ -152,20 +195,7 @@ public partial class TerrainBuilder
             }
         }
 
-        Godot.Collections.Array arrays = new Godot.Collections.Array();
-        G.resize(arrays, (int)Mesh.ArrayType.Max);
-        arrays[(int)Mesh.ArrayType.Vertex] = Variant.From(vertices.ToArray());
-        arrays[(int)Mesh.ArrayType.Normal] = Variant.From(normals.ToArray());
-        arrays[(int)Mesh.ArrayType.TexUV] = Variant.From(uvs.ToArray());
-        arrays[(int)Mesh.ArrayType.Color] = Variant.From(colors.ToArray());
-        arrays[(int)Mesh.ArrayType.Index] = Variant.From(indices.ToArray());
-        ArrayMesh mesh = new ArrayMesh();
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-        if (material != null)
-        {
-            mesh.SurfaceSetMaterial(0, material);
-        }
-        return mesh;
+        return new Grid { positions = vertices.ToArray(), normals = normals.ToArray(), uvs = uvs.ToArray(), colors = colors.ToArray(), indices = indices.ToArray() };
     }
 
     /// Split the existing grid without resampling. Shared border vertices keep
@@ -173,14 +203,27 @@ public partial class TerrainBuilder
     /// can reject whole chunks outside its frustum and shadow cascades.
     public static Godot.Collections.Array<ArrayMesh> split_render_mesh(ArrayMesh mesh, int cells = 64)
     {
-        if (cells < 1) throw new ArgumentOutOfRangeException(nameof(cells));
         using var source = mesh.SurfaceGetArrays(0);
-        Vector3[] positions = source[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-        Vector3[] normals = source[(int)Mesh.ArrayType.Normal].AsVector3Array();
-        Vector2[] uv = source[(int)Mesh.ArrayType.TexUV].AsVector2Array();
-        Color[] colors = source[(int)Mesh.ArrayType.Color].AsColorArray();
+        var grid = new Grid
+        {
+            positions = source[(int)Mesh.ArrayType.Vertex].AsVector3Array(),
+            normals = source[(int)Mesh.ArrayType.Normal].AsVector3Array(),
+            uvs = source[(int)Mesh.ArrayType.TexUV].AsVector2Array(),
+            colors = source[(int)Mesh.ArrayType.Color].AsColorArray(),
+        };
+        return split_render_grid(grid, mesh.SurfaceGetMaterial(0), cells);
+    }
+
+    /// The grid split into render chunks (main thread: it creates the meshes).
+    public static Godot.Collections.Array<ArrayMesh> split_render_grid(Grid grid, Material material, int cells = 64)
+    {
+        if (cells < 1) throw new ArgumentOutOfRangeException(nameof(cells));
+        Vector3[] positions = grid.positions;
+        Vector3[] normals = grid.normals;
+        Vector2[] uv = grid.uvs;
+        Color[] colors = grid.colors;
         int n = (int)Math.Sqrt(positions.Length);
-        if (n * n != positions.Length || n < 2) throw new ArgumentException("Expected a square terrain grid", nameof(mesh));
+        if (n * n != positions.Length || n < 2) throw new ArgumentException("Expected a square terrain grid", nameof(grid));
         var result = new Godot.Collections.Array<ArrayMesh>();
         for (int z = 0; z < n - 1; z += cells)
             for (int x = 0; x < n - 1; x += cells)
@@ -217,7 +260,7 @@ public partial class TerrainBuilder
                 arrays[(int)Mesh.ArrayType.Index] = indices;
                 var chunk = new ArrayMesh();
                 chunk.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-                chunk.SurfaceSetMaterial(0, mesh.SurfaceGetMaterial(0));
+                chunk.SurfaceSetMaterial(0, material);
                 result.Add(chunk);
             }
         return result;
