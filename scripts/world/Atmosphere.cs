@@ -34,7 +34,7 @@ public partial class Atmosphere
     public const double SUN_INTENSITY = 22.0;
     public const double SUN_ENERGY_SCALE = 4.2;
     public const double MOON_ENERGY = 0.2;
-    public static readonly Color MOON_COLOR = new Color(0.62f, 0.72f, 1.0f);
+    public static readonly Color MOON_COLOR = new Color(0.50f, 0.62f, 1.0f);
 
     /// Solar noon (hours). The sun culminates at +62 degrees and sets around 20:15.
     public const double NOON = 13.0;

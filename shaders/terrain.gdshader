@@ -54,11 +54,13 @@ uniform float ao_strength : hint_range(0.0, 1.0) = 0.85;
 varying vec3 world_pos;
 varying vec3 world_nrm;
 varying vec4 mask;
+varying float v_dip;
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	world_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	mask = COLOR;
+	v_dip = UV2.x;
 }
 
 // Height weights: the material standing proudest wins locally, softened by
@@ -248,14 +250,17 @@ void fragment() {
 	float above = world_pos.y - water_level;
 	float wet = 1.0 - smoothstep(0.0, 1.1, above);
 	wet = max(wet, w.z * 0.5);
-	wet = max(wet, scene_wetness * (0.60 + macro.g * 0.4) * clamp(n.y * 1.4, 0.0, 1.0));
+	// Rain wets every exposed surface alike; a noise-modulated film read as
+	// blotchy gloss on flat ground.
+	wet = max(wet, scene_wetness * 0.92 * clamp(n.y * 1.4, 0.0, 1.0));
 	albedo *= 1.0 - wet * wet_darkening;
-	// Only compacted, relatively level earth gathers a shallow film. Litter
-	// and turf remain broken and rough instead of turning into a glass floor.
-	float basin = smoothstep(0.46, 0.70, texture(noise_tex, world_pos.xz * 0.22).g);
+	// Standing water only where the ground dips (baked per vertex), on level
+	// earth and, shallower, in the turf. The noise only roughens the margin.
+	float margin = texture(noise_tex, world_pos.xz * 0.9).g * 0.018;
+	float basin = smoothstep(0.012 + margin, 0.045 + margin, v_dip);
 	float pooled = smoothstep(0.35, 0.95, scene_wetness) * basin
-		* smoothstep(0.92, 0.995, n.y) * clamp(w.z + w.w * 0.8, 0.0, 1.0);
-	rough = mix(rough, 0.32, wet * 0.85);
+		* smoothstep(0.94, 0.995, n.y) * clamp(w.z + w.w * 0.9 + w.x * 0.35 + w.y * 0.2, 0.0, 1.0);
+	rough = mix(rough, 0.40, wet * 0.85);
 	rough = mix(rough, 0.11, pooled);
 	nrm_ts.xy *= 1.0 - pooled * 0.85;
 	nrm_ts = normalize(nrm_ts);

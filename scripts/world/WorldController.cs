@@ -49,6 +49,9 @@ public partial class WorldController : Node3D
     /// 400 m away and turned the wooded ridges pale yellow-green; real morning air
     /// over a forest is about half that.
     public const double AIR_FOG_DENSITY = 0.0004;
+    /// Night air is blue-black. The twilight scattering sample turned rain haze
+    /// into a lit green-grey wash once the night exposure lifted it.
+    public static readonly Color NIGHT_FOG = new Color(0.016f, 0.022f, 0.042f);
     public const double WATER_FOG_DENSITY = 0.16;
     public const double AIR_VOLUME_DENSITY = 0.00045;
     public const double WATER_VOLUME_DENSITY = 0.09;
@@ -446,7 +449,8 @@ public partial class WorldController : Node3D
         environment.TonemapExposure = (float)(_exposure_for(daylight, sun_dir) * exposure_scale);
         // Night vision is colour-poor: desaturate and cool the grade after dark,
         // further still once the sun is well down and only the moon is left.
-        environment.AdjustmentSaturation = (float)lerpf(lerpf(0.86, 0.72, deep_night), 0.98, daylight);
+        // Keep enough colour that night stays blue and the fire stays warm.
+        environment.AdjustmentSaturation = (float)lerpf(lerpf(0.90, 0.84, deep_night), 0.98, daylight);
         environment.AdjustmentContrast = (float)lerpf(1.04, 1.02, daylight);
 
         Color sun_col = sun_light["color"].AsColor();
@@ -464,7 +468,7 @@ public partial class WorldController : Node3D
         /// the fire-lit camp stays readable without ever looking like daylight.
         double low_sun = 1.0 - smoothstep(0.0, 0.45, sun_dir.Y);
         double day_exposure = lerpf(0.9, 1.25, low_sun);
-        double night_exposure = 2.7;
+        double night_exposure = 2.45;
         return lerpf(night_exposure, day_exposure, daylight);
     }
 
@@ -679,9 +683,12 @@ public partial class WorldController : Node3D
         // the averaged scattering sample: bias the haze toward blue so distant
         // canopy fades grey-blue instead of yellow.
         Color haze_colour = new Color((float)(_fog_color.R * 0.94), (float)(_fog_color.G * 0.99), (float)minf(_fog_color.B * 1.06, 1.0)).Lightened(0.03f);
-        environment.FogLightColor = haze_colour.Lerp(UNDERWATER_FOG, (float)u);
         double rain = weather != null ? weather.rain : 0.0;
-        environment.FogDensity = (float)lerpf(AIR_FOG_DENSITY + rain * 0.006, WATER_FOG_DENSITY, u);
+        double night = 1.0 - daylight();
+        haze_colour = haze_colour.Lerp(NIGHT_FOG, (float)(night * lerpf(0.55, 0.9, rain)));
+        environment.FogLightColor = haze_colour.Lerp(UNDERWATER_FOG, (float)u);
+        // Rain thickens the air by day; at night the dark beyond stays dark.
+        environment.FogDensity = (float)lerpf(AIR_FOG_DENSITY + rain * lerpf(0.006, 0.0028, night), WATER_FOG_DENSITY, u);
         environment.FogAerialPerspective = (float)lerpf(0.6, 0.0, u);
         environment.FogSkyAffect = (float)lerpf(0.12, 1.0, u);
         environment.FogSunScatter = (float)lerpf(0.07, 0.0, u);

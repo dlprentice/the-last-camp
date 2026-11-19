@@ -81,6 +81,8 @@ public partial class TerrainBuilder
         public Vector3[] positions = Array.Empty<Vector3>();
         public Vector3[] normals = Array.Empty<Vector3>();
         public Vector2[] uvs = Array.Empty<Vector2>();
+        /// x: how far the ground sits below its surroundings (m), where rain pools.
+        public Vector2[] dips = Array.Empty<Vector2>();
         public Color[] colors = Array.Empty<Color>();
         public int[] indices = Array.Empty<int>();
 
@@ -103,6 +105,7 @@ public partial class TerrainBuilder
         arrays[(int)Mesh.ArrayType.Vertex] = grid.positions;
         arrays[(int)Mesh.ArrayType.Normal] = grid.normals;
         arrays[(int)Mesh.ArrayType.TexUV] = grid.uvs;
+        if (grid.dips.Length == grid.positions.Length) arrays[(int)Mesh.ArrayType.TexUV2] = grid.dips;
         arrays[(int)Mesh.ArrayType.Color] = grid.colors;
         arrays[(int)Mesh.ArrayType.Index] = grid.indices;
         ArrayMesh mesh = new ArrayMesh();
@@ -173,6 +176,24 @@ public partial class TerrainBuilder
             }
         }
 
+        // Hollows: the mean of a ring about 1.5 m out (at the camp's 0.5 m
+        // lattice) above this vertex. Only these hold standing water.
+        var dips = new Vector2[count];
+        for (long iz5 = 0; iz5 < n; iz5++)
+        {
+            for (long ix5 = 0; ix5 < n; ix5++)
+            {
+                double ring = 0.0;
+                for (long k5 = 0; k5 < 8; k5++)
+                {
+                    long ox = k5 switch { 0 => 3, 1 => -3, 2 => 0, 3 => 0, 4 => 2, 5 => -2, 6 => 2, _ => -2 };
+                    long oz = k5 switch { 0 => 0, 1 => 0, 2 => 3, 3 => -3, 4 => 2, 5 => 2, 6 => -2, _ => -2 };
+                    ring += heights[(int)(clampi(iz5 + oz, 0, n - 1) * n + clampi(ix5 + ox, 0, n - 1))];
+                }
+                dips[iz5 * n + ix5] = new Vector2((float)(ring / 8.0 - heights[(int)(iz5 * n + ix5)]), 0.0f);
+            }
+        }
+
         List<int> indices = new List<int>();
         G.resize(indices, (int)((n - 1) * (n - 1) * 6));
         long k = 0;
@@ -195,7 +216,7 @@ public partial class TerrainBuilder
             }
         }
 
-        return new Grid { positions = vertices.ToArray(), normals = normals.ToArray(), uvs = uvs.ToArray(), colors = colors.ToArray(), indices = indices.ToArray() };
+        return new Grid { positions = vertices.ToArray(), normals = normals.ToArray(), uvs = uvs.ToArray(), dips = dips, colors = colors.ToArray(), indices = indices.ToArray() };
     }
 
     /// Split the existing grid without resampling. Shared border vertices keep
@@ -209,6 +230,7 @@ public partial class TerrainBuilder
             positions = source[(int)Mesh.ArrayType.Vertex].AsVector3Array(),
             normals = source[(int)Mesh.ArrayType.Normal].AsVector3Array(),
             uvs = source[(int)Mesh.ArrayType.TexUV].AsVector2Array(),
+            dips = source[(int)Mesh.ArrayType.TexUV2].VariantType == Variant.Type.Nil ? Array.Empty<Vector2>() : source[(int)Mesh.ArrayType.TexUV2].AsVector2Array(),
             colors = source[(int)Mesh.ArrayType.Color].AsColorArray(),
         };
         return split_render_grid(grid, mesh.SurfaceGetMaterial(0), cells);
@@ -222,6 +244,7 @@ public partial class TerrainBuilder
         Vector3[] normals = grid.normals;
         Vector2[] uv = grid.uvs;
         Color[] colors = grid.colors;
+        bool has_dips = grid.dips.Length == positions.Length;
         int n = (int)Math.Sqrt(positions.Length);
         if (n * n != positions.Length || n < 2) throw new ArgumentException("Expected a square terrain grid", nameof(grid));
         var result = new Godot.Collections.Array<ArrayMesh>();
@@ -234,6 +257,7 @@ public partial class TerrainBuilder
                 var normal = new Vector3[p.Length];
                 var tex = new Vector2[p.Length];
                 var color = new Color[p.Length];
+                var dip = has_dips ? new Vector2[p.Length] : null;
                 for (int row = 0; row < depth; row++)
                 {
                     int first = (z + row) * n + x, dest = row * width;
@@ -241,6 +265,7 @@ public partial class TerrainBuilder
                     Array.Copy(normals, first, normal, dest, width);
                     Array.Copy(uv, first, tex, dest, width);
                     Array.Copy(colors, first, color, dest, width);
+                    if (has_dips) Array.Copy(grid.dips, first, dip, dest, width);
                 }
                 var indices = new int[(width - 1) * (depth - 1) * 6];
                 int k = 0;
@@ -256,6 +281,7 @@ public partial class TerrainBuilder
                 arrays[(int)Mesh.ArrayType.Vertex] = p;
                 arrays[(int)Mesh.ArrayType.Normal] = normal;
                 arrays[(int)Mesh.ArrayType.TexUV] = tex;
+                if (has_dips) arrays[(int)Mesh.ArrayType.TexUV2] = dip;
                 arrays[(int)Mesh.ArrayType.Color] = color;
                 arrays[(int)Mesh.ArrayType.Index] = indices;
                 var chunk = new ArrayMesh();
