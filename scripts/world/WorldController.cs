@@ -698,7 +698,9 @@ public partial class WorldController : Node3D
         environment.VolumetricFogAnisotropy = (float)lerpf(0.72, 0.75, u);
         environment.VolumetricFogSkyAffect = (float)lerpf(0.45, 1.0, u);
         double deep_night = smoothstep(-0.12, -0.35, Atmosphere.sun_direction(hour).Y);
-        environment.AmbientLightEnergy = (float)lerpf(lerpf(1.6, 1.0, daylight()) * lerpf(1.0, 0.75, deep_night) * lerpf(1.0, 0.65, rain), 0.6, u);
+        // Day shade under the canopy keeps its colour: more sky bounce by day,
+        // the night value unchanged.
+        environment.AmbientLightEnergy = (float)lerpf(lerpf(1.6, 1.3, daylight()) * lerpf(1.0, 0.75, deep_night) * lerpf(1.0, 0.65, rain), 0.6, u);
         environment.FogLightEnergy = 1.0f;
         if (waterline_material != null)
         {

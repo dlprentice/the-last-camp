@@ -163,17 +163,19 @@ void fragment() {
 	// mostly matte. Dry grass keeps its established response.
 	float wet = clamp(scene_wetness, 0.0, 1.0);
 	// Limit the wet specular film so blade tips do not resemble frost.
+	// Wet blades darken and deepen in colour. Their film stays a faint sheen:
+	// a brighter specular turned moonlit tips white, like frost.
 	float film = wet * (v_blade < -0.5 ? 0.08 : 0.22 + 0.28 * v_height);
-	ALBEDO = albedo * (1.0 - wet * 0.12);
+	ALBEDO = mix(albedo, albedo * albedo * 2.2, wet * 0.35) * (1.0 - wet * 0.22);
 	float dry_roughness = v_blade < -0.5 ? 0.96 : mix(0.75, 0.5, v_height) - sheen * 0.12 + old_leaf * 0.12;
-	ROUGHNESS = mix(dry_roughness, 0.40, film * 0.75);
-	SPECULAR = 0.18 + sheen * 0.15 + film * 0.08;
-	CLEARCOAT = film * 0.10;
-	CLEARCOAT_ROUGHNESS = 0.22;
+	ROUGHNESS = mix(dry_roughness, 0.55, film * 0.5);
+	SPECULAR = (0.18 + sheen * 0.15) * (1.0 - wet * 0.45);
 	AO = mix(0.56, 1.0, smoothstep(0.0, 0.75, v_height));
 	AO_LIGHT_AFFECT = 0.28;
 	NORMAL = view_normal_from_world(VIEW_MATRIX, n);
 	// Forward+ applies ALBEDO to BACKLIGHT itself. Keep transmission restrained
 	// while allowing low sunlight to pass through the finer green blade tips.
-	BACKLIGHT = vec3(1.0, 0.98, 0.88) * (v_blade < -0.5 ? 0.008 : 0.07 + 0.34 * v_height * v_height);
+	// Transmission starts at the base, so backlit roots are not black, and
+	// thins when the blade is wet (a lit wet tip otherwise glows white).
+	BACKLIGHT = vec3(1.0, 0.98, 0.88) * (v_blade < -0.5 ? 0.008 : 0.13 + 0.30 * v_height * v_height) * (1.0 - wet * 0.55);
 }

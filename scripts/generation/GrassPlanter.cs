@@ -254,7 +254,9 @@ public partial class GrassPlanter
             double trodden = 0.0;
             if ((p.X > -19.0 && p.X < 14.0 && p.Y > -10.0 && p.Y < 73.0) || (field.places_enabled && TerrainField.PLACE_TRAIL_BOUNDS.HasPoint(p)))
             {
-                if (field.walking_distance(p) < 0.52 || TerrainField.camp_wear(p) > 0.94)
+                // A ragged margin: tufts creep into the path in places.
+                double invade = patches.GetNoise2D((float)(p.X * 9.0), (float)(p.Y * 9.0));
+                if (field.walking_distance(p) < 0.46 + 0.14 * invade || TerrainField.camp_wear(p) > 0.94)
                 {
                     continue;
                 }
@@ -288,7 +290,15 @@ public partial class GrassPlanter
             height *= lerpf(0.78, 1.06, smoothstep(-0.40, 0.40, growth)) * lerpf(1.0, 0.74, cover);
             height *= lerpf(1.0, 0.80, mature);
             // Bruised stems near the fire and the paths pale toward straw.
-            height *= lerpf(1.0, 0.45, trodden);
+            // Trodden stems are uneven, not mown: some survive almost whole, and
+            // footprint-sized patches lie crushed flat.
+            double crushed = 0.0;
+            if (trodden > 0.0)
+            {
+                height *= lerpf(1.0, rng.RandfRange(0.25f, 0.95f), trodden);
+                crushed = smoothstep(0.30, 0.55, patches.GetNoise2D((float)(p.X * 14.0 + 17.0), (float)(p.Y * 14.0 - 5.0))) * trodden;
+                height *= 1.0 - 0.45 * crushed;
+            }
             mature = maxf(mature, trodden * 0.62);
             double yaw = rng.Randf() * TAU;
             double lean_angle = yaw + rng.RandfRange(-0.6f, 0.6f);
@@ -316,7 +326,7 @@ public partial class GrassPlanter
             floats[(int)(o + 16)] = rng.Randf();
             floats[(int)(o + 17)] = (float)(cos(lean_angle) * 0.5 + 0.5);
             floats[(int)(o + 18)] = (float)(sin(lean_angle) * 0.5 + 0.5);
-            floats[(int)(o + 19)] = (float)lerpf(rng.RandfRange(0.15f, 0.6f), 1.0, trodden);
+            floats[(int)(o + 19)] = (float)lerpf(rng.RandfRange(0.15f, 0.6f), 1.0, minf(1.0, maxf(trodden * 0.8, crushed * 1.6)));
             count += 1;
             min_pos = new Vector3((float)minf(min_pos.X, p.X), (float)minf(min_pos.Y, y), (float)minf(min_pos.Z, p.Y));
             max_pos = new Vector3((float)maxf(max_pos.X, p.X), (float)maxf(max_pos.Y, y + height), (float)maxf(max_pos.Z, p.Y));

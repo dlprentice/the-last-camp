@@ -146,7 +146,16 @@ void fragment() {
 	vec2 dx_n = dFdx(uv_near);
 	vec2 dy_n = dFdy(uv_near);
 
-	vec4 m = mask / max(mask.r + mask.g + mask.b + mask.a, 1e-4);
+	vec4 mask_r = mask;
+	// A ragged path margin: where turf and trodden earth share a vertex, fine
+	// noise lets tufts of turf invade the path and bare patches reach into the
+	// turf, instead of one smooth wavy line.
+	float margin_mix = clamp(mask_r.a * (1.0 - mask_r.a) * 4.0, 0.0, 1.0);
+	float ragged = (texture(noise_tex, world_pos.xz * 1.9).r - 0.5) * 1.1 * margin_mix;
+	float shift = clamp(ragged, -mask_r.a, mask_r.r);
+	mask_r.a += shift;
+	mask_r.r -= shift;
+	vec4 m = mask_r / max(mask_r.r + mask_r.g + mask_r.b + mask_r.a, 1e-4);
 
 	float parallax_amount = parallax_depth * (1.0 - smoothstep(parallax_fade * 0.5, parallax_fade, dist));
 	vec3 view_ts = vec3(dot(view_dir, t), dot(view_dir, b), dot(view_dir, n));
@@ -205,8 +214,21 @@ void fragment() {
 		rough += orm_m.g * w.z;
 		ao += orm_m.r * w.z;
 	}
+	// Close to the eye the trodden earth needs a finer grain of litter, twigs
+	// and grit than the 2 m tile carries; a 3.3x sample of the same set adds it.
+	float fine_near = 1.0 - smoothstep(2.5, 9.0, dist);
 	if (w.w > 0.002) {
-		albedo += textureGrad(path_albedo, uv_near, dx_n, dy_n).rgb * w.w;
+		vec3 path_col = textureGrad(path_albedo, uv_near, dx_n, dy_n).rgb;
+		if (fine_near > 0.0) {
+			vec2 uv_fine = uv_near * 3.3 + vec2(0.37, 0.71);
+			vec3 fine = textureGrad(path_albedo, uv_fine, dx_n * 3.3, dy_n * 3.3).rgb;
+			vec3 fine_mean = textureLod(path_albedo, uv_fine, 9.0).rgb;
+			path_col *= mix(vec3(1.0), clamp(fine / max(fine_mean, vec3(0.02)), 0.4, 1.8), 0.55 * fine_near);
+			if (want_normal) {
+				nrm_ts += (textureGrad(path_normal, uv_fine, dx_n * 3.3, dy_n * 3.3).rgb * 2.0 - 1.0) * vec3(1.0, 1.0, 0.0) * w.w * 0.7 * fine_near;
+			}
+		}
+		albedo += path_col * w.w;
 		if (want_far) {
 			albedo_far += texture(path_albedo, uv_far).rgb * w.w;
 		}
@@ -227,7 +249,9 @@ void fragment() {
 	albedo *= 0.80 + 0.40 * macro.r;
 	// Damp turf below the blades shares their colour and never reads as a
 	// pale carpet through gaps in the stand.
-	albedo *= mix(vec3(1.0), vec3(0.50, 0.68, 0.46), w.x);
+	// Trodden turf at a path margin is dry and pale, not a dark halo.
+	vec3 turf_shade = mix(vec3(0.50, 0.68, 0.46), vec3(0.72, 0.76, 0.58), smoothstep(0.02, 0.45, mask.a));
+	albedo *= mix(vec3(1.0), turf_shade, w.x);
 	albedo *= mix(vec3(1.0), vec3(1.06, 1.0, 0.9), (macro2.g - 0.5) * 0.6);
 	// The same habitat-blended PBR turf/litter continues onto the hills.
 	// Mip filtering and macro variation handle scale; a flat distant colour
@@ -253,6 +277,10 @@ void fragment() {
 	// Rain wets every exposed surface alike; a noise-modulated film read as
 	// blotchy gloss on flat ground.
 	wet = max(wet, scene_wetness * 0.92 * clamp(n.y * 1.4, 0.0, 1.0));
+	// Water fills the pores: wet ground is darker and more saturated, never
+	// paler. A broad glossy sheen lit by the moon or a flash read as frost.
+	vec3 soaked_albedo = albedo * albedo * 1.9;
+	albedo = mix(albedo, min(soaked_albedo, albedo), wet * 0.55);
 	albedo *= 1.0 - wet * wet_darkening;
 	// Standing water only where the ground dips (baked per vertex), on level
 	// earth and, shallower, in the turf. The noise only roughens the margin.
@@ -260,7 +288,7 @@ void fragment() {
 	float basin = smoothstep(0.02 + margin, 0.06 + margin, v_dip);
 	float pooled = smoothstep(0.35, 0.95, scene_wetness) * basin
 		* smoothstep(0.94, 0.995, n.y) * clamp(w.z + w.w * 0.9, 0.0, 1.0);
-	rough = mix(rough, 0.50, wet * 0.85);
+	rough = mix(rough, 0.62, wet * 0.6);
 	rough = mix(rough, 0.11, pooled);
 	nrm_ts.xy *= 1.0 - pooled * 0.85;
 	nrm_ts = normalize(nrm_ts);
@@ -285,7 +313,9 @@ void fragment() {
 
 	ALBEDO = albedo;
 	ROUGHNESS = rough;
-	SPECULAR = mix(0.25, 0.40, wet);
+	// Specular stays at the dry level; only the pooled film adds sharp,
+	// small highlights where a light actually reflects.
+	SPECULAR = mix(0.25, 0.18, wet * (1.0 - pooled));
 	CLEARCOAT = pooled * 0.7;
 	CLEARCOAT_ROUGHNESS = 0.12;
 	AO = mix(1.0, ao, ao_strength);
