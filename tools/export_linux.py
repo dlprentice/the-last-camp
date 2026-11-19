@@ -217,6 +217,9 @@ def main(argv: list[str] | None = None) -> int:
         executable = confirm_package(game)
         for name in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
             shutil.copyfile(REPO / name, game / name)
+        # The bundled fonts' SIL Open Font Licences travel with the executable.
+        for licence in sorted((REPO / "fonts").glob("*-OFL.txt")):
+            shutil.copyfile(licence, game / licence.name)
         copy_runtime_notices(game)
         text = budget.run("package-check", [str(executable), "--headless", "--log-file", str(logs / "engine.log"),
             "--", "--package-check", f"--notices={game / 'GODOT-NOTICES.txt'}"], game, logs, env)
@@ -226,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
         credits = ["# The Last Camp — credits\n\nEngine notices: GODOT-NOTICES.txt. "
                    ".NET notices: DOTNET-RUNTIME-LICENSE.TXT and DOTNET-RUNTIME-THIRD-PARTY-NOTICES.TXT.\n"]
         credits.extend((REPO / name).read_text() for name in
-            ("textures/SOURCES.md", "audio/SOURCES.md", "models/SOURCES.md", "THIRD_PARTY_NOTICES.md"))
+            ("textures/SOURCES.md", "audio/SOURCES.md", "models/SOURCES.md", "fonts/SOURCES.md", "THIRD_PARTY_NOTICES.md"))
         (game / "credits.md").write_text("\n".join(credits))
         (game / "README.md").write_text("""# The Last Camp — Linux x86-64
 
