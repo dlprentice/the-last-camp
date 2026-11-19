@@ -40,7 +40,7 @@ at.
 ## Typeface and UI kit
 
 - **One serif**: Noto Serif, bundled with its licence, for menus and all printed text.
-  One scale at 1080p: 18 (small print, the floor), 22 (body), 30 (heading), 56 (title).
+  One scale at 1080p: 18 (small print, the floor), 22 (body), 30 (heading), 56 (title). The title screen's wordmark alone is set larger, at 96.
 - **Two hands**: June's handwriting (her letter and her margin notes) is a real,
   legible script face; Tom's is blockier, in pencil grey. Settings has a plain-text
   toggle that sets both in the serif.
