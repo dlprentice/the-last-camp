@@ -43,6 +43,8 @@ here.
   tracked `audio/generated/manifest.json` and `voice.json` list every file; a clone
   without the files must build, pass its tests and play silently. No sound is made in
   code.
+- Keep only the newest build, the previous verified build, and evidence a current open claim or defect
+  cites; everything else in local-data is disposable.
 - No addons, GDExtensions or new runtime dependencies. No hosted CI workflows; all
   checks run locally.
 - Executable builds ship the engine, .NET runtime and asset notices;

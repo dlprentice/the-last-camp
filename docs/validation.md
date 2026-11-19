@@ -278,7 +278,7 @@ The first attempted Vulkan validation run lacked the layer. A subsequent run
 loaded the Khronos validation layer and completed a High/Medium/High round trip
 in the exported build without a validation error or new kernel GPU fault. Its
 instrumented timings are not performance measurements. This does not explain or
-invalidate the earlier failure. Native failure and validation logs were retained.
+invalidate the earlier failure.
 
 A separate startup run failed while retrieving a cached tree mesh through the
 native Variant bridge. Tree-generation records now use strong, typed managed
