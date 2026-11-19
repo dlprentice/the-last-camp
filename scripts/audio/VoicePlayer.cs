@@ -96,7 +96,9 @@ public partial class VoicePlayer : Node
 {
     /// Silence between paragraphs, and before a queued line starts.
     public const double ParagraphGap = 0.6;
-    public static readonly Color SubtitleColor = new(0.96f, 0.94f, 0.88f);
+    public static readonly Color SubtitleColor = UiTheme.PAPER;
+    /// Set while the line's own text is on screen (June's postcard): no subtitle under it.
+    public static bool SubtitlesHeld;
 
     /// A line finished playing (its last paragraph ended).
     public event Action<string>? LineHeard;
@@ -122,12 +124,9 @@ public partial class VoicePlayer : Node
         AddChild(_player);
         _layer = new CanvasLayer { Name = "Subtitles", Layer = 5 };
         AddChild(_layer);
-        _subtitle = UiTheme.label("", 22, SubtitleColor);
-        _subtitle.AddThemeFontOverride("font", new SystemFont { FontNames = new[] { "Noto Serif", "DejaVu Serif" } });
-        _subtitle.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.55f));
-        _subtitle.AddThemeConstantOverride("shadow_offset_x", 0);
-        _subtitle.AddThemeConstantOverride("shadow_offset_y", 2);
-        _subtitle.AddThemeConstantOverride("shadow_outline_size", 6);
+        // The kit's serif at body size, paper with a soft shadow over the world.
+        _subtitle = UiTheme.label("", UiTheme.BODY, SubtitleColor, shadow: true);
+        _subtitle.Theme = UiTheme.Kit;
         _subtitle.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _subtitle.VerticalAlignment = VerticalAlignment.Bottom;
         _subtitle.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterBottom);
@@ -140,6 +139,15 @@ public partial class VoicePlayer : Node
         _subtitle.Visible = false;
         _layer.AddChild(_subtitle);
         Attach(Game.Instance?.session);
+        // The tree's frame signal runs while the game is paused too, so the
+        // subtitle hides behind the pause menu and returns on resume, and the
+        // subtitles setting applies at once to a line already showing.
+        GetTree().ProcessFrame += RefreshSubtitle;
+    }
+
+    private void RefreshSubtitle()
+    {
+        if (_subtitle != null && Current != null) _subtitle.Visible = SubtitleShown;
     }
 
     /// Listens to a session's story lines. Called again lazily if the session starts later.
@@ -169,6 +177,10 @@ public partial class VoicePlayer : Node
     }
 
     public bool Speaking => Current != null;
+
+    /// Subtitles show when they are on, not held by the postcard, and the game is
+    /// not paused behind the pause menu, the journal or settings.
+    private bool SubtitleShown => GameSettings.Current.Subtitles && !SubtitlesHeld && !(IsInsideTree() && GetTree().Paused);
 
     public override void _Process(double delta)
     {
@@ -215,7 +227,7 @@ public partial class VoicePlayer : Node
         if (_subtitle != null)
         {
             _subtitle.Text = Current.Text;
-            _subtitle.Visible = true;
+            _subtitle.Visible = SubtitleShown;
         }
     }
 
@@ -236,6 +248,7 @@ public partial class VoicePlayer : Node
 
     public override void _ExitTree()
     {
+        GetTree().ProcessFrame -= RefreshSubtitle;
         if (_session != null) _session.LinePlayed -= OnLine;
         _session = null;
         Game.Instance?.audio?.set_voice_ducking(false);

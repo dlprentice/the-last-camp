@@ -11,6 +11,23 @@ alterations. Keep them with redistributed copies and derivative films:
 - [Texture sources](textures/SOURCES.md): eight Poly Haven PBR sets and ambientCG Fabric061, CC0 1.0.
 - [Model sources](models/SOURCES.md): 35 Poly Haven models, CC0 1.0.
 - [Sound sources](audio/SOURCES.md): no third-party recordings.
+- [Font sources](fonts/SOURCES.md): Noto Serif, Caveat and Architects Daughter, SIL Open Font License 1.1.
+
+## Fonts
+
+The game bundles three fonts, unchanged, under the SIL Open Font License, Version 1.1.
+The full licence text, with each font's copyright line, is in `fonts/` and is copied
+beside the executable in builds:
+
+- Noto Serif: Copyright 2022 The Noto Project Authors
+  (https://github.com/notofonts/latin-greek-cyrillic). `fonts/NotoSerif-OFL.txt`.
+- Caveat: Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat).
+  `fonts/Caveat-OFL.txt`.
+- Architects Daughter: Copyright (c) 2010, Kimberly Geswein (kimberlygeswein.com).
+  `fonts/ArchitectsDaughter-OFL.txt`.
+
+The fonts may be used, bundled and redistributed with the game; they may not be sold
+on their own. The OFL, not the project's MIT license, covers the font files.
 
 ## Generated audio
 

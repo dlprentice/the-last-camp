@@ -1,11 +1,13 @@
 # The finished game
 
-This is the design for the complete *The Last Camp*: a relaxed first-person story
-game of about an hour, built on the existing camp, pond and woodland. It describes
-the target. [The roadmap](roadmap.md) orders the work and says how each step is
-accepted; [the README](../README.md) describes what plays today. Decisions that only
-David can make are listed at the end, each with the default this design uses until
-he answers.
+This is the wider design *The Last Camp* draws on: a story game of about an hour
+built on the existing camp, pond and woodland. The game being built is the shorter
+micro cut in [DONE](DONE.md), which wins wherever the two differ: it keeps the old
+fire ring and Tom's Rock and drops the canoe, the blind, the grove, the spring,
+fishing, splitting, foraging, cooking, the camera, Free Play and gamepad support.
+[The script](script.md) replaces the entries and margin notes below, and
+[the direction](direction.md) replaces the art and audio direction where they differ.
+The Game Overseer makes the open decisions listed at the end.
 
 ## What the game is
 
@@ -416,16 +418,12 @@ committed generator.
 
 - **Soundscape first.** Wind, water, fire, birds, insects, rain, Foley and June's voice
   carry the game, as they carry the film. Whether the title and credits get a short
-  theme from the SoundFont pipeline is David's decision (see the end); the default
-  is no music anywhere. Every sound is generated with ElevenLabs
+  piece is allowed over the credits only; there is no music in play. Every sound is generated with ElevenLabs
   ([direction](direction.md)); nothing is synthesised in code.
-- **Voice**: the local voice kit through a new `tools/voice.py`, copying the kids'
-  games' working pattern in full: June's voice is designed once and its reference
-  committed with its settings; every line is cloned from that reference with the
-  Qwen base model, rendered sentence by sentence, and gated by Whisper word
-  matching and speaker similarity; subtitle timings come from Whisper's word
-  timestamps. The tool writes OGG files and subtitle timings to `audio/voice/`. The
-  voice is warm and elderly with a slight rasp.
+- **Voice**: June is one fixed ElevenLabs voice (`tools/elevenlabs_tts.py`), every
+  line checked word for word with a local Whisper model and levelled by
+  `tools/prepare_audio.py`. The files stay out of Git; `audio/generated/voice.json`
+  lists them.
 - **New sounds**, generated with ElevenLabs and added to the manifest:
   - activities: paddle strokes and drips, the canoe's knock on the hull, reel ratchet,
     line whip, bobber plop, a fish splash and flap, axe chop and split, tarp flap and

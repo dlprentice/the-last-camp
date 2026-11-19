@@ -182,6 +182,8 @@ public partial class AudioDirector : Node
     public double _time = 0.0;
     public double _fade_elapsed = -1.0;
     public double _master_user_db = 0.0;
+    /// The player's ambience, effects and voice volumes (settings), added to the director's own levels.
+    public static double UserAmbienceDb, UserEffectsDb, UserVoiceDb;
     public double _film_gain = 1.0;
     public double _submersion = 0.0;
     public Vector3 _fire_position = Vector3.Zero;
@@ -632,10 +634,10 @@ public partial class AudioDirector : Node
             fade_db = lerpf(-48.0, 0.0, smoothstep(0.0, 1.0, _fade_elapsed / START_FADE_SECONDS));
         }
         double film_db = linear_to_db(maxf(_film_gain, 0.0001));
-        _set_bus_db(BUS_AMBIENCE, fade_db + film_db - _submersion * 5.0 + _duck_db.value);
-        _set_bus_db(BUS_SFX, fade_db + film_db - _submersion * 5.0);
-        _set_bus_db(BUS_WATER_FOLEY, fade_db + film_db);
-        _set_bus_db(BUS_VOICE, film_db);
+        _set_bus_db(BUS_AMBIENCE, fade_db + film_db - _submersion * 5.0 + _duck_db.value + UserAmbienceDb);
+        _set_bus_db(BUS_SFX, fade_db + film_db - _submersion * 5.0 + UserEffectsDb);
+        _set_bus_db(BUS_WATER_FOLEY, fade_db + film_db + UserEffectsDb);
+        _set_bus_db(BUS_VOICE, film_db + UserVoiceDb);
     }
 
     public static void _set_bus_db(StringName bus, double db)

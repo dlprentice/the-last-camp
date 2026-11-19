@@ -6,46 +6,43 @@ using System.Threading.Tasks;
 using Godot;
 using GdRuntime;
 using static GdRuntime.G;
-using Environment = Godot.Environment;
-using Range = Godot.Range;
-using LastCamp;
-using LastCamp.Construction;
+using LastCamp.Story;
 
 namespace LastCamp;
 
-/// Diegetic-light overlay: title card, control hints, interaction prompt,
-/// quality panel, performance stats, pause menu and cinematic letterbox.
+/// The play screen, almost empty (docs/direction.md): an interaction dot with one
+/// verb, and the chapter cards. Behind Esc, the pause menu and its
+/// settings; behind J, the journal. Also the photo-mode line, the cinematic
+/// letterbox, the rest fade and the developer quality and frame panels.
 public partial class Hud : CanvasLayer
 {
-    public const string HINTS = "WASD move    SHIFT run    C crouch    E interact    L lantern    J journal    P photo mode    ESC menu";
-
     public Control _root;
-    public Label _title;
-    public Label _hints;
-    /// The title card plays once, when play first begins; leaving photo mode or
-    /// the menu later must not bring it back over the game.
-    public bool title_played = false;
-    public Label _prompt;
-    private Label _notice;
-    private double _noticeTime;
-    private ProgressBar _throwPower;
-    private PanelContainer _journal;
+    public InteractionDot _dot;
+    public Label _verb;
+    private JournalBook _journal;
+    private bool _journalFromPause;
     public bool JournalVisible => _journal.Visible;
-    private Label _journalText;
-    private Label _journalHint;
+    public JournalBook Journal => _journal;
     private ColorRect _restFade;
-    public Label _clock;
     public PanelContainer _quality_panel;
     public Label _quality_label;
     public Label _stats;
     public PanelContainer _stats_panel;
-    public PanelContainer _menu;
+    public Control _menu;
+    private VBoxContainer _menuButtons;
+    private KitButton _resume;
+    public SettingsPanel _settings;
     public Godot.Collections.Array<ColorRect> _bars = new Godot.Collections.Array<ColorRect>();
     public Label _photo_label;
+    public Control _card;
+    private Label _cardNumber, _cardTitle;
+    private Tween _cardTween;
+    public string CardShown { get; private set; } = "";
+    private Control _ending;
+    public bool EndingShown => _ending != null;
+    private CampSession _attached;
 
-    public double _clock_fade = 0.0;
     public bool _stats_visible = false;
-    public double _prev_hour = -1.0;
 
     public override void _Ready()
     {
@@ -65,58 +62,26 @@ public partial class Hud : CanvasLayer
 
     public void _build()
     {
-        _root = new Control();
-        _root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        _root.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _root = UiTheme.Root("HudRoot");
         AddChild(_root);
 
-        _title = UiTheme.label("THE LAST CAMP", 52, UiTheme.ACCENT);
-        _title.AddThemeConstantOverride("outline_size", 0);
-        _place(_title, new Vector2(0.5f, 0.5f), new Vector2(-400, -190), new Vector2(400, -110));
-        Color _t1 = _title.Modulate;
-        _t1.A = 0.0f;
-        _title.Modulate = _t1;
-        _root.AddChild(_title);
+        _dot = new InteractionDot { Name = "Dot" };
+        _place(_dot, new Vector2(0.5f, 0.5f), new Vector2(-14, -14), new Vector2(14, 14));
+        _root.AddChild(_dot);
+        _verb = UiTheme.label("", UiTheme.BODY, UiTheme.PAPER, HorizontalAlignment.Center, shadow: true);
+        _place(_verb, new Vector2(0.5f, 0.5f), new Vector2(-200, 22), new Vector2(200, 56));
+        _root.AddChild(_verb);
 
-        _hints = UiTheme.label(HINTS, 15, UiTheme.MUTED);
-        _place(_hints, new Vector2(0.5f, 1.0f), new Vector2(-700, -46), new Vector2(700, -20));
-        Color _t2 = _hints.Modulate;
-        _t2.A = 0.0f;
-        _hints.Modulate = _t2;
-        _root.AddChild(_hints);
 
-        _prompt = UiTheme.label("", 20, UiTheme.TEXT);
-        _place(_prompt, new Vector2(0.5f, 1.0f), new Vector2(-300, -120), new Vector2(300, -80));
-        _root.AddChild(_prompt);
-
-        _notice = UiTheme.label("", 18, UiTheme.ACCENT);
-        _place(_notice, new Vector2(0.5f, 0.78f), new Vector2(-530, -28), new Vector2(530, 12));
-        _notice.Visible = false;
-        _root.AddChild(_notice);
-        _throwPower = new ProgressBar { ShowPercentage = false, MaxValue = 1, MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
-        _place(_throwPower, new Vector2(0.5f, 1), new Vector2(-110, -75), new Vector2(110, -68));
-        _throwPower.AddThemeStyleboxOverride("fill", new StyleBoxFlat { BgColor = UiTheme.ACCENT });
-        _throwPower.AddThemeStyleboxOverride("background", new StyleBoxFlat { BgColor = UiTheme.PANEL });
-        _root.AddChild(_throwPower);
-
-        _clock = UiTheme.label("", 22, UiTheme.ACCENT);
-        _place(_clock, new Vector2(0.5f, 0.0f), new Vector2(-120, 28), new Vector2(120, 60));
-        Color _t3 = _clock.Modulate;
-        _t3.A = 0.0f;
-        _clock.Modulate = _t3;
-        _root.AddChild(_clock);
-
-        _photo_label = UiTheme.label("PHOTO MODE      WASD/Space/C fly    wheel speed    F12 save    P exit", 16, UiTheme.ACCENT);
-        _place(_photo_label, new Vector2(0.5f, 1.0f), new Vector2(-500, -40), new Vector2(500, -14));
+        _photo_label = UiTheme.label("Photo mode    WASD, Space and C fly    wheel changes speed    F12 saves    P leaves",
+            UiTheme.SMALL, UiTheme.PAPER, HorizontalAlignment.Center, shadow: true);
+        _place(_photo_label, new Vector2(0.5f, 1.0f), new Vector2(-560, -44), new Vector2(560, -16));
         _photo_label.Visible = false;
         _root.AddChild(_photo_label);
 
         for (long i = 0; i < 2; i++)
         {
-            ColorRect bar = new ColorRect();
-            bar.Color = Colors.Black;
-            bar.MouseFilter = Control.MouseFilterEnum.Ignore;
-            bar.Visible = false;
+            ColorRect bar = new ColorRect { Color = Colors.Black, MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
             _root.AddChild(bar);
             _bars.Add(bar);
         }
@@ -125,63 +90,136 @@ public partial class Hud : CanvasLayer
         _bars[1].SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomWide);
         _bars[1].OffsetTop = 0.0f;
 
-        _quality_panel = UiTheme.panel(new Vector2(360, 0));
-        _place(_quality_panel, new Vector2(1.0f, 0.0f), new Vector2(-400, 32), new Vector2(-32, 32));
+        _quality_panel = UiTheme.panel(new Vector2(380, 0));
+        _place(_quality_panel, new Vector2(1.0f, 0.0f), new Vector2(-420, 32), new Vector2(-32, 32));
         _quality_panel.Visible = false;
         VBoxContainer qbox = new VBoxContainer();
-        qbox.AddThemeConstantOverride("separation", 8);
         _quality_panel.AddChild(qbox);
-        qbox.AddChild(UiTheme.label("QUALITY", 20, UiTheme.ACCENT));
-        _quality_label = UiTheme.label("", 16, UiTheme.TEXT);
+        qbox.AddChild(UiTheme.label("Quality", UiTheme.HEADING, UiTheme.INK, HorizontalAlignment.Left));
+        _quality_label = UiTheme.label("", UiTheme.BODY, UiTheme.INK, HorizontalAlignment.Left);
         qbox.AddChild(_quality_label);
-        qbox.AddChild(UiTheme.label("1 Low    2 Medium    3 High    4 Ultra", 14, UiTheme.MUTED));
+        qbox.AddChild(UiTheme.label("1 Low    2 Medium    3 High    4 Ultra", UiTheme.SMALL, UiTheme.FADED, HorizontalAlignment.Left));
         _root.AddChild(_quality_panel);
 
-        _stats_panel = UiTheme.panel(new Vector2(300, 0));
-        _place(_stats_panel, new Vector2(0.0f, 0.0f), new Vector2(32, 32), new Vector2(340, 32));
+        _stats_panel = UiTheme.panel(new Vector2(340, 0));
+        _place(_stats_panel, new Vector2(0.0f, 0.0f), new Vector2(32, 32), new Vector2(380, 32));
         _stats_panel.Visible = false;
-        _stats = UiTheme.label("", 14, UiTheme.TEXT, HorizontalAlignment.Left);
+        _stats = UiTheme.label("", UiTheme.SMALL, UiTheme.INK, HorizontalAlignment.Left);
         _stats_panel.AddChild(_stats);
         _root.AddChild(_stats_panel);
 
-        _menu = UiTheme.panel(new Vector2(680, 0));
-        _place(_menu, new Vector2(0.5f, 0.5f), new Vector2(-340, -210), new Vector2(340, 210));
-        _menu.Visible = false;
-        VBoxContainer mbox = new VBoxContainer();
-        mbox.AddThemeConstantOverride("separation", 12);
-        _menu.AddChild(mbox);
-        mbox.AddChild(UiTheme.label("PAUSED", 30, UiTheme.ACCENT));
-        mbox.AddChild(UiTheme.label("ESC resume        Q quit        F11 fullscreen", 16, UiTheme.TEXT));
-        Label controls = UiTheme.label("WASD  walk        SHIFT  run        C  crouch\n" + "E / click  take firewood or a stone, tend the fire, rest\n" + "With a stone: hold left click, aim, release. Right click cancels.\n" + "L  hand lantern        J  camp journal        P  photo mode\n" + "T  run the day cycle        [ ]  scrub time\n" + "TAB  quality panel        1-4  presets        F3  stats        H  hide HUD", 15, UiTheme.MUTED);
-        mbox.AddChild(controls);
-        _root.AddChild(_menu);
+        _build_card();
+        _build_menu();
 
-        _journal = UiTheme.panel(new Vector2(620, 0));
-        _place(_journal, new Vector2(0.5f, 0.5f), new Vector2(-310, -250), new Vector2(310, 250));
-        _journal.Visible = false;
-        var journalBox = new VBoxContainer();
-        journalBox.AddThemeConstantOverride("separation", 18);
-        _journal.AddChild(journalBox);
-        journalBox.AddChild(UiTheme.label("AN EVENING AT CAMP", 25, UiTheme.ACCENT));
-        _journalText = UiTheme.label("", 17, UiTheme.TEXT, HorizontalAlignment.Left);
-        _journalText.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        journalBox.AddChild(_journalText);
-        journalBox.AddChild(UiTheme.label("J  close journal", 15, UiTheme.MUTED));
+        _journal = new JournalBook { Visible = false };
+        _journal.CloseRequested += () => _close_journal(true);
         _root.AddChild(_journal);
-        _journalHint = UiTheme.label("", 15, UiTheme.MUTED, HorizontalAlignment.Left);
-        _place(_journalHint, new Vector2(0, 0), new Vector2(30, 28), new Vector2(360, 58));
-        _root.AddChild(_journalHint);
-        _restFade = new ColorRect { Color = Colors.Black, Modulate = new Color(1, 1, 1, 0),
+
+        _restFade = new ColorRect { Name = "RestFade", Color = Colors.Black, Modulate = new Color(1, 1, 1, 0),
             MouseFilter = Control.MouseFilterEnum.Ignore };
         _restFade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         // Rest transitions remain visible when the player has hidden the HUD.
-        AddChild(_restFade);
+        var fadeRoot = UiTheme.Root("FadeRoot");
+        fadeRoot.AddChild(_restFade);
+        AddChild(fadeRoot);
+    }
+
+    private void _build_card()
+    {
+        _card = new Control { Name = "ChapterCard", Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore };
+        _card.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        var black = new ColorRect { Color = Colors.Black, MouseFilter = Control.MouseFilterEnum.Ignore };
+        black.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _card.AddChild(black);
+        var box = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
+        box.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        box.AddThemeConstantOverride("separation", 14);
+        _card.AddChild(box);
+        _cardNumber = UiTheme.label("", UiTheme.BODY, new Color(UiTheme.PAPER, 0.7f));
+        _cardTitle = UiTheme.label("", UiTheme.TITLE, UiTheme.PAPER);
+        _cardTitle.AddThemeFontOverride("font", UiTheme.SerifItalic);
+        box.AddChild(_cardNumber);
+        box.AddChild(_cardTitle);
+        _root.AddChild(_card);
+    }
+
+    private void _build_menu()
+    {
+        _menu = new Control { Name = "Pause", Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore };
+        _menu.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        var dim = new ColorRect { Color = new Color(UiTheme.INK, 0.45f), MouseFilter = Control.MouseFilterEnum.Stop };
+        dim.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _menu.AddChild(dim);
+        var centre = new CenterContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        centre.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _menu.AddChild(centre);
+
+        var panel = new PanelContainer { Name = "PausePanel", CustomMinimumSize = new Vector2(460, 0), MouseFilter = Control.MouseFilterEnum.Stop };
+        _menuButtons = new VBoxContainer();
+        _menuButtons.AddThemeConstantOverride("separation", 4);
+        panel.AddChild(_menuButtons);
+        _menuButtons.AddChild(UiTheme.label("Paused", UiTheme.HEADING, UiTheme.INK, HorizontalAlignment.Left));
+        _menuButtons.AddChild(new Control { CustomMinimumSize = new Vector2(0, 8), MouseFilter = Control.MouseFilterEnum.Ignore });
+        _resume = _menu_button("Resume", () => { if (Game.Instance.mode == Game.Mode.PAUSED) _toggle_pause(); });
+        _menu_button("Journal", () => _open_journal(fromPause: true));
+        _menu_button("Settings", _open_settings);
+        _menu_button("Return to camp", ReturnToCamp);
+        _menu_button("Save and quit to title", () =>
+        {
+            Game.Instance.session?.Save();
+            LoadingScreen.ReturnToTitle(GetTree());
+        });
+        _menu_button("Quit to desktop", () =>
+        {
+            if (Game.Instance.session != null) Game.Instance.session.SaveAndQuit();
+            else Game.Instance.quit_cleanly();
+        });
+        centre.AddChild(panel);
+
+        _settings = new SettingsPanel { Visible = false };
+        _settings.Closed += () =>
+        {
+            panel.Visible = true;
+            _resume.FocusQuietly();
+        };
+        centre.AddChild(_settings);
+        _root.AddChild(_menu);
+    }
+
+    private KitButton _menu_button(string text, Action action)
+    {
+        var b = new KitButton(text);
+        b.Pressed += action;
+        _menuButtons.AddChild(b);
+        return b;
+    }
+
+    public void _open_settings()
+    {
+        _menuButtons.GetParent<Control>().Visible = false;
+        _settings.Open();
+    }
+
+    /// "Return to camp": through black to standing by the fire, facing it. The
+    /// story is not touched; this is only the way back from anywhere.
+    public async void ReturnToCamp()
+    {
+        Player player = Game.Instance.player;
+        if (player == null || Game.Instance.session?.Resting == true) return;
+        if (Game.Instance.mode == Game.Mode.PAUSED) _toggle_pause();
+        player.suspend();
+        await FadeRest(true);
+        if (!IsInsideTree() || !GodotObject.IsInstanceValid(player)) return;
+        player.return_to_camp();
+        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+        await FadeRest(false);
+        if (Game.Instance.mode == Game.Mode.PLAY && GodotObject.IsInstanceValid(player)) player.begin();
     }
 
     public async Task FadeRest(bool dark)
     {
         Tween tween = CreateTween();
-        tween.TweenProperty(_restFade, "modulate:a", dark ? 1.0 : 0.0, 1.0);
+        tween.TweenProperty(_restFade, "modulate:a", dark ? 1.0 : 0.0, 1.0).SetTrans(Tween.TransitionType.Sine);
         await ToSignal(tween, Tween.SignalName.Finished);
     }
 
@@ -199,15 +237,12 @@ public partial class Hud : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (Game.Instance.session?.Resting == true) return;
+        if (Game.Instance.session?.Resting == true || _ending != null) return;
         if (@event.IsActionPressed("camp_journal") && Game.Instance.session != null
             && (Game.Instance.mode == Game.Mode.PLAY || _journal.Visible))
         {
-            bool opening = !_journal.Visible;
-            _toggle_pause();
-            _journal.Visible = opening;
-            if (opening) _menu.Visible = false;
-            Game.Instance.audio?.play_interact(opening ? Sounds.JournalOpen : Sounds.JournalClose);
+            if (_journal.Visible) _close_journal(false);
+            else _open_journal(fromPause: false);
             GetViewport().SetInputAsHandled();
         }
         else if (@event.IsActionPressed("quality_menu"))
@@ -223,26 +258,45 @@ public partial class Hud : CanvasLayer
         }
         else if (@event.IsActionPressed("pause"))
         {
-            // Opening the pause menu moves focus to it; leaving it is the choice to resume.
             bool opening = Game.Instance.mode == Game.Mode.PLAY;
             _toggle_pause();
             Game.Instance.audio?.play_interact(opening ? Sounds.UiMove : Sounds.UiSelect);
+            GetViewport().SetInputAsHandled();
         }
-        else if (Game.Instance.mode == Game.Mode.PAUSED && @event is InputEventKey && ((InputEventKey)@event).IsPressed())
+    }
+
+    /// Opens the journal over play (pausing it) or over the pause menu.
+    public void _open_journal(bool fromPause)
+    {
+        CampSession session = Game.Instance.session;
+        if (session == null || _journal.Visible) return;
+        _journalFromPause = fromPause && Game.Instance.mode == Game.Mode.PAUSED;
+        if (!_journalFromPause) _toggle_pause();
+        if (Game.Instance.mode != Game.Mode.PAUSED) return;
+        _menu.Visible = false;
+        _journal.Open(session.Story);
+        Game.Instance.audio?.play_interact(Sounds.JournalOpen);
+    }
+
+    /// Closes the journal: back to the pause menu it came from, or to play.
+    public void _close_journal(bool viaCancel)
+    {
+        if (!_journal.Visible) return;
+        _journal.Visible = false;
+        Game.Instance.audio?.play_interact(Sounds.JournalClose);
+        if (_journalFromPause && Game.Instance.mode == Game.Mode.PAUSED)
         {
-            InputEventKey key = ((InputEventKey)@event);
-            if (key.Keycode == Key.Q)
-            {
-                Game.Instance.audio?.play_interact(Sounds.UiSelect);
-                if (Game.Instance.session != null) Game.Instance.session.SaveAndQuit();
-                else Game.Instance.quit_cleanly();
-            }
+            _menu.Visible = true;
+            _resume.FocusQuietly();
         }
+        else if (Game.Instance.mode == Game.Mode.PAUSED) _toggle_pause();
     }
 
     public void _toggle_pause()
     {
         _journal.Visible = false;
+        _settings.Visible = false;
+        _menuButtons.GetParent<Control>().Visible = true;
         if (Game.Instance.mode == Game.Mode.PAUSED)
         {
             GetTree().Paused = false;
@@ -257,75 +311,151 @@ public partial class Hud : CanvasLayer
             GetTree().Paused = true;
             Game.Instance.mode = Game.Mode.PAUSED;
         }
-        _menu.Visible = Game.Instance.mode == Game.Mode.PAUSED;
+        _show_menu(Game.Instance.mode == Game.Mode.PAUSED);
+    }
+
+    private void _show_menu(bool show)
+    {
+        _menu.Visible = show;
+        if (!show) return;
+        _menu.Modulate = new Color(1, 1, 1, 0);
+        UiTheme.Fade(_menu, 1.0);
+        if (_menu.IsInsideTree()) _resume.FocusQuietly();
+    }
+
+    /// The verb an interaction prompt offers, as one word.
+    public static string Verb(string prompt)
+    {
+        string first = prompt.Trim().Split(' ', 2)[0].ToLowerInvariant();
+        return first switch
+        {
+            "take" or "pick" => "Take",
+            "add" or "feed" or "tend" => "Feed",
+            "read" => "Read",
+            "sit" => "Sit",
+            "lift" => "Lift",
+            "rest" or "turn" or "sleep" or "the" => "Rest",
+            "light" => "Light",
+            "douse" => "Douse",
+            "open" => "Open",
+            "strike" => "Strike",
+            "rake" => "Rake",
+            "scatter" => "Scatter",
+            "walk" or "leave" => "Leave",
+            "" => "",
+            _ => char.ToUpperInvariant(first[0]) + first[1..],
+        };
+    }
+
+    /// What the dot says now: a verb when something can be used, else nothing.
+    public static string VerbFor(Player player, Node focus, bool playing)
+    {
+        if (!playing || player == null) return "";
+        if (player.held_item == "stone") return player.charging_stone ? "Release" : "Throw";
+        if (focus != null && focus.HasMethod("prompt")) return Verb(G.str(focus.Call("prompt")));
+        return "";
     }
 
     public override void _Process(double delta)
     {
-        bool playing = Game.Instance.mode == Game.Mode.PLAY;
+        bool playing = Game.Instance.mode == Game.Mode.PLAY && _ending == null;
         CampSession session = Game.Instance.session;
-        _journalHint.Visible = playing && session != null && !_stats_visible;
-        if (session != null)
-        {
-            _journalHint.Text = $"J  Camp journal   {session.Completed}/{session.Total}";
-            if (_journal.Visible) _journalText.Text = session.Journal();
-        }
+        if (!ReferenceEquals(session, _attached)) _attach(session);
         if (!playing && Game.Instance.mode != Game.Mode.PAUSED) _journal.Visible = false;
-        if (playing) _noticeTime = Math.Max(0, _noticeTime - delta);
-        _notice.Visible = playing && _noticeTime > 0;
-        _notice.Modulate = new Color(1, 1, 1, (float)Math.Min(1, _noticeTime));
         Player player = Game.Instance.player;
-        _throwPower.Visible = playing && player?.charging_stone == true;
-        if (player != null) _throwPower.Value = player.stone_charge;
+        string verb = VerbFor(player, player?.focus(), playing);
+        _verb.Text = verb;
+        _dot.Shown = verb.Length > 0;
+        _dot.Charge = player?.charging_stone == true ? player.stone_charge : 0;
         if (_stats_visible)
         {
             _update_stats();
         }
-        if (Game.Instance.world != null)
-        {
-            double hour = Game.Instance.world.hour;
-            if (_prev_hour >= 0.0 && (int)(hour * 60) != (int)(_prev_hour * 60))
-            {
-                _clock_fade = 2.2;
-                _clock.Text = _format_hour(hour);
-            }
-            _prev_hour = hour;
-        }
-        _clock_fade = maxf(_clock_fade - delta, 0.0);
-        Color _t1 = _clock.Modulate;
-        _t1.A = (float)clampf(_clock_fade, 0.0, 1.0);
-        _clock.Modulate = _t1;
-        if (Game.Instance.player != null)
-        {
-            Node focus = Game.Instance.player.focus();
-            if (playing && player.held_item == "stone")
-            {
-                _prompt.Text = player.charging_stone ? "Release to throw  ·  Right click to cancel" : "Hold left click to aim and throw  ·  Aim low for more skips";
-            }
-            else if (player.held_item == "log" && playing && focus != Game.Instance.camp?.campsite?.firepit?.body)
-            {
-                _prompt.Text = "Carrying firewood  ·  Take it to the fire";
-            }
-            else if (focus != null && focus.HasMethod("prompt") && playing)
-            {
-                _prompt.Text = "[E]  " + G.str(G.str(focus.Call("prompt")));
-            }
-            else if (Game.Instance.player.held_item == "log" && Game.Instance.mode == Game.Mode.PLAY)
-            {
-                _prompt.Text = "Carrying firewood  ·  Take it to the fire";
-            }
-            else
-            {
-                _prompt.Text = "";
-            }
-        }
         _update_letterbox(delta);
+    }
+
+    private void _attach(CampSession session)
+    {
+        if (_attached != null && GodotObject.IsInstanceValid(_attached)) _attached.BandStarted -= _on_band_started;
+        _attached = session;
+        if (session != null) session.BandStarted += _on_band_started;
+    }
+
+    private void _on_band_started(BandTransition transition)
+    {
+        if (transition.ChapterChanged && transition.ToChapter != null)
+            ShowChapterCard(StoryScript.ChapterIndex(transition.ToChapter.Id), transition.ToChapter.Title, false);
+    }
+
+    /// The chapter's card: its number and name, eased in and out over black, 3 s.
+    public void ShowChapterCard(int index, string title, bool sound)
+    {
+        _cardNumber.Text = JournalContent.ChapterNumber(index);
+        _cardTitle.Text = title;
+        CardShown = title;
+        _card.Visible = true;
+        _card.Modulate = new Color(1, 1, 1, 0);
+        if (sound) Game.Instance.audio?.play_interact(Sounds.CardIn);
+        _cardTween?.Kill();
+        _cardTween = CreateTween();
+        _cardTween.TweenProperty(_card, "modulate:a", 1.0, 0.4).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
+        _cardTween.TweenInterval(1.8);
+        _cardTween.TweenProperty(_card, "modulate:a", 0.0, 0.8).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.InOut);
+        _cardTween.TweenCallback(Callable.From(() => _card.Visible = false));
+    }
+
+    /// The end of the game, for the story to call once the player has walked out:
+    /// the credits roll, then June's postcard (entry 7, voiced), then the title.
+    public void ShowEnding(bool fireKept)
+    {
+        if (_ending != null) return;
+        if (Game.Instance.mode == Game.Mode.PAUSED) _toggle_pause();
+        Game.Instance.player?.suspend();
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        var holder = new Control { Name = "Ending", MouseFilter = Control.MouseFilterEnum.Stop };
+        holder.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _ending = holder;
+        _root.AddChild(holder);
+        _root.Visible = true;
+        var roll = new CreditsRoll();
+        roll.Finished += () =>
+        {
+            roll.QueueFree();
+            _show_postcard(holder, fireKept);
+        };
+        holder.AddChild(roll);
+    }
+
+    private void _show_postcard(Control holder, bool fireKept)
+    {
+        var card = new Postcard(fireKept);
+        holder.AddChild(card);
+        VoicePlayer voice = GetTree().Root.FindChild("Voice", true, false) as VoicePlayer;
+        VoicePlayer.SubtitlesHeld = true;
+        void heard(string line)
+        {
+            if (line != "e7") return;
+            card.Heard();
+        }
+        if (voice != null) voice.LineHeard += heard;
+        card.Finished += () =>
+        {
+            if (voice != null && GodotObject.IsInstanceValid(voice)) voice.LineHeard -= heard;
+            VoicePlayer.SubtitlesHeld = false;
+            LoadingScreen.ReturnToTitle(GetTree());
+        };
+        CampSession session = Game.Instance.session;
+        bool played = session != null && session.Story.LinesPlayed.Contains("e7");
+        session?.FinishCredits();
+        bool triggered = session != null && !played && session.Story.LinesPlayed.Contains("e7");
+        if (!triggered && voice != null) voice.Enqueue("e7", fireKept ? "survived" : "went_out");
     }
 
     public void notify(string message)
     {
-        _notice.Text = message;
-        _noticeTime = 5;
+        // The play screen carries no hint or status text (docs/direction.md); teaching
+        // lives in the journal's list. Notices are kept for the log only.
+        GD.Print($"NOTICE {message}");
     }
 
     public void _update_letterbox(double delta)
@@ -349,12 +479,7 @@ public partial class Hud : CanvasLayer
         _bars[1].OffsetTop = (float)-px;
     }
 
-    public static string _format_hour(double hour)
-    {
-        long h = (long)floor(hour);
-        long m = (long)floor((hour - (double)h) * 60.0);
-        return G.format("%02d:%02d", new Godot.Collections.Array { h, m });
-    }
+    public static string _format_hour(double hour) => UiTheme.ClockText(hour);
 
     public void _update_stats()
     {
@@ -372,15 +497,14 @@ public partial class Hud : CanvasLayer
     public void _on_mode_changed(Game.Mode mode)
     {
         _photo_label.Visible = mode == Game.Mode.PHOTO;
-        _menu.Visible = mode == Game.Mode.PAUSED;
+        if (mode != Game.Mode.PAUSED)
+        {
+            _menu.Visible = false;
+            _settings.Visible = false;
+        }
         switch (mode)
         {
             case Game.Mode.PLAY:
-                if (!title_played)
-                {
-                    _play_title();
-                }
-                break;
             case Game.Mode.LOADING:
             case Game.Mode.INTRO:
             case Game.Mode.PHOTO:
@@ -392,27 +516,51 @@ public partial class Hud : CanvasLayer
         }
     }
 
-    public void _play_title()
-    {
-        title_played = true;
-        Tween t = CreateTween();
-        t.TweenProperty(_title, "modulate:a", 1.0, 1.8).SetTrans(Tween.TransitionType.Sine);
-        t.TweenInterval(3.0);
-        t.TweenProperty(_title, "modulate:a", 0.0, 2.0).SetTrans(Tween.TransitionType.Sine);
-        Tween t2 = CreateTween();
-        t2.TweenInterval(1.0);
-        t2.TweenProperty(_hints, "modulate:a", 1.0, 1.5);
-        t2.TweenInterval(14.0);
-        t2.TweenProperty(_hints, "modulate:a", 0.0, 2.5);
-    }
-
     public void _on_quality_changed(QualityPreset p)
     {
-        _quality_label.Text = G.format("%s  -  %d%% render scale", new Godot.Collections.Array { p.display_name, (long)round(p.render_scale * 100.0) });
-    }
-    public override void _ExitTree()
-    {
-        if (Game.Instance != null && ReferenceEquals(Game.Instance.hud, this)) Game.Instance.hud = null;
+        _quality_label.Text = G.format("%s  ·  %d%% render scale", new Godot.Collections.Array { p.display_name, (long)round(p.render_scale * 100.0) });
     }
 
+    public override void _ExitTree()
+    {
+        _attach(null);
+        VoicePlayer.SubtitlesHeld = false;
+        if (Game.Instance != null && ReferenceEquals(Game.Instance.hud, this)) Game.Instance.hud = null;
+    }
+}
+
+/// The interaction dot: a small paper dot with a soft shadow, shown when something
+/// can be used. While a stone is charged, a thin ring fills around it.
+public partial class InteractionDot : Control
+{
+    private double _alpha;
+    public bool Shown;
+    public double Charge;
+
+    public InteractionDot()
+    {
+        MouseFilter = MouseFilterEnum.Ignore;
+    }
+
+    public override void _Process(double delta)
+    {
+        double target = Shown || Charge > 0 ? 1 : 0;
+        double next = Mathf.MoveToward(_alpha, target, delta / 0.25);
+        if (Math.Abs(next - _alpha) > 1e-4 || Charge > 0) QueueRedraw();
+        _alpha = next;
+    }
+
+    public override void _Draw()
+    {
+        if (_alpha <= 0.001) return;
+        Vector2 c = Size * 0.5f;
+        float a = (float)_alpha;
+        DrawCircle(c + new Vector2(0, 1), 4.5f, new Color(0, 0, 0, 0.35f * a), true, -1, true);
+        DrawCircle(c, 3.5f, new Color(UiTheme.PAPER, 0.95f * a), true, -1, true);
+        if (Charge > 0)
+        {
+            DrawArc(c, 11, 0, Mathf.Tau, 48, new Color(0, 0, 0, 0.25f * a), 2.5f, true);
+            DrawArc(c, 11, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * (float)Math.Clamp(Charge, 0, 1), 48, new Color(UiTheme.PAPER, 0.9f * a), 1.5f, true);
+        }
+    }
 }

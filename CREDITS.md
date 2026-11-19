@@ -15,6 +15,7 @@ alterations in these canonical tables:
 | Nine PBR material sets | [Texture sources](textures/SOURCES.md) | CC0 1.0 |
 | 35 photoscanned models | [Model sources](models/SOURCES.md) | CC0 1.0 |
 | All game audio, generated with ElevenLabs | [Sound sources](audio/SOURCES.md) | Licensed; not redistributed in the repository |
+| Three typefaces: Noto Serif (The Noto Project Authors), Caveat (The Caveat Project Authors) and Architects Daughter (Kimberly Geswein), from Google Fonts | [Font sources](fonts/SOURCES.md) | SIL Open Font License 1.1, bundled with each font |
 | Adapted shader hashes and engine | [Third-party notices](THIRD_PARTY_NOTICES.md) | MIT and engine component licenses |
 
 ## Audio
