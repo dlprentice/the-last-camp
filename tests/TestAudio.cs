@@ -288,4 +288,23 @@ public partial class TestAudio : TestCase
         tree.Root.RemoveChild(voiced);
         voiced.Free();
     }
+
+    public void test_steady_bed_levels_are_not_rewritten_every_frame()
+    {
+        // Each VolumeDb write swaps the playback's bus details under the audio
+        // thread; a steady bed must not write at all (the headless mixer abort).
+        var player = new AudioStreamPlayer();
+        var bed = new AudioDirector.Bed { player = player, id = "test" };
+        bed.set_level(-12.0);
+        assert_eq(player.VolumeDb, -12.0f, "the first level is written");
+        player.VolumeDb = 3.0f;
+        for (int i = 0; i < 100; i++) bed.set_level(-12.0 + i * 0.0003);
+        assert_eq(player.VolumeDb, 3.0f, "a level that barely moves is not rewritten");
+        bed.set_level(-11.0);
+        assert_eq(player.VolumeDb, -11.0f, "a real change is");
+        bed.set_level(AudioDirector.SILENT_DB);
+        assert_eq(player.VolumeDb, (float)AudioDirector.SILENT_DB, "and going silent always is");
+        player.Free();
+        assert_eq(Main.HEADLESS_MAX_FPS, 120, "headless runs are frame-capped");
+    }
 }

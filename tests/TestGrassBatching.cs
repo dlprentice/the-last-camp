@@ -108,7 +108,7 @@ public partial class TestGrassBatching : TestCase
                 assert_true(chunk.aabb.HasPoint(GrassPlanter.read_transform(chunk.buffer, i).Origin), "merged cull bounds contain every root");
     }
 
-    private static List<string> Records(Godot.Collections.Array<GrassPlanter.Chunk> chunks)
+    private static List<string> Records(List<GrassPlanter.Chunk> chunks)
     {
         var result = new List<string>();
         foreach (var chunk in chunks)

@@ -92,6 +92,11 @@ public partial class Firepit : Node3D
         {
             return "Add a log";
         }
+        string act = Game.Instance.session?.FireAct();
+        if (!string.IsNullOrEmpty(act))
+        {
+            return act;
+        }
         if (intensity < 0.2)
         {
             return "The fire is dying";
@@ -113,12 +118,157 @@ public partial class Firepit : Node3D
             }
             return;
         }
+        if (player != null && Game.Instance.session?.DoFireAct(player) == true)
+        {
+            return;
+        }
         if (player != null)
         {
             player.resting = !player.resting;
             Game.Instance.hud?.notify(player.resting ? "Resting by the fire. Move to stand." : "Back on your feet.");
             Game.Instance.session?.RestByFire(player);
         }
+    }
+
+    // ------------------------------------------------------- leave no trace
+
+    public readonly List<MeshInstance3D> ring_stones = new();
+    public readonly List<MeshInstance3D> fire_logs = new();
+    public MeshInstance3D coals;
+    public MeshInstance3D raked_ash;
+    public bool ash_raked = false;
+    public int stones_moved = 0;
+    public const double RAKE_SECONDS = 1.4;
+    public const double STONE_SECONDS = 1.1;
+    public const double STONE_STAGGER = 0.3;
+    /// Where the scattered stones are set down: well out from the fire, beyond the
+    /// seats, and off the trampled ground (the trail and the camp's walking lines).
+    public const double SCATTER_MIN = 4.2;
+    public const double SCATTER_MAX = 5.6;
+    public const double SCATTER_PATH_CLEARANCE = 1.4;
+    public const double SCATTER_PROP_CLEARANCE = 1.6;
+
+    public bool stones_scattered => stones_moved >= ring_stones.Count;
+    private CollisionShape3D _pit_shape;
+    public bool has_pit_pillar => _pit_shape != null;
+
+    /// Rakes the ash out: the burnt ends and the heaped coals are pulled apart
+    /// into a low, wide spread. If the fire lived through the storm it is still
+    /// warm, with embers glowing in it; if not it is cold, wet and grey. The fire
+    /// itself is out afterwards.
+    public void rake_ash(bool warm)
+    {
+        if (ash_raked) return;
+        ash_raked = true;
+        intensity = 0.0;
+        _apply_intensity();
+        MeshBuilder mb = new MeshBuilder();
+        mb.add_displaced_sphere(14, 26, BED_RADIUS + 0.3, Callable.From((Vector3 dir) =>
+            1.0 - maxf(-dir.Y, 0.0) * 0.5 + 0.12 * sin(dir.X * 11.0) * cos(dir.Z * 9.0) + 0.06 * sin(dir.X * 29.0 - dir.Z * 23.0)));
+        StandardMaterial3D ash = new StandardMaterial3D();
+        if (warm)
+        {
+            ash.AlbedoColor = new Color(0.14f, 0.13f, 0.12f);
+            ash.Roughness = 0.95f;
+            ash.EmissionEnabled = true;
+            ash.Emission = new Color(1.0f, 0.34f, 0.06f);
+            ash.EmissionEnergyMultiplier = 1.6f;
+            // Embers only where the noise is bright: a scatter of points, not a glow.
+            ash.EmissionTexture = new NoiseTexture2D { Width = 128, Height = 128, Noise = new FastNoiseLite { Seed = 1996, Frequency = 0.09f },
+                ColorRamp = new Gradient { Offsets = new[] { 0.0f, 0.7f, 0.82f }, Colors = new[] { Colors.Black, Colors.Black, Colors.White } } };
+        }
+        else
+        {
+            // Rain-soaked ash: lighter grey, darkened and glossed by the water.
+            ash.AlbedoColor = new Color(0.30f, 0.30f, 0.29f);
+            ash.Roughness = 0.32f;
+        }
+        raked_ash = new MeshInstance3D { Name = "RakedAsh", Mesh = mb.commit(), MaterialOverride = ash, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        Vector3 heaped = coals != null ? coals.Scale : new Vector3(1, 0.16f, 1);
+        Vector3 spread = new Vector3(1.25f, 0.05f, 1.2f);
+        raked_ash.Position = new Vector3(0, -0.02f, 0);
+        AddChild(raked_ash);
+        if (coals != null) coals.Visible = false;
+        if (!IsInsideTree())
+        {
+            raked_ash.Scale = spread;
+            foreach (MeshInstance3D log in fire_logs) log.Visible = false;
+            return;
+        }
+        raked_ash.Scale = heaped * 0.8f;
+        Tween tween = CreateTween().SetParallel(true);
+        tween.TweenProperty(raked_ash, "scale", spread, RAKE_SECONDS).SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Sine);
+        // The burnt ends are raked down into the ash.
+        foreach (MeshInstance3D log in fire_logs)
+            tween.TweenProperty(log, "position:y", log.Position.Y - 0.12f, RAKE_SECONDS * 0.8).SetEase(Tween.EaseType.In).SetTrans(Tween.TransitionType.Sine);
+        tween.Chain().TweenCallback(Callable.From(() => { foreach (MeshInstance3D log in fire_logs) log.Visible = false; }));
+    }
+
+    /// Where ring stone `i` is set down: out from its place in the ring, at a
+    /// seeded distance, bedded as deep in the ground as it was in the ring.
+    public Vector3 scatter_target(int i)
+    {
+        MeshInstance3D stone = ring_stones[i];
+        using var rng = new RandomNumberGenerator { Seed = (ulong)(1407 + i * 31) };
+        Vector3 at = stone.Position;
+        double angle = Math.Atan2(at.Z, at.X) + rng.RandfRange(-0.22f, 0.22f);
+        double r = rng.RandfRange((float)SCATTER_MIN, (float)SCATTER_MAX);
+        Vector3 local = Vector3.Zero;
+        // Turn round the fire in small steps until the spot is clear of the paths and props.
+        for (int k = 0; k < 64; k++)
+        {
+            double a = angle + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 0.09;
+            local = new Vector3((float)(Math.Cos(a) * r), 0, (float)(Math.Sin(a) * r));
+            if (scatter_clear(field, GlobalPosition + local)) break;
+        }
+        Vector3 from_world = ToGlobal(at);
+        Vector3 to_world = ToGlobal(local);
+        double bury = from_world.Y - field.height(from_world.X, from_world.Z);
+        local.Y = (float)(field.height(to_world.X, to_world.Z) + bury - GlobalPosition.Y);
+        return local;
+    }
+
+    /// Off the trampled ground and clear of the seats, tent, table and woodpile.
+    public static bool scatter_clear(TerrainField field, Vector3 world)
+    {
+        Vector2 p = new(world.X, world.Z);
+        if (field.walking_distance(p) < SCATTER_PATH_CLEARANCE) return false;
+        foreach (Vector2 seat in TerrainField.SEATS)
+            if (p.DistanceTo(seat) < SCATTER_PROP_CLEARANCE) return false;
+        return p.DistanceTo(TerrainField.WOODPILE) > SCATTER_PROP_CLEARANCE + 0.6 && p.DistanceTo(TerrainField.TENT) > 2.6
+            && p.DistanceTo(TerrainField.TABLE) > SCATTER_PROP_CLEARANCE + 0.4;
+    }
+
+    /// Lifts the next `count` ring stones out of the ring one after another and
+    /// sets each down beyond it, eased. Returns how many it started moving.
+    public int scatter_stones(int count)
+    {
+        int moved = 0;
+        while (moved < count && stones_moved < ring_stones.Count)
+        {
+            int i = stones_moved++;
+            MeshInstance3D stone = ring_stones[i];
+            Vector3 from = stone.Position, to = scatter_target(i);
+            moved++;
+            if (!IsInsideTree())
+            {
+                stone.Position = to;
+                continue;
+            }
+            Vector3 lift = from.Lerp(to, 0.4f) + Vector3.Up * 0.32f;
+            Tween tween = CreateTween();
+            tween.TweenInterval(STONE_STAGGER * (moved - 1));
+            tween.TweenProperty(stone, "position", lift, STONE_SECONDS * 0.45).SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Sine);
+            tween.TweenProperty(stone, "position", to, STONE_SECONDS * 0.55).SetEase(Tween.EaseType.InOut).SetTrans(Tween.TransitionType.Sine);
+        }
+        // With the ring gone there is nothing left to walk round: the pit's
+        // collision pillar goes too (the tripod's legs stay).
+        if (stones_scattered && _pit_shape != null)
+        {
+            if (IsInsideTree()) _pit_shape.QueueFree(); else _pit_shape.Free();
+            _pit_shape = null;
+        }
+        return moved;
     }
 
     public void feed()
@@ -275,6 +425,7 @@ public partial class Firepit : Node3D
             mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
             mesh.GIMode = GeometryInstance3D.GIModeEnum.Static;
             AddChild(mesh);
+            ring_stones.Add(mesh);
             // Measure the rotated stone against the terrain across its footprint.
             // Bury 28–36% of its actual height, so the irregular base seats into
             // earth without leaving a dark gap or a rim of barely touching points.
@@ -318,6 +469,7 @@ public partial class Firepit : Node3D
         bed.MaterialOverride = mat;
         bed.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         AddChild(bed);
+        coals = bed;
     }
 
     public void _build_logs()
@@ -345,6 +497,7 @@ public partial class Firepit : Node3D
             mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
             mesh.GIMode = GeometryInstance3D.GIModeEnum.Static;
             AddChild(mesh);
+            fire_logs.Add(mesh);
         }
         for (long i2 = 0; i2 < 2; i2++)
         {
@@ -355,6 +508,7 @@ public partial class Firepit : Node3D
             mesh2.Rotation = new Vector3(0.0f, (float)(rng.Randf() * TAU), rng.RandfRange(-0.1f, 0.1f));
             mesh2.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
             AddChild(mesh2);
+            fire_logs.Add(mesh2);
         }
     }
 
@@ -599,7 +753,8 @@ public partial class Firepit : Node3D
         body.SetMeta("surface", (StringName)"rock");
         body.on_interact = new Callable(this, Firepit.MethodName.interact);
         body.prompt_text = prompt();
-        CollisionShape3D pit = new CollisionShape3D();
+        CollisionShape3D pit = new CollisionShape3D { Name = "PitPillar" };
+        _pit_shape = pit;
         CylinderShape3D cyl = new CylinderShape3D();
         cyl.Radius = (float)(RING_RADIUS + 0.12);
         cyl.Height = 0.6f;

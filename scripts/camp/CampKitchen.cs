@@ -22,6 +22,9 @@ public partial class CampKitchen : Node3D
     public TerrainField field;
     public Godot.Collections.Array<Vector3> feet = new Godot.Collections.Array<Vector3>();
     public SoftBody3D cloth;
+    /// June's letter, folded, on the cloth beside the journal; and what reads it.
+    public Node3D letter;
+    public Interactable letter_body;
     public List<int> cloth_pins = new List<int>();
     public List<int> _cloth_wind_points = new List<int>();
     public List<float> _cloth_wind_phases = new List<float>();
@@ -124,6 +127,7 @@ public partial class CampKitchen : Node3D
         _t4.Y = 1.6f;
         secondMug.Rotation = _t4;
         _add_journal();
+        _add_letter();
         _add_crate(wood);
     }
 
@@ -268,6 +272,42 @@ public partial class CampKitchen : Node3D
         MeshBuilder mb = new MeshBuilder();
         mb.add_tube(new Godot.Collections.Array<Vector3> { new Vector3(0.069f, 0.035f, -0.09f), new Vector3(0.069f, 0.035f, 0.07f), new Vector3(0.069f, 0.035f, 0.086f) }, new Godot.Collections.Array<double> { 0.003, 0.003, 0.0002 }, 6);
         FieldKit.add(root, mb.commit(), PropMaterials.wood(new Color(0.66f, 0.48f, 0.21f), 0.1, 0));
+    }
+
+    /// June's letter: a sheet folded in half, lying flat on the cloth, its upper
+    /// leaf sprung a few degrees open about the fold. Nothing marks it.
+    public void _add_letter()
+    {
+        letter = new Node3D { Name = "JuneLetter", Position = new Vector3(-0.07f, (float)CLOTH_TOP, 0.16f), Rotation = new Vector3(0, 0.38f, 0) };
+        AddChild(letter);
+        StandardMaterial3D paper = FieldKit.solid(new Color(0.86f, 0.82f, 0.72f), 0.92);
+        Vector3 leaf = new Vector3(0.105f, 0.0009f, 0.148f);
+        FieldKit.add(letter, FieldKit.rounded_box(leaf, 0.0003), paper, new Vector3(0, leaf.Y * 0.5f, 0), "LowerLeaf");
+        // The fold runs along the leaf's left edge (local -X); the upper leaf rests
+        // on the lower one there and lifts towards its free edge.
+        Node3D hinge = new Node3D { Name = "Fold", Position = new Vector3(-leaf.X * 0.5f, leaf.Y, 0), Rotation = new Vector3(0, 0, 0.07f) };
+        letter.AddChild(hinge);
+        FieldKit.add(hinge, FieldKit.rounded_box(leaf, 0.0003), paper, new Vector3(leaf.X * 0.5f, leaf.Y * 0.5f, 0), "UpperLeaf");
+        // A few lines of June's hand showing on the outside of the fold.
+        MeshBuilder ink = new MeshBuilder();
+        for (int i = 0; i < 3; i++)
+        {
+            double z = -0.035 + i * 0.012;
+            ink.add_tube(new Godot.Collections.Array<Vector3> { new Vector3(0.018f, (float)(leaf.Y + 0.0003), (float)z), new Vector3((float)(0.075 - i * 0.012), (float)(leaf.Y + 0.0003), (float)z) },
+                new Godot.Collections.Array<double> { 0.00045, 0.00045 }, 3);
+        }
+        FieldKit.add(hinge, ink.commit(), FieldKit.solid(new Color(0.16f, 0.15f, 0.2f), 0.8), Vector3.Zero, "Address");
+        letter_body = new Interactable { Name = "LetterBody", CollisionLayer = 1u << 1, CollisionMask = 0, prompt_text = "Read" };
+        letter_body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(0.18f, 0.06f, 0.22f) }, Position = new Vector3(0, 0.03f, 0) });
+        letter.AddChild(letter_body);
+    }
+
+    /// The letter goes with the reader: off the table and out of reach.
+    public void take_letter()
+    {
+        if (letter == null) return;
+        letter.Visible = false;
+        letter_body.CollisionLayer = 0;
     }
 
     public void _add_crate(Material wood)

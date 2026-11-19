@@ -66,8 +66,141 @@ public partial class Tent : Node3D
         _add_mesh("Lines", _line_mesh(), _rope, false);
         _add_mesh("Pegs", _peg_mesh(), PropMaterials.wood(new Color(0.45f, 0.36f, 0.26f), 0.5, 0.0, 1.0), false);
         _add_furniture();
+        _add_tackle_tin();
         _add_lantern();
         _add_collision();
+        _add_strike();
+    }
+
+    // ------------------------------------------------------------- Tom's tin
+
+    public static readonly Vector3 TIN_SIZE = new(0.21f, 0.068f, 0.125f);
+    public const double TIN_LID = 0.018;
+    public const double TIN_OPEN_DEG = 104.0;
+    /// On the floor to the right of the bedroll, a step inside the door.
+    public static readonly Vector3 TIN_AT = new(0.30f, 0.004f, -0.45f);
+    public const double TIN_YAW = 0.42;
+
+    public Node3D tackle_tin;
+    public Node3D tin_lid;
+    public Interactable tin_body;
+    public bool tin_open = false;
+
+    /// Tom's tackle tin: a small painted steel box, its green worn to bare metal
+    /// at the edges, a hinged lid with a wire latch. It sits flat on the ground
+    /// sheet. Its interaction stays off until the story offers it.
+    public void _add_tackle_tin()
+    {
+        tackle_tin = new Node3D { Name = "TackleTin", Position = TIN_AT, Rotation = new Vector3(0, (float)TIN_YAW, 0) };
+        AddChild(tackle_tin);
+        ShaderMaterial paint = PropMaterials.iron(new Color(0.24f, 0.30f, 0.22f));
+        ShaderMaterial bare = PropMaterials.iron(new Color(0.42f, 0.40f, 0.36f));
+        Vector3 s = TIN_SIZE;
+        float body_h = s.Y - (float)TIN_LID;
+        FieldKit.add(tackle_tin, FieldKit.rounded_box(new Vector3(s.X, body_h, s.Z), 0.006), paint, new Vector3(0, body_h * 0.5f, 0), "TinBox");
+        // The lid hinges along the back edge (local +Z).
+        tin_lid = new Node3D { Name = "TinLidHinge", Position = new Vector3(0, body_h, s.Z * 0.5f) };
+        tackle_tin.AddChild(tin_lid);
+        FieldKit.add(tin_lid, FieldKit.rounded_box(new Vector3(s.X + 0.004f, (float)TIN_LID, s.Z + 0.004f), 0.006), paint, new Vector3(0, (float)TIN_LID * 0.5f, -s.Z * 0.5f), "TinLid");
+        MeshBuilder wire = new MeshBuilder();
+        wire.add_tube(new Godot.Collections.Array<Vector3> { new Vector3(-s.X * 0.5f, 0, 0.002f), new Vector3(s.X * 0.5f, 0, 0.002f) }, new Godot.Collections.Array<double> { 0.0028, 0.0028 }, 6);
+        FieldKit.add(tin_lid, wire.commit(), bare, Vector3.Zero, "TinHinge");
+        MeshBuilder latch = new MeshBuilder();
+        latch.add_tube(new Godot.Collections.Array<Vector3> { new Vector3(-0.014f, body_h - 0.016f, -s.Z * 0.5f - 0.002f), new Vector3(-0.014f, body_h + 0.004f, -s.Z * 0.5f - 0.003f),
+            new Vector3(0.014f, body_h + 0.004f, -s.Z * 0.5f - 0.003f), new Vector3(0.014f, body_h - 0.016f, -s.Z * 0.5f - 0.002f) }, new Godot.Collections.Array<double> { 0.0015, 0.0015, 0.0015, 0.0015 }, 5);
+        FieldKit.add(tackle_tin, latch.commit(), bare, Vector3.Zero, "TinLatch");
+        // Inside: the flat skipping stones on the tally book, seen once it is open.
+        StandardMaterial3D page = FieldKit.solid(new Color(0.78f, 0.74f, 0.62f), 0.95);
+        FieldKit.add(tackle_tin, FieldKit.rounded_box(new Vector3(s.X - 0.03f, 0.008f, s.Z - 0.025f), 0.002), page, new Vector3(0, body_h - 0.02f, 0), "TallyBook");
+        ShaderMaterial pebble = PropMaterials.triplanar("rock", new Color(0.62f, 0.62f, 0.58f), 3.0);
+        for (int i = 0; i < 4; i++)
+        {
+            MeshInstance3D stone = new MeshInstance3D { Name = $"TinStone{i + 1}", Mesh = PropMeshes.rock(9120 + i, 1.0), MaterialOverride = pebble,
+                Position = new Vector3(-0.065f + i * 0.043f, body_h - 0.011f, (i % 2 == 0 ? -0.015f : 0.017f)),
+                Rotation = new Vector3(0, i * 1.3f, 0), Scale = new Vector3(0.019f, 0.0055f, 0.016f) };
+            tackle_tin.AddChild(stone);
+        }
+        tin_body = new Interactable { Name = "TinBody", CollisionLayer = 0, CollisionMask = 0, prompt_text = "Open" };
+        tin_body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(s.X + 0.06f, 0.12f, s.Z + 0.06f) }, Position = new Vector3(0, 0.06f, 0) });
+        tackle_tin.AddChild(tin_body);
+    }
+
+    /// Offers or withdraws the tin's interaction.
+    public void offer_tin(bool offered) => tin_body.CollisionLayer = offered ? 1u << 1 : 0;
+
+    /// Swings the lid open about its hinge, eased.
+    public void open_tin()
+    {
+        if (tin_open) return;
+        tin_open = true;
+        Vector3 open = new((float)Mathf.DegToRad(TIN_OPEN_DEG), 0, 0);
+        if (!IsInsideTree())
+        {
+            tin_lid.Rotation = open;
+            return;
+        }
+        CreateTween().TweenProperty(tin_lid, "rotation", open, 0.7).SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Sine);
+    }
+
+    // ------------------------------------------------------------- striking
+
+    public Interactable strike_body;
+    public bool struck = false;
+    public const double PEG_SECONDS = 0.9;
+    public const double FALL_SECONDS = 1.3;
+    public const double PACK_SECONDS = 1.0;
+
+    /// One collider over the whole tent that asks to strike it on the last
+    /// morning. Off until the story offers it.
+    public void _add_strike()
+    {
+        strike_body = new Interactable { Name = "StrikeTent", CollisionLayer = 0, CollisionMask = 0, prompt_text = "Strike" };
+        strike_body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3((float)WIDTH, (float)HEIGHT, (float)LENGTH) }, Position = new Vector3(0, (float)(HEIGHT * 0.5), 0) });
+        AddChild(strike_body);
+    }
+
+    public void offer_strike(bool offered) => strike_body.CollisionLayer = offered && !struck ? 1u << 1 : 0;
+
+    /// Strikes the tent: the pegs come up out of the ground, the poles and the
+    /// canvas come down flat, then everything is packed away. Calls `pegs_out`
+    /// and `fallen` at those moments; completes when the pitch is bare.
+    public async System.Threading.Tasks.Task strike(Action pegs_out = null, Action fallen = null)
+    {
+        if (struck) return;
+        struck = true;
+        offer_strike(false);
+        offer_tin(false);
+        var pegs = GetNode<Node3D>("Pegs");
+        var lines = GetNode<Node3D>("Lines");
+        if (IsInsideTree())
+        {
+            Tween pull = CreateTween();
+            pull.TweenProperty(pegs, "position:y", 0.14f, PEG_SECONDS).SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Sine);
+            await ToSignal(pull, Tween.SignalName.Finished);
+        }
+        pegs.Visible = false;
+        lines.Visible = false;
+        pegs_out?.Invoke();
+        // The canvas, hems and poles settle to the ground together: a fall that
+        // starts slow and lands, flattened about the ground plane.
+        var fallers = new List<Node3D>();
+        foreach (string name in new[] { "Canvas", "CanvasHems", "Poles" })
+            fallers.Add(GetNode<Node3D>(name));
+        fallers.Add(lantern);
+        if (IsInsideTree())
+        {
+            Tween fall = CreateTween().SetParallel(true);
+            foreach (Node3D n in fallers)
+                fall.TweenProperty(n, "scale:y", n == lantern ? 0.02f : 0.035f, FALL_SECONDS).SetEase(Tween.EaseType.In).SetTrans(Tween.TransitionType.Quad);
+            await ToSignal(fall, Tween.SignalName.Finished);
+        }
+        fallen?.Invoke();
+        if (IsInsideTree())
+            await ToSignal(GetTree().CreateTimer(PACK_SECONDS), SceneTreeTimer.SignalName.Timeout);
+        // Packed away: nothing of the tent is left on the pitch.
+        Visible = false;
+        foreach (Node n in FindChildren("*", "CollisionObject3D", true, false))
+            ((CollisionObject3D)n).CollisionLayer = 0;
     }
 
     public MeshInstance3D _add_mesh(string node_name, ArrayMesh mesh, Material material, bool gi)
@@ -410,7 +543,8 @@ public partial class Tent : Node3D
             shape.Shape = box;
             shape.Position = new Vector3((float)(side * WIDTH * 0.25), (float)(HEIGHT * 0.5), 0.0f);
             Vector3 _t1 = shape.Rotation;
-            _t1.Z = (float)(-side * atan2(slope.X, slope.Y));
+            // Each wall leans in from its ground line to the ridge, like the canvas.
+            _t1.Z = (float)(side * atan2(slope.X, slope.Y));
             shape.Rotation = _t1;
             body.AddChild(shape);
         }

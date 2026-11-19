@@ -18,6 +18,9 @@ namespace LastCamp;
 /// the capture/benchmark tool depending on the command line.
 public partial class Main : Node3D
 {
+    /// The frame cap of a headless run (see the constructor).
+    public const int HEADLESS_MAX_FPS = 120;
+
     public Main()
     {
         _sceneRoot = this;
@@ -25,6 +28,10 @@ public partial class Main : Node3D
         if (!OS.GetCmdlineUserArgs().Contains("--package-check"))
         {
             string[] args = OS.GetCmdlineUserArgs();
+            // Headless runs draw nothing and would otherwise spin thousands of
+            // frames a second; the audio server ages freed playback data by main-
+            // loop frames, so an uncapped loop frees it while the mixer still reads.
+            if (DisplayServer.GetName() == "headless" && Engine.MaxFps == 0) Engine.MaxFps = HEADLESS_MAX_FPS;
             bool capture = args.Any(a => new[] { "--capture", "--benchmark", "--profile", "--traverse", "--cinematic", "--review-assets", "--check-pond", "--movie-size", "--review-route" }.Any(flag => a == flag || a.StartsWith(flag + "=", StringComparison.Ordinal)));
             if (capture && DisplayServer.GetName() != "headless")
             {

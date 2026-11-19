@@ -23,7 +23,9 @@ namespace LastCamp;
 /// falling through the ground, getting stuck or timing out.
 ///   godot --path . --fullscreen -- --skip-intro --quality=high --traverse="$PWD/local-data/traversal/run-1"
 ///   godot --headless --path . -- --skip-intro --traverse=/tmp/x    (physics only)
-/// Add --traverse-places to walk the micro cut's places as well (see _walk_places).
+/// Add --traverse-places to walk the micro cut's places as well (see _walk_places),
+/// and --traverse-story (with --session-check) to play the rest of the story to the
+/// credits through the real interactions, logging the time spent in each band.
 /// Straight legs between authored points; the route walks around the fire
 /// ring and along the dock's centreline (start (-15.9, 6.3) towards the pond).
 public partial class TraversalCheck : Node
@@ -74,9 +76,28 @@ public partial class TraversalCheck : Node
         {
             await _walk_places();
         }
+        if (Game.Instance.session is CampSession timed)
+        {
+            _start_band_clock(timed);
+        }
         int expectedRecoveries = _player.RecoveryCount;
         await _interactions();
         _check("interactions needed no fall recovery", _player.RecoveryCount == expectedRecoveries);
+        if (Game.Instance.has_flag("traverse-story"))
+        {
+            if (Game.Instance.session is CampSession session)
+            {
+                await _walk_story(session);
+            }
+            else
+            {
+                _check("the story walk needs the story session (--session-check)", false);
+            }
+        }
+        if (Game.Instance.session != null)
+        {
+            _report_band_times();
+        }
         bool passed = G.Call(_report["failures"], "is_empty").AsBool();
         _report["passed"] = passed;
         FileAccess file = FileAccess.Open(_out_dir.PathJoin("report.json"), FileAccess.ModeFlags.Write);
@@ -430,20 +451,32 @@ public partial class TraversalCheck : Node
         if (Game.Instance.session is CampSession evening)
         {
             // The three logs and the throw above went through the real carry and
-            // throw. Injected, because the route cannot do them yet: June's letter
-            // (the camp table's letter is not built; the game does not require it
-            // until it is), and three skips only if the route's single fixed throw
-            // fell short of three (it is tuned for at least two).
+            // throw; so does everything below: the letter on the table, a throw
+            // of three, the sit at the pier end and the night. Only the plain
+            // traversal (without --traverse-story) still injects three skips if
+            // every real throw fell short.
             var story = evening.Story;
             var logs = story.Band.Objectives.First(o => o.Event == LastCamp.Story.StoryEvents.LogCarried);
             _check("story counts the three carried logs and the throw", story.ProgressOf(logs) == 3 &&
                 story.Facts.Contains(LastCamp.Story.StoryEvents.StoneSkips));
-            evening.ReadLetter();
-            if (Game.Instance.camp.pond.last_skips < 3)
+            bool storyRun = Game.Instance.has_flag("traverse-story");
+            await _throw_until_three();
+            if (Game.Instance.camp.pond.last_skips < 3 && story.BestSkips < 3)
             {
+                _check("a real throw reaches three skips", !storyRun);
                 G.print(G.format("TRAVERSAL injected=stone_skips:3 thrown=%d", (long)Game.Instance.camp.pond.last_skips));
-                evening.Story.Raise(LastCamp.Story.StoryEvents.StoneSkips + ":3");
+                if (!storyRun) evening.Story.Raise(LastCamp.Story.StoryEvents.StoneSkips + ":3");
             }
+            await _follow("to_table", new[] { new Vector2(-16, 6.3f), new Vector2(-14.2f, 6.6f), new Vector2(-9, 2), new Vector2(-3.6f, 3.6f), new Vector2(3.8f, 3.8f), new Vector2(6.4f, 1.3f), new Vector2(7.6f, 0.1f) });
+            CampKitchen kitchen = Game.Instance.camp.campsite.kitchen;
+            Vector3 table_side = kitchen.ToGlobal(new Vector3(-0.07f, 0, -0.85f));
+            await _go_to("table_side", new Vector2(table_side.X, table_side.Z));
+            await _aim_and_interact(kitchen.letter_body.GlobalPosition + Vector3.Up * 0.03f, kitchen.letter_body);
+            await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
+            _check("reading June's letter opens the sheet and raises letter_read", evening.Reading.IsOpen && story.Facts.Contains(LastCamp.Story.StoryEvents.LetterRead));
+            await _screenshot("june_letter");
+            await _read_through(evening);
+            _check("the letter is taken from the table", !kitchen.letter.Visible && story.Items.Contains("june_letter"));
             _check("camp journal recognises completed evening activities", evening.BandDone);
             _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = true });
             await ToSignal(GetTree().CreateTimer(0.2, true), SceneTreeTimer.SignalName.Timeout);
@@ -453,29 +486,34 @@ public partial class TraversalCheck : Node
             _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = true });
             _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = false });
             _check("closing the journal resumes play", !GetTree().Paused && Game.Instance.mode == Game.Mode.PLAY);
-            await _go_to("tent_return_dock", new Vector2(-16, 6.3f));
-            await _go_to("tent_return_bank", new Vector2(-14.2f, 6.6f));
-            await _go_to("tent_return_shore", new Vector2(-9, 2));
-            await _go_to("tent_return_clearing", new Vector2(-3.6f, 3.6f));
-            await _go_to("tent_return_seats", new Vector2(3.8f, 3.8f));
-            await _go_to("tent_return_door", new Vector2(4.4f, -0.4f));
-            await _go_to("tent_around_woodpile", new Vector2(3.6f, -2.8f));
-            Vector3 entrance = Game.Instance.camp.campsite.tent.ToGlobal(new Vector3(-0.3f, 0, -2.6f));
-            await _go_to("tent_entrance", new Vector2(entrance.X, entrance.Z));
-            var bed = Game.Instance.camp.campsite.tent.GetNode<Interactable>("BedrollRest");
-            Game.Instance.world.hour = 19;
-            await _aim_and_interact(bed.GlobalPosition, bed);
-            await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
-            _check("resting at the tent advances to dusk and restores control", !evening.Resting && _player.enabled && Game.Instance.world.hour > 20);
-            // Night: light the fire with a real log, light the lantern, walk back.
-            await _go_to("night_leave_tent", new Vector2(3.6f, -2.8f));
+
+            // The pier end: sitting there runs the sunset into the night.
+            // Onto the pier from the shore path, not the bank (its deck end is a step up from there).
+            await _follow("to_pier", new[] { new Vector2(6.4f, 1.3f), new Vector2(3.8f, 3.8f), new Vector2(-3.6f, 3.6f), new Vector2(-9, 2), new Vector2(-16, 6.3f), new Vector2(-23.1f, 5.4f) });
+            Interactable pier = evening.PierSeat;
+            await _aim_and_interact(pier.GlobalPosition, pier);
+            await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+            _check("sitting at the pier end raises sat:pier and seats the player", story.Facts.Contains(LastCamp.Story.StoryEvents.SatPier) && _player.resting);
+            double sunset_from = Game.Instance.world.hour;
+            await _wait_for(() => story.Band.Id == "night", LastCamp.Story.StoryScript.SunsetSeconds + 20);
+            _check(G.format("the sunset runs the clock from %.2f into the night (%.2f)", new Godot.Collections.Array { sunset_from, Game.Instance.world.hour }),
+                story.Band.Id == "night" && Game.Instance.world.hour >= 20.45 && _player.enabled);
+            await _screenshot("pier_sunset_done");
+
+            // Night: light the fire with a real log, light the lantern, turn in.
+            await _follow("night_walk", new[] { new Vector2(-16, 6.3f), new Vector2(-14.2f, 6.6f), new Vector2(-9, 2), new Vector2(-3.6f, 3.6f), new Vector2(3.8f, 3.8f), new Vector2(4.4f, -0.4f) });
             await _carry_log_to_fire();
             if (!_player.lantern_on) _player.toggle_lantern();
             _check("lighting the fire and the lantern completes the night", evening.BandDone);
-            await _go_to("night_seats", new Vector2(3.8f, 3.8f));
-            await _go_to("night_door", new Vector2(4.4f, -0.4f));
-            await _go_to("night_around_woodpile", new Vector2(3.6f, -2.8f));
-            await _go_to("night_tent_entrance", new Vector2(entrance.X, entrance.Z));
+            await _go_to_tent("night");
+            Tent tent = Game.Instance.camp.campsite.tent;
+            if (storyRun)
+            {
+                // Before the old fire ring Tom's tin does not offer itself at all.
+                await _aim(tent.tin_body.GlobalPosition);
+                _check("the tin is refused before the old ring (no interaction is offered)", _player.focus() != tent.tin_body && !story.TinAvailable);
+            }
+            var bed = tent.GetNode<Interactable>("BedrollRest");
             await _aim_and_interact(bed.GlobalPosition, bed);
             await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
             _check("sleeping completes the evening and returns to playable dawn", evening.Story.Chapter.Id == LastCamp.Story.StoryScript.Marks && _player.enabled && Game.Instance.world.hour < 7);
@@ -483,6 +521,311 @@ public partial class TraversalCheck : Node
         }
     }
 
+    /// Opt-in (--traverse-story): the rest of the story, from the second morning to
+    /// the credits, through the real controller and the real interactions only.
+    private async Task _walk_story(CampSession session)
+    {
+        var story = session.Story;
+        Places places = Game.Instance.camp.places;
+        Campsite site = Game.Instance.camp.campsite;
+        Tent tent = site.tent;
+        Firepit fire = site.firepit;
+        int recoveries = _player.RecoveryCount;
+        _check("the story walk starts on the second morning", story.Chapter.Id == LastCamp.Story.StoryScript.Marks && story.Band.Id == "morning");
+
+        // Morning: June's footpath to the old ring; the notch before the tin is nothing.
+        await _go_to_old_ring("morning");
+        _check("arriving at the old ring raises place:old_ring and June's entry", story.Facts.Contains(LastCamp.Story.StoryEvents.PlaceOldRing) && story.LinesPlayed.Contains("e4"));
+        await _look_at_notch();
+        _check("looking at the notch before the tin raises nothing", !story.Facts.Contains(LastCamp.Story.StoryEvents.BlazeFound));
+        await _screenshot("story_notch_before_tin");
+        await _follow("ring_back", Enumerable.Reverse(PlacesLayout.JUNE_FOOTPATH).Skip(1).Append(TerrainField.TRAIL[6]).Append(new Vector2(-3.6f, 3.6f)).Append(new Vector2(3.8f, 3.8f)).Append(new Vector2(4.4f, -0.4f)));
+        await _go_to_tent("tin");
+        await _aim_and_interact(tent.tin_body.GlobalPosition + Vector3.Up * 0.02f, tent.tin_body);
+        await _wait_for(() => session.Reading.IsOpen, 3);
+        _check("opening Tom's tin raises tin_opened and shows his tally book", story.Facts.Contains(LastCamp.Story.StoryEvents.TinOpened) && session.Reading.IsOpen && session.Reading.PageCount == LastCamp.Story.StoryTexts.TallyBook.Length && tent.tin_open);
+        await _screenshot("story_tally_book");
+        await _read_through(session);
+        _check("June falls silent once the tin is open", story.JuneSilent);
+        var bed = tent.GetNode<Interactable>("BedrollRest");
+        await _aim_and_interact(bed.GlobalPosition, bed);
+        await _wait_for(() => story.Band.Id == "evening" && !session.Resting, 10);
+        _check("resting after the tin carries the day to evening", story.Band.Id == "evening" && _player.enabled);
+
+        // Evening: the notch now counts; Tom's route, his steps, the bench, the step.
+        await _go_to_old_ring("evening");
+        await _look_at_notch();
+        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        _check("looking at the notch within 2 m after the tin raises blaze_found", story.Facts.Contains(LastCamp.Story.StoryEvents.BlazeFound) &&
+            story.IsDone(story.Band.Objectives.First(o => o.Event == LastCamp.Story.StoryEvents.BlazeFound)));
+        Vector2[] route = PlacesLayout.TOMS_ROUTE;
+        bool tom = await _follow("story_toms_route", route[..^1]);
+        tom &= await _go_to("story_steps_foot", route[^1]);
+        _check("the lift is not offered before the player has stood on the step", !places.loose_step_stood_on && session.StepLift.CollisionLayer == 0);
+        bool climbed = await _follow("story_steps", PlacesLayout.STEP_LINE[1..]);
+        await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
+        _check(G.format("the loose step rocks under the player (%.2f deg) and is marked stood on", new Godot.Collections.Array { places.rock.rock_angle }),
+            tom && climbed && places.IsPlayerOnLooseStep() && places.loose_step_stood_on && places.rock.rock_angle > 1.0);
+        await _aim(session.StepLift.GlobalPosition);
+        _check("standing on the step before the bench still offers no lift", _player.focus() != session.StepLift && !session.LiftOffered);
+        await _aim_and_interact(session.BenchSeat.GlobalPosition, session.BenchSeat);
+        await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
+        _check("sitting on Tom's bench raises sat:lookout and June's entry", story.Facts.Contains(LastCamp.Story.StoryEvents.SatLookout) && story.LinesPlayed.Contains("e5") && places.bench_sat);
+        double from = Game.Instance.world.hour;
+        await _wait_for(() => Game.Instance.world.hour >= story.Band.Limit - 0.01, LastCamp.Story.StoryScript.SunsetSeconds + 20);
+        _check(G.format("the lookout sunset runs the clock from %.2f to %.2f", new Godot.Collections.Array { from, Game.Instance.world.hour }), Game.Instance.world.hour >= story.Band.Limit - 0.01);
+        await _screenshot("story_lookout_sunset");
+        _check("after the bench the stood-on step offers Lift", session.LiftOffered);
+        await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
+        await _aim_and_interact(session.StepLift.GlobalPosition, session.StepLift);
+        await _wait_for(() => session.Reading.IsOpen, 6);
+        _check("lifting the step sets the stone aside and shows Tom's letter", places.StepIsLifted && session.Reading.IsOpen &&
+            places.LooseStep.GlobalPosition.DistanceTo(places.rock.loose_rest.Origin) > 0.5);
+        await _screenshot("story_tom_letter");
+        await _read_through(session);
+        await _wait_for(() => story.Band.Storm, 3);
+        _check("reading Tom's letter raises step_lifted and the walk down begins", story.Facts.Contains(LastCamp.Story.StoryEvents.StepLifted) && story.Band.Storm && story.Items.Contains("tom_letter"));
+
+        // The walk down by lantern, then the storm.
+        if (!_player.lantern_on) _player.toggle_lantern();
+        bool down = await _go_to("story_bench_side", PlacesLayout.local(0.35, -1.35));
+        down &= await _follow("story_painted_path", PlacesLayout.PAINTED_PATH);
+        Godot.Collections.Array<Vector2> trail = TerrainField.TRAIL;
+        Vector2 path_end = PlacesLayout.PAINTED_PATH[^1];
+        int join = 0;
+        for (int i = 0; i < 5; i++) if (trail[i].DistanceTo(path_end) < trail[join].DistanceTo(path_end)) join = i;
+        var to_camp = new List<Vector2>();
+        for (int i = join + 1; i <= 4; i++) to_camp.Add(trail[i]);
+        to_camp.Add(new Vector2(2.4f, 3.2f));
+        down &= await _follow("story_trail_down", to_camp);
+        _check("the walk down by lantern reaches camp", down && _player.lantern_on);
+        await _wait_for(() => Game.Instance.world.weather.rain > 0.3, 90);
+        _check("the storm's rain arrives", Game.Instance.world.weather.rain > 0.3);
+        await _screenshot("story_storm");
+        await _go_to("story_woodpile_from_fire", new Vector2(3.4f, 0.9f));
+        await _carry_log_to_fire();
+        await _carry_log_to_fire();
+        var fed = story.Band.Objectives.First(o => o.Event == LastCamp.Story.StoryEvents.FireFedInRain);
+        _check("the fire is fed twice in the rain", story.IsDone(fed));
+        await _go_to("story_storm_door", new Vector2(4.4f, -0.4f));
+        await _go_to_tent("storm");
+        await _aim_and_interact(bed.GlobalPosition, bed);
+        await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
+        _check("resting in the tent in the storm shelters the player", _player.resting);
+        await _wait_for(() => story.Chapter.Id == LastCamp.Story.StoryScript.Epilogue && !session.Resting, LastCamp.Story.StoryScript.ShelterSeconds + 30);
+        _check(G.format("sheltering ends the storm and the next morning comes (%s)", new Godot.Collections.Array { story.StormOutcome }),
+            story.Chapter.Id == LastCamp.Story.StoryScript.Epilogue && story.StormOutcome.Length > 0 && story.LinesPlayed.Contains("e6") && _player.enabled);
+
+        // The last morning: strike the tent, rake the ash, scatter the stones, walk out.
+        var linesAfterAsh = new List<string>();
+        bool ashDone = false;
+        Action<string, LastCamp.Story.LineKind, string> watch = (id, _, _) => { if (ashDone) linesAfterAsh.Add(id); };
+        session.LinePlayed += watch;
+        await _aim_and_interact(tent.GlobalPosition + Vector3.Up * 0.8f, tent.strike_body);
+        await _wait_for(() => story.Facts.Contains(LastCamp.Story.StoryEvents.TentStruck), Tent.PEG_SECONDS + Tent.FALL_SECONDS + Tent.PACK_SECONDS + 3);
+        _check("striking the tent brings it down and packs it away", story.Facts.Contains(LastCamp.Story.StoryEvents.TentStruck) && !tent.Visible);
+        await _screenshot("story_tent_struck");
+        await _go_to("story_round_woodpile", new Vector2(3.6f, -2.8f));
+        await _go_to("story_to_fire", new Vector2(4.6f, -0.05f));
+        await _go_to("story_fire_side", new Vector2(1.7f, 1.8f));
+        await _aim_and_interact(fire.GlobalPosition + Vector3.Up * 0.3f, fire.body);
+        await ToSignal(GetTree().CreateTimer(Firepit.RAKE_SECONDS + 0.4), SceneTreeTimer.SignalName.Timeout);
+        ashDone = story.Facts.Contains(LastCamp.Story.StoryEvents.AshRaked);
+        _check(G.format("raking the ash changes it (%s) and plays June's last note", new Godot.Collections.Array { story.StormOutcome == "went_out" ? "cold and wet" : "warm embers" }),
+            ashDone && fire.raked_ash != null && fire.raked_ash.Visible && !fire.coals.Visible && story.LinesPlayed.Contains("m9"));
+        await _screenshot("story_ash_raked");
+        int moves = 0;
+        while (!fire.stones_scattered && moves < 6)
+        {
+            await _aim_and_interact(fire.GlobalPosition + Vector3.Up * 0.3f, fire.body);
+            moves++;
+            await ToSignal(GetTree().CreateTimer(Firepit.STONE_STAGGER * CampSession.StonesPerMove + Firepit.STONE_SECONDS + 0.3), SceneTreeTimer.SignalName.Timeout);
+        }
+        double nearest = fire.ring_stones.Min(st => new Vector2(st.Position.X, st.Position.Z).Length());
+        _check(G.format("moving the ring stones sets all %d down off the site in %d moves (nearest %.2f m)", new Godot.Collections.Array { fire.ring_stones.Count, moves, nearest }),
+            fire.stones_scattered && moves >= 3 && nearest >= Firepit.SCATTER_MIN - 0.3 && story.Facts.Contains(LastCamp.Story.StoryEvents.StonesScattered) && !fire.has_pit_pillar);
+        await _screenshot("story_stones_scattered");
+        _check("the last morning is done", session.BandDone);
+        Vector2 out_at = CampSession.WalkOutPoint;
+        bool walked = await _follow("story_walk_out", new[] { new Vector2(3.4f, 0.9f), new Vector2(3.8f, 3.8f), trail[4], trail[3], trail[2], trail[1], new Vector2(3.9f, 67.6f) });
+        // On past the post until the walk out counts: the ending then takes the
+        // player over (it suspends the controller), so this leg stops there.
+        walked &= await _walk_until(out_at, () => story.Finished, 20);
+        await _wait_for(() => story.Finished, 3);
+        _check("walking out past the trailhead post raises walked_out", walked && story.Finished && story.Facts.Contains(LastCamp.Story.StoryEvents.WalkedOut));
+        // The HUD's credits roll; a player may let it run or skip it with Enter.
+        await ToSignal(GetTree().CreateTimer(6.0), SceneTreeTimer.SignalName.Timeout);
+        Node roll = Game.Instance.hud.FindChild("Ending", true, false);
+        _check("walking out starts the HUD's ending", session.EndingRunning && roll != null);
+        await _screenshot("story_credits");
+        _player.GetViewport().PushInput(new InputEventAction { Action = "ui_accept", Pressed = true });
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        _player.GetViewport().PushInput(new InputEventAction { Action = "ui_accept", Pressed = false });
+        await _wait_for(() => story.Facts.Contains(LastCamp.Story.StoryEvents.CreditsFinished), 30);
+        await _screenshot("story_postcard");
+        _check("the ending runs and raises credits_finished, then June's postcard", story.Facts.Contains(LastCamp.Story.StoryEvents.CreditsFinished) && story.LinesPlayed.Contains("e7"));
+        session.LinePlayed -= watch;
+        _check($"nothing follows June's last note until the postcard ({string.Join(" ", linesAfterAsh)})", linesAfterAsh.All(id => id == "e7"));
+        _check("the story walk needed no fall recovery", _player.RecoveryCount == recoveries);
+    }
+
+    /// The camp to the old ring: round the fire to the footpath, then June's path.
+    private async Task _go_to_old_ring(string label)
+    {
+        bool ok = await _follow($"{label}_to_ring", new[] { new Vector2(3.6f, -2.8f), new Vector2(4.4f, -0.4f), new Vector2(3.8f, 3.8f), new Vector2(-3.6f, 3.6f), TerrainField.TRAIL[6] });
+        ok &= await _follow($"{label}_june_path", PlacesLayout.JUNE_FOOTPATH);
+        _check($"June's footpath reaches the old ring ({label})", ok);
+    }
+
+    /// Steps up to Tom's first notch and looks at it from a little over a metre.
+    private async Task _look_at_notch()
+    {
+        OldFireRing ring = Game.Instance.camp.places.ring;
+        Vector3 face = new Vector3(ring.notch_face.X, 0, ring.notch_face.Z).Normalized();
+        Vector3 stand = ring.notch_world + face * 1.0f;
+        await _approach(new Vector2(stand.X, stand.Z), new Vector2(ring.notch_world.X, ring.notch_world.Z), 1.25f);
+        await _aim(ring.notch_world);
+        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+        G.print(G.format("TRAVERSAL notch distance=%.2f", _player.camera.GlobalPosition.DistanceTo(ring.notch_world)));
+    }
+
+    /// From the camp's east side round the woodpile to the tent door.
+    private async Task _go_to_tent(string label)
+    {
+        await _go_to($"{label}_around_woodpile", new Vector2(3.6f, -2.8f));
+        Vector3 entrance = Game.Instance.camp.campsite.tent.ToGlobal(new Vector3(-0.3f, 0, -2.6f));
+        await _go_to($"{label}_tent_entrance", new Vector2(entrance.X, entrance.Z));
+    }
+
+    /// Puts the reading sheet away page by page, with the interact key.
+    private async Task _read_through(CampSession session)
+    {
+        for (int i = 0; i < 12 && session.Reading.IsOpen; i++)
+        {
+            await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+            _player.GetViewport().PushInput(new InputEventAction { Action = "interact", Pressed = true });
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            _player.GetViewport().PushInput(new InputEventAction { Action = "interact", Pressed = false });
+        }
+        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+        _check("the reading sheet is put away and play resumes", !session.Reading.IsOpen && _player.enabled);
+    }
+
+    /// Throws again from the pier end until a throw makes three skips (a few tries).
+    private async Task _throw_until_three()
+    {
+        Interactable stones = Game.Instance.camp.campsite.dock.GetNode<Interactable>("SkippingStones");
+        double[] pitches = { -0.02, -0.05, 0.0, -0.08, 0.02, -0.035 };
+        for (int i = 0; i < pitches.Length && Game.Instance.camp.pond.last_skips < 3 && Game.Instance.session.BestSkips < 3; i++)
+        {
+            await _aim_and_interact(stones.GlobalPosition, stones);
+            Vector3 throwDirection = -Game.Instance.camp.campsite.dock.GlobalBasis.Z;
+            _player.yaw = Math.Atan2(-throwDirection.X, -throwDirection.Z);
+            _player.pitch = pitches[i];
+            _player.GetViewport().PushInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = true });
+            await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
+            _player.GetViewport().PushInput(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = false });
+            await ToSignal(GetTree().CreateTimer(5), SceneTreeTimer.SignalName.Timeout);
+            G.print(G.format("TRAVERSAL rethrow pitch=%.3f skips=%d", new Godot.Collections.Array { pitches[i], (long)Game.Instance.camp.pond.last_skips }));
+        }
+    }
+
+    /// Walks towards `target` until within `within` of `near` (horizontally), or
+    /// until it stops getting closer: for standing close to something on the ground.
+    /// Steers at `target` with the forward key until `done` holds (true), or the
+    /// time runs out (false).
+    private async Task<bool> _walk_until(Vector2 target, Func<bool> done, double seconds)
+    {
+        double elapsed = 0;
+        while (!done() && elapsed < seconds)
+        {
+            Vector2 to = target - new Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z);
+            if (to.Length() > 0.3f) _player.yaw = Math.Atan2(-to.X, -to.Y);
+            Input.ActionPress("move_forward");
+            elapsed += GetPhysicsProcessDeltaTime();
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        _release();
+        _record("story_walk_out_post", done());
+        return done();
+    }
+
+    private async Task _approach(Vector2 target, Vector2 near, float within)
+    {
+        double elapsed = 0, since = 0, best = double.PositiveInfinity;
+        while (elapsed < WAYPOINT_TIMEOUT && since < 2.0)
+        {
+            Vector2 pos = new(_player.GlobalPosition.X, _player.GlobalPosition.Z);
+            double d = pos.DistanceTo(near);
+            if (d < within || pos.DistanceTo(target) < ARRIVE) break;
+            Vector2 to = target - pos;
+            _player.yaw = Math.Atan2(-to.X, -to.Y);
+            Input.ActionPress("move_forward");
+            if (d < best - 0.05) { best = d; since = 0; } else since += GetPhysicsProcessDeltaTime();
+            elapsed += GetPhysicsProcessDeltaTime();
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        _release();
+        _record("notch_side", true);
+    }
+
+    private async Task _wait_for(Func<bool> done, double seconds)
+    {
+        double waited = 0;
+        while (!done() && waited < seconds)
+        {
+            await ToSignal(GetTree().CreateTimer(0.25), SceneTreeTimer.SignalName.Timeout);
+            waited += 0.25;
+        }
+    }
+
+    /// Looks at `target` from the settled eye, without interacting.
+    private async Task _aim(Vector3 target)
+    {
+        await ToSignal(GetTree().CreateTimer(0.35), SceneTreeTimer.SignalName.Timeout);
+        Vector3 direction = target - _player.eye_position();
+        _player.yaw = Math.Atan2(-direction.X, -direction.Z);
+        _player.pitch = Math.Atan2(direction.Y, new Vector2(direction.X, direction.Z).Length());
+        await ToSignal(GetTree().CreateTimer(0.3), SceneTreeTimer.SignalName.Timeout);
+        _player.interact_ray.ForceRaycastUpdate();
+        _player._update_focus();
+    }
+
+    // ---- Time per band --------------------------------------------------------------
+
+    private readonly List<(string band, double seconds)> _bandTimes = new();
+    private string _bandName = "";
+    private double _bandStart;
+
+    private void _start_band_clock(CampSession session)
+    {
+        _bandName = $"{session.Story.Chapter.Id}/{session.Story.Band.Id}";
+        _bandStart = Time.GetTicksMsec() / 1000.0;
+        session.BandStarted += t => _close_band(t.ToChapter != null ? $"{t.ToChapter.Id}/{t.ToBand!.Id}" : "");
+    }
+
+    private void _close_band(string next)
+    {
+        double now = Time.GetTicksMsec() / 1000.0;
+        if (_bandName.Length > 0)
+        {
+            _bandTimes.Add((_bandName, now - _bandStart));
+            G.print(G.format("TRAVERSAL_BAND band=%s seconds=%.1f", new Godot.Collections.Array { _bandName, now - _bandStart }));
+        }
+        _bandName = next;
+        _bandStart = now;
+    }
+
+    private void _report_band_times()
+    {
+        if (_bandName.Length > 0 && Game.Instance.session is CampSession s && !s.Story.Finished) _close_band("");
+        var times = new Godot.Collections.Dictionary();
+        foreach ((string band, double seconds) in _bandTimes) times[band] = seconds;
+        _report["band_seconds"] = times;
+        double total = _bandTimes.Sum(b => b.seconds);
+        _report["story_seconds"] = total;
+        G.print(G.format("TRAVERSAL_STORY_TIME seconds=%.1f bands=%d", new Godot.Collections.Array { total, _bandTimes.Count }));
+    }
     /// Walks to the woodpile, takes a log, walks to the fire and adds it.
     private async Task _carry_log_to_fire()
     {

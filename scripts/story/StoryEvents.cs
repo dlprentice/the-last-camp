@@ -43,8 +43,10 @@ public static class StoryEvents
     /// cannot happen. Add an event here in the change that wires it.
     public static readonly HashSet<string> Built = new()
     {
-        LogCarried, StoneSkips, StoneSunk, PlacePierEnd, FireLit, LanternLit, TentEntered,
-        RestBedroll, RestFire, TurnedIn, FireFedInRain, StormSheltered, WokeAfterStorm,
+        LetterRead, LogCarried, StoneSkips, StoneSunk, PlaceTrailhead, PlacePierEnd, SatPier, FireLit,
+        LanternLit, TentEntered, RestBedroll, RestFire, TurnedIn,
+        TinOpened, PlaceOldRing, BlazeFound, SatLookout, StepLifted, FireFedInRain, StormSheltered,
+        WokeAfterStorm, TentStruck, AshRaked, StonesScattered, WalkedOut, CreditsFinished,
     };
 
     /// The name part of `name:value`, which is what `Built` lists for counted events.

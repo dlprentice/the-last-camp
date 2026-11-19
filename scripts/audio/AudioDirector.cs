@@ -168,8 +168,19 @@ public partial class AudioDirector : Node
         public SmoothedValue amp;
         public double trim_db;
 
+        /// Smallest level change written to the player. Every VolumeDb write makes
+        /// the AudioServer swap the playback's bus details, which the audio thread
+        /// reads while it mixes; the engine frees a swapped-out copy two main-loop
+        /// frames later. Writing a bed's level every frame (thousands a second in
+        /// an uncapped headless run) let a copy be freed while the mixer still read
+        /// it. Steady beds now write nothing.
+        public const double LEVEL_STEP_DB = 0.05;
+        public double written_db = double.NaN;
+
         public void set_level(double db)
         {
+            if (!double.IsNaN(written_db) && Math.Abs(db - written_db) < LEVEL_STEP_DB && !(db <= SILENT_DB && written_db > SILENT_DB)) return;
+            written_db = db;
             if (player is AudioStreamPlayer flat) flat.VolumeDb = (float)db;
             else if (player is AudioStreamPlayer3D spatial) spatial.VolumeDb = (float)db;
         }
@@ -958,6 +969,27 @@ public partial class AudioDirector : Node
                 _play_wildlife(Sounds.Loon, _rng.RandfRange(-5.0f, 0.0f));
             }
         }
+    }
+
+    /// One hiss now: a log going onto the fire in the rain. Played only while
+    /// it rains on a burning fire, like the scheduled ones.
+    public void fire_hiss()
+    {
+        if (!_is_setup || !IsInsideTree() || _rain < 0.25 || _fire_intensity < 0.05)
+        {
+            return;
+        }
+        int variant = pick_variant(Sounds.FireHiss);
+        AudioStream stream = bank.Stream(Sounds.FireHiss, variant);
+        if (stream == null)
+        {
+            return;
+        }
+        _fire_hiss.Stream = stream;
+        _fire_hiss.PitchScale = _rng.RandfRange(0.95f, 1.05f);
+        _fire_hiss.VolumeDb = (float)play_db(Sounds.FireHiss, variant, linear_to_db(maxf(_rain, 0.3)));
+        _fire_hiss.Play();
+        _hiss_timer.reset(_rng.RandfRange(3.0f, 6.0f));
     }
 
     /// Rain hissing on the coals while the fire burns in the rain.

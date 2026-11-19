@@ -208,8 +208,23 @@ public partial class Places : Node3D
         return true;
     }
 
+    /// The player has stood on the loose step at least once (it then offers itself).
+    public bool loose_step_stood_on = false;
+    bool _on_loose;
+
+    /// The player stepped onto the loose step (each time, not only the first).
+    public event Action LooseStepPressed;
+
     public override void _PhysicsProcess(double delta)
     {
+        bool on = IsPlayerOnLooseStep();
+        rock?.update_rock(on, delta);
+        if (on && !_on_loose)
+        {
+            loose_step_stood_on = true;
+            LooseStepPressed?.Invoke();
+        }
+        _on_loose = on;
         if (BlazeInView == null || blazes.Count == 0) return;
         _poll -= delta;
         if (_poll > 0.0) return;

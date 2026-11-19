@@ -20,7 +20,6 @@ public static class ScriptPins
     {
         typeof(AudioDirector.SmoothedValue),
         typeof(GdBox),
-        typeof(GrassPlanter.Chunk),
         typeof(MeshBuilder),
         typeof(PondSimulation),
         typeof(QualityPreset),

@@ -368,7 +368,8 @@ public partial class TomsRock : Node3D
         part(new Vector3(rim_x, rim_h, s.Z - 2 * rim_z), new Vector3(s.X * 0.5f - rim_x * 0.5f, rim_y, 0), "RimRight");
         part(new Vector3(rim_x, rim_h, s.Z - 2 * rim_z), new Vector3(-s.X * 0.5f + rim_x * 0.5f, rim_y, 0), "RimLeft");
         loose_body = new StaticBody3D { Name = "LooseStepBody", CollisionLayer = 1, CollisionMask = 0 };
-        loose_body.SetMeta("surface", (StringName)"rock");
+        // It sounds hollow underfoot: the footstep on it is the hollow step.
+        loose_body.SetMeta("surface", (StringName)"hollow");
         var shape_362 = new BoxShape3D { Size = s };
         loose_body.AddChild(new CollisionShape3D { Shape = shape_362 });
         GC.KeepAlive(shape_362);
@@ -399,15 +400,65 @@ public partial class TomsRock : Node3D
         return Math.Abs(local.X) <= h.X + 0.12f && Math.Abs(local.Z) <= h.Z + 0.12f && local.Y > h.Y - 0.08f && local.Y < h.Y + 0.3f;
     }
 
+    /// Where the footstone is laid once lifted: on the summit beside its place.
+    public Transform3D lifted_pose()
+    {
+        Vector2 aside = PlacesLayout.local(0.25, -0.95);
+        double ground = field.height(aside.X, aside.Y);
+        Basis basis = summit_basis(-14.0) * new Basis(Vector3.Forward, Mathf.DegToRad(1.5f));
+        return new Transform3D(basis, new Vector3(aside.X, (float)(ground - 0.012 + LOOSE_SIZE.Y * 0.5), aside.Y));
+    }
+
     /// Lifts the footstone off and lays it on the summit beside its place,
-    /// leaving the tin open to view and reach. Its collision goes with it.
+    /// leaving the tin open to view and reach. Its collision goes with it. In
+    /// the live scene it is raised clear, carried aside and set down over
+    /// `LIFT_SECONDS`, eased; outside the tree it is placed at once.
     public void lift_step()
     {
         if (step_lifted) return;
         step_lifted = true;
-        Vector2 aside = PlacesLayout.local(0.25, -0.95);
-        double ground = field.height(aside.X, aside.Y);
-        Basis basis = summit_basis(-14.0) * new Basis(Vector3.Forward, Mathf.DegToRad(1.5f));
-        loose_step.Transform = new Transform3D(basis, new Vector3(aside.X, (float)(ground - 0.012 + LOOSE_SIZE.Y * 0.5), aside.Y));
+        _rock_angle = 0.0;
+        Transform3D target = lifted_pose();
+        if (!IsInsideTree())
+        {
+            loose_step.Transform = target;
+            return;
+        }
+        Transform3D from = loose_step.Transform;
+        Transform3D raised = new(from.Basis.Slerp(target.Basis, 0.4f), from.Origin.Lerp(target.Origin, 0.35f) + Vector3.Up * 0.28f);
+        Tween tween = CreateTween();
+        tween.TweenMethod(Callable.From((float t) => loose_step.Transform = from.InterpolateWith(raised, t)), 0.0f, 1.0f, LIFT_SECONDS * 0.45)
+            .SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Sine);
+        tween.TweenMethod(Callable.From((float t) => loose_step.Transform = raised.InterpolateWith(target, t)), 0.0f, 1.0f, LIFT_SECONDS * 0.55)
+            .SetEase(Tween.EaseType.InOut).SetTrans(Tween.TransitionType.Sine);
+    }
+
+    public const double LIFT_SECONDS = 1.6;
+    /// How far the footstone rocks under a foot, and how fast it eases there.
+    public const double ROCK_DEG = 2.6;
+    public const double ROCK_EASE = 7.0;
+    double _rock_angle;
+
+    /// Eases the footstone towards rocked (pressed down at its front, about its
+    /// settled back edge) while someone stands on it, and back when they step off.
+    public void update_rock(bool pressed, double delta)
+    {
+        if (step_lifted || loose_step == null) return;
+        double target = pressed ? ROCK_DEG : 0.0;
+        double next = Mathf.Lerp(_rock_angle, target, 1.0 - Math.Exp(-delta * ROCK_EASE));
+        if (Math.Abs(next - _rock_angle) < 1e-5 && Math.Abs(next - target) < 1e-4) return;
+        _rock_angle = next;
+        loose_step.Transform = rocked_pose(loose_rest, _rock_angle);
+    }
+
+    public double rock_angle => _rock_angle;
+
+    /// `rest` turned `degrees` about its back bottom edge, the front going down.
+    public static Transform3D rocked_pose(Transform3D rest, double degrees)
+    {
+        Vector3 hinge_local = new(0, -LOOSE_SIZE.Y * 0.5f, LOOSE_SIZE.Z * 0.5f);
+        Basis basis = rest.Basis * new Basis(Vector3.Right, -Mathf.DegToRad((float)degrees));
+        Vector3 hinge_world = rest * hinge_local;
+        return new Transform3D(basis, hinge_world - basis * hinge_local);
     }
 }

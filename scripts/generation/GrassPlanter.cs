@@ -19,7 +19,9 @@ namespace LastCamp;
 /// Output is a MultiMesh buffer per chunk, ready to upload.
 public partial class GrassPlanter
 {
-    public partial class Chunk : RefCounted
+    /// Plain managed data: the planner fills chunks on worker threads, so they
+    /// are no engine objects (nothing to finalize or free off the main thread).
+    public sealed class Chunk
     {
         public Vector2 origin;
         public long count = 0;
@@ -47,9 +49,9 @@ public partial class GrassPlanter
     public double density;
     public long seed_value = 424242;
     public ScalarField suitability;
-    public Godot.Collections.Array<GrassPlanter.Chunk> chunks = new Godot.Collections.Array<GrassPlanter.Chunk>();
+    public List<GrassPlanter.Chunk> chunks = new List<GrassPlanter.Chunk>();
     public long total_blades = 0;
-    public Godot.Collections.Array<GrassPlanter.Chunk> distant_chunks = new Godot.Collections.Array<GrassPlanter.Chunk>();
+    public List<GrassPlanter.Chunk> distant_chunks = new List<GrassPlanter.Chunk>();
     public long distant_clumps = 0;
     public FastNoiseLite patches = meadow_patch_noise();
 
@@ -104,23 +106,23 @@ public partial class GrassPlanter
                 origins.Add(origin);
             }
         }
-        Godot.Collections.Array results = new Godot.Collections.Array();
-        G.resize(results, (int)(long)origins.Count);
+        var results = new GrassPlanter.Chunk[origins.Count];
+        var cells = new List<Vector2>(origins);
         long base_seed = seed_value;
         Callable task = Callable.From((long index) =>
 {
-    RandomNumberGenerator local_rng = new RandomNumberGenerator();
+    // Released on this thread when the task ends, never by the finalizer.
+    using RandomNumberGenerator local_rng = new RandomNumberGenerator();
     // Stable world-cell seeds retain the same plants when quality changes
     // the extent; indexing the origins array moved every clump instead.
-    Vector2 cell = origins[(int)index] / (float)CHUNK_SIZE;
+    Vector2 cell = cells[(int)index] / (float)CHUNK_SIZE;
     local_rng.Seed = unchecked((ulong)(base_seed + (long)cell.X * 73856093 + (long)cell.Y * 19349663));
-    results[(int)index] = _plan_chunk(origins[(int)index], local_rng);
+    results[(int)index] = _plan_chunk(cells[(int)index], local_rng);
 });
         long group = WorkerThreadPool.AddGroupTask(task, (int)(long)origins.Count, (int)PLANNING_TASKS, false, "grass");
         WorkerThreadPool.WaitForGroupTaskCompletion(group);
-        foreach (Variant r in results)
+        foreach (GrassPlanter.Chunk chunk in results)
         {
-            GrassPlanter.Chunk chunk = r.As<GrassPlanter.Chunk>();
             if (chunk != null && chunk.count > 0)
             {
                 chunks.Add(chunk);
@@ -136,7 +138,7 @@ public partial class GrassPlanter
     /// Combine neighbouring upload batches without moving, resampling or
     /// thinning any plants. A 16 m render cell replaces four 8 m draw calls;
     /// placement seeds and the original vertex data remain unchanged.
-    public static Godot.Collections.Array<Chunk> merge_chunks(Godot.Collections.Array<Chunk> input, int cellSize)
+    public static List<Chunk> merge_chunks(List<Chunk> input, int cellSize)
     {
         var groups = new Dictionary<Vector2I, Chunk>();
         foreach (Chunk source in input)
@@ -152,7 +154,7 @@ public partial class GrassPlanter
             target.buffer.AddRange(source.buffer);
             target.aabb = target.aabb.Merge(source.aabb);
         }
-        return new Godot.Collections.Array<Chunk>(groups.Values);
+        return new List<Chunk>(groups.Values);
     }
 
     /// Keep every instance intact but distribute prefixes across the whole cell.
@@ -335,20 +337,19 @@ public partial class GrassPlanter
                 }
             }
         }
-        Godot.Collections.Array results = new Godot.Collections.Array();
-        G.resize(results, (int)(long)origins.Count);
+        var results = new GrassPlanter.Chunk[origins.Count];
+        var cells = new List<Vector2>(origins);
         Callable task = Callable.From((long index) =>
 {
-    Vector2 cell = origins[(int)index] / (float)DISTANT_CHUNK_SIZE;
-    RandomNumberGenerator rng = new RandomNumberGenerator();
+    Vector2 cell = cells[(int)index] / (float)DISTANT_CHUNK_SIZE;
+    using RandomNumberGenerator rng = new RandomNumberGenerator();
     rng.Seed = unchecked((ulong)(seed_value + 7301 + (long)cell.X * 73856093 + (long)cell.Y * 19349663));
-    results[(int)index] = _plan_distant_chunk(origins[(int)index], rng);
+    results[(int)index] = _plan_distant_chunk(cells[(int)index], rng);
 });
         long group = WorkerThreadPool.AddGroupTask(task, (int)(long)origins.Count, (int)PLANNING_TASKS, false, "hill groundcover");
         WorkerThreadPool.WaitForGroupTaskCompletion(group);
-        foreach (Variant result in results)
+        foreach (GrassPlanter.Chunk chunk in results)
         {
-            GrassPlanter.Chunk chunk = result.As<GrassPlanter.Chunk>();
             if (chunk.count > 0)
             {
                 distant_chunks.Add(chunk);
