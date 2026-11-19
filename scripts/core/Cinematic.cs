@@ -1294,7 +1294,7 @@ public partial class Cinematic : Node
 
     public static Godot.Collections.Array<Godot.Collections.Dictionary> score_cues(string _name)
     {
-        // Retain the standalone synthesis study, but every film is nature-only.
+        // No film has music cues: the films are nature and Foley only.
         return new Godot.Collections.Array<Godot.Collections.Dictionary>();
     }
 
