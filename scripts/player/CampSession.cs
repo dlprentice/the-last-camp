@@ -45,9 +45,9 @@ public partial class CampSession : Node
             StoryState? loaded = Slot.Load();
             if (loaded == null && Slot.LastError.Length > 0)
             {
-                GD.PushWarning(Slot.LastError);
-                // Never save over a slot that could not be read and could not be kept.
-                if (Slot.PreserveRejected().Length == 0) Saving = false;
+                // The slot copied itself aside (or blocked saving) before anything saves.
+                GD.PushWarning(Slot.LastError + (Slot.Rejected.Length > 0 ? $" (kept as {Slot.Rejected})" : " (could not be kept; saving is off)"));
+                if (Slot.Blocked) Saving = false;
                 Game.Instance.hud?.notify("The saved story could not be read. Starting fresh; the old file is kept.");
             }
             Story = loaded ?? new StoryState();
@@ -219,7 +219,16 @@ public partial class CampSession : Node
     public void ReachPlace(string place) => Story.Raise("place:" + place);
     public void ReachTrailhead() => ReachPlace("trailhead");
     public void SitAtPierEnd(Player player) => _ = Sit(StoryEvents.SatPier, player);
-    public void OpenTin() { Story.AddItem("tally_book"); Story.Raise(StoryEvents.TinOpened); }
+    /// Whether Tom's tin can be opened yet: only after the old fire ring. The tin's
+    /// interaction should offer itself only while this is true.
+    public bool TinAvailable => Story.TinAvailable;
+    public bool OpenTin()
+    {
+        if (!Story.TinAvailable) return false;
+        Story.AddItem("tally_book");
+        Story.Raise(StoryEvents.TinOpened);
+        return true;
+    }
     public void FindBlaze() => Story.Raise(StoryEvents.BlazeFound);
     public void SitAtLookout(Player player) => _ = Sit(StoryEvents.SatLookout, player);
     public void LiftStep(Player player) { Story.AddItem("tom_letter"); Story.Raise(StoryEvents.StepLifted); _ = EndBand(StoryEvents.StepLifted, player); }
@@ -255,6 +264,8 @@ public partial class CampSession : Node
             if (Game.Instance.mode != Game.Mode.PLAY) continue;
             elapsed += GetProcessDeltaTime();
             world.hour = Mathf.Lerp(from, Math.Max(from, target), Math.Min(elapsed / StoryScript.SunsetSeconds, 1.0));
+            // The band now holds at the later time; the clock never goes back.
+            Story.HoldAt(world.hour);
         }
         world.cycle_running = running;
         _sunsetRunning = false;
@@ -284,15 +295,19 @@ public partial class CampSession : Node
     /// sequence or a fade through black, the clock jump, then an autosave.
     public async Task<bool> EndBand(string act, Player? player)
     {
-        if (Resting || !Story.CanEndBy(act)) return false;
+        if (_ending || Resting || !Story.CanEndBy(act)) return false;
         EndAct endAct = Story.EndActFor(act)!;
-        Resting = true;
+        _ending = true;
         try
         {
             Band next = NextBand() ?? Story.Band;
+            // The sunset is play: the pause menu and the journal still open, and
+            // pausing pauses the sunset. Only the fade itself blocks input.
             if (endAct.Sunset) await RunSunset(next.Start);
+            if (!IsInsideTree() || !Story.CanEndBy(act)) return false;
             if (endAct.Fade)
             {
+                Resting = true;
                 player?.suspend();
                 await Game.Instance.hud.FadeRest(true);
                 if (!IsInsideTree()) return false;
@@ -315,8 +330,11 @@ public partial class CampSession : Node
         finally
         {
             Resting = false;
+            _ending = false;
         }
     }
+
+    private bool _ending;
 
     private Band? NextBand()
     {
@@ -329,7 +347,9 @@ public partial class CampSession : Node
     {
         if (transition.ToBand is not Band band) return;
         WorldController world = Game.Instance.world;
-        if (jumpClock || world.hour < band.Start && band.Start - world.hour < 12) world.hour = band.Start;
+        // Forward only: a new chapter is a new day; within a day the clock never goes back.
+        bool later = band.Start > world.hour && band.Start - world.hour < 12;
+        if (later || jumpClock && transition.ChapterChanged) world.hour = band.Start;
         world.cycle_hours_per_second = band.ClockRate;
         world.cycle_running = true;
         Firepit fire = Game.Instance.camp.campsite.firepit;

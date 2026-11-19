@@ -12,7 +12,9 @@ public sealed record Objective(string Id, string Event, int Count = 1, string Jo
 /// `Fade` the screen goes through black and the clock jumps to the next band's
 /// start; `Sunset` first runs the clock to the next band's start over
 /// `StoryScript.SunsetSeconds` (the sunset sequence) and then carries on without a fade.
-public sealed record EndAct(string Event, bool Fade = true, bool Sunset = false);
+/// An act with `FallbackFor` set ends the band only while that event's place is
+/// not built: it keeps the game moving until the real act exists, then retires.
+public sealed record EndAct(string Event, bool Fade = true, bool Sunset = false, string FallbackFor = "");
 
 /// A stretch of a chapter's clock. The clock starts at `Start`, runs at the rate
 /// that shows the whole arc to `Hold` in about `ExpectedSeconds` and stops at
@@ -50,8 +52,13 @@ public static class StoryScript
 
     /// Real seconds the sunset sequence takes to run the clock to the next band.
     public const double SunsetSeconds = 90.0;
-    /// The fire counts as alive through the storm while it stays above this.
-    public const double StormFireThreshold = 0.05;
+    /// The fire's visible floor: below it there is no flame or light.
+    public const double StormFireFloor = 0.02;
+    /// The fire has gone out in the storm once it stays below the floor this long.
+    public const double StormFireOutSeconds = 3.0;
+    /// Seconds into the "storm" weather phase when rain begins to fall
+    /// (`CampWeather.conditions`); the storm's fire reading starts there.
+    public const double StormRainStartSeconds = 8.0;
     /// Extra fire decay per second at full rain (the fire itself decays slowly anyway).
     public const double RainFireDecay = 0.0045;
     /// Storm weather phases, in band seconds. The rain then holds until the
@@ -74,7 +81,7 @@ public static class StoryScript
                     new("logs", StoryEvents.LogCarried, 3, "Carry three logs to the fire ring."),
                     new("skips", StoryEvents.StoneSkips + ":3", 1, "Skip a stone three times. Stones wait at the end of the pier."),
                 },
-                new EndAct[] { new(StoryEvents.SatPier, Fade: false, Sunset: true), new(StoryEvents.RestBedroll) }),
+                new EndAct[] { new(StoryEvents.SatPier, Fade: false, Sunset: true), new(StoryEvents.RestBedroll, FallbackFor: StoryEvents.SatPier) }),
             new("night", "Night", 20.5, 23.5, 23.75, 300,
                 new Objective[]
                 {
@@ -102,9 +109,9 @@ public static class StoryScript
                     new("step", StoryEvents.StepLifted, 1, "Read what Tom left."),
                 },
                 // Lifting the step is the band's last act; the walk down continues
-                // into the storm without a fade. Rest is the way on while the
-                // lookout is not built yet.
-                new EndAct[] { new(StoryEvents.StepLifted, Fade: false), new(StoryEvents.RestBedroll) }),
+                // into the storm without a fade. Rest is the way on only while the
+                // step is not built yet.
+                new EndAct[] { new(StoryEvents.StepLifted, Fade: false), new(StoryEvents.RestBedroll, FallbackFor: StoryEvents.StepLifted) }),
             new("storm", "The Storm", 20.5, 23.5, 23.75, 360,
                 new Objective[]
                 {
@@ -127,6 +134,7 @@ public static class StoryScript
     };
 
     /// June's entries (e1..e7) and margin notes (m1..m9), with the script's triggers.
+    /// Margin notes belong to their chapter and expire with it.
     public static readonly LineTrigger[] Lines =
     {
         new("e1", LineKind.Entry, StoryEvents.LetterRead),
@@ -136,15 +144,15 @@ public static class StoryScript
         new("e5", LineKind.Entry, StoryEvents.SatLookout),
         new("e6", LineKind.Entry, StoryEvents.StormSheltered),
         new("e7", LineKind.Entry, StoryEvents.CreditsFinished),
-        new("m1", LineKind.MarginNote, StoryEvents.PlaceTrailhead),
-        new("m2", LineKind.MarginNote, StoryEvents.LogCarried),
-        new("m3", LineKind.MarginNote, StoryEvents.StoneSunk),
-        new("m4", LineKind.MarginNote, StoryEvents.PlacePierEnd),
-        new("m5", LineKind.MarginNote, StoryEvents.LanternLit),
-        new("m6", LineKind.MarginNote, StoryEvents.TentEntered),
-        new("m7", LineKind.MarginNote, StoryEvents.TinOpened),
-        new("m8", LineKind.MarginNote, StoryEvents.WokeAfterStorm),
-        new("m9", LineKind.MarginNote, StoryEvents.AshRaked),
+        new("m1", LineKind.MarginNote, StoryEvents.PlaceTrailhead, Arrival),
+        new("m2", LineKind.MarginNote, StoryEvents.LogCarried, Arrival),
+        new("m3", LineKind.MarginNote, StoryEvents.StoneSunk, Arrival),
+        new("m4", LineKind.MarginNote, StoryEvents.PlacePierEnd, Arrival),
+        new("m5", LineKind.MarginNote, StoryEvents.LanternLit, Arrival),
+        new("m6", LineKind.MarginNote, StoryEvents.TentEntered, Arrival),
+        new("m7", LineKind.MarginNote, StoryEvents.TinOpened, Marks),
+        new("m8", LineKind.MarginNote, StoryEvents.WokeAfterStorm, Epilogue),
+        new("m9", LineKind.MarginNote, StoryEvents.AshRaked, Epilogue),
     };
 
     public static Chapter ChapterById(string id) =>

@@ -34,12 +34,14 @@ public partial class TestStory : TestCase
         var s = new StoryState { RequireUnbuilt = true };
         foreach (string ev in new[] { StoryEvents.LetterRead, StoryEvents.LogCarried, StoryEvents.LogCarried, StoryEvents.LogCarried, "stone_skips:4" })
             s.Raise(ev);
-        s.Advance(StoryEvents.RestBedroll);
+        s.Advance(StoryEvents.SatPier);
         s.Raise(StoryEvents.FireLit);
         s.AddItem("june_letter");
         s.AddItem("tally_book");
         s.StormOutcome = "went_out";
-        s.StormMinFire = 0.02;
+        s.StormFireOutSeconds = 1.75;
+        s.StormFireWentOut = true;
+        s.ClockHeldAt = 20.25;
         s.BandSeconds = 12.5;
         s.ShelterSeconds = 4.25;
         s.ClearingElapsed = 3.5;
@@ -85,7 +87,9 @@ public partial class TestStory : TestCase
         assert_eq(string.Join(",", loaded.Items), "june_letter,tally_book", "story items");
         assert_true(loaded.LinesPlayed.SetEquals(saved.LinesPlayed) && loaded.LinesPlayed.Contains("e1") && loaded.LinesPlayed.Contains("e3"), "lines played");
         assert_eq(loaded.StormOutcome, "went_out", "storm outcome");
-        assert_near(loaded.StormMinFire, 0.02, 0, "storm minimum fire");
+        assert_near(loaded.StormFireOutSeconds, 1.75, 0, "seconds the storm fire has been out");
+        assert_true(loaded.StormFireWentOut, "the storm fire's latch");
+        assert_near(loaded.ClockHeldAt, 20.25, 0, "the sunset hold");
         assert_true(loaded.World.HasPosition && loaded.World.X == -12.5 && loaded.World.Y == 1.25 && loaded.World.Z == 4.75 && loaded.World.Yaw == 1.5, "last safe position");
         assert_eq(loaded.BestSkips, 6, "stone record");
         assert_true(loaded.RecordsMigrated, "records migration flag");
@@ -234,8 +238,10 @@ public partial class TestStory : TestCase
         var s = new StoryState { RequireUnbuilt = true };
         var lines = new List<string>();
         s.LineTriggered += (id, _, _) => lines.Add(id);
+        s.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 0);
+        s.Raise(StoryEvents.PlaceOldRing);
         s.Raise(StoryEvents.TinOpened);
-        assert_eq(string.Join(" ", lines), "m7", "the tin's own note plays");
+        assert_eq(string.Join(" ", lines), "e4 m7", "the old ring's entry, then the tin's own note");
         // Every other trigger June has, entries and notes, from every band.
         foreach (LineTrigger line in StoryScript.Lines)
         {
@@ -246,7 +252,7 @@ public partial class TestStory : TestCase
                 s.Raise(line.Event);
             }
         }
-        assert_eq(string.Join(" ", lines), "m7", "no entry or note plays while the tin is open");
+        assert_eq(string.Join(" ", lines), "e4 m7", "no entry or note plays while the tin is open");
         assert_false(s.Facts.Contains(StoryEvents.SatLookout), "the lookout has not been reached");
     }
 
@@ -257,28 +263,174 @@ public partial class TestStory : TestCase
         Objective blaze = s.Band.Objectives.First(o => o.Event == StoryEvents.BlazeFound);
         s.Raise(StoryEvents.BlazeFound);
         assert_eq(s.ProgressOf(blaze), 0, "the notch means nothing before the tally book");
+        s.Raise(StoryEvents.PlaceOldRing);
         s.Raise(StoryEvents.TinOpened);
         s.Raise(StoryEvents.BlazeFound);
         assert_eq(s.ProgressOf(blaze), 1, "after the tin it is Tom's first blaze");
     }
 
-    public void test_margin_notes_return_after_the_lookout()
+    public void test_entries_resume_at_the_lookout_and_notes_after_the_storm()
     {
         var s = new StoryState { RequireUnbuilt = true };
         var lines = new List<string>();
         s.LineTriggered += (id, _, _) => lines.Add(id);
+        int marks = StoryScript.ChapterIndex(StoryScript.Marks);
+        s.SetPosition(marks, 0);
+        s.Raise(StoryEvents.PlaceOldRing);
         s.Raise(StoryEvents.TinOpened);
-        s.Raise(StoryEvents.TentEntered);
-        s.Raise(StoryEvents.LanternLit);
-        assert_eq(string.Join(" ", lines), "m7", "only the tin's own note plays while the tin is open");
+        s.SetPosition(marks, 1);
         s.Raise(StoryEvents.SatLookout);
+        s.SetPosition(marks, 2);
+        s.Raise(StoryEvents.StormSheltered);
+        assert_eq(string.Join(" ", lines), "e4 m7 e5 e6", "entries come back at the lookout");
         s.Raise(StoryEvents.TentEntered);
-        assert_eq(string.Join(" ", lines), "m7 e5 m6", "notes come back after the lookout, once each");
+        s.SetPosition(StoryScript.ChapterIndex(StoryScript.Epilogue), 0);
         s.Raise(StoryEvents.AshRaked);
+        assert_eq(string.Join(" ", lines), "e4 m7 e5 e6", "margin notes stay silent until June wakes you after the storm");
+        s.Raise(StoryEvents.WokeAfterStorm);
+        assert_eq(lines.Last(), "m8", "m8 is the first note after the storm");
+        // m9 was raised early and stayed silent; it can still play once, then nothing.
+        s.Raise(StoryEvents.AshRaked);
+        assert_eq(lines.Last(), "m9", "June's last note");
         s.Raise(StoryEvents.LanternLit);
-        assert_false(lines.Contains("m5"), "nothing follows June's last note until the postcard");
+        s.Raise(StoryEvents.PlaceOldRing);
+        assert_eq(lines.Last(), "m9", "nothing follows June's last note until the postcard");
         s.Raise(StoryEvents.CreditsFinished);
         assert_eq(lines.Last(), "e7", "the postcard still plays");
+    }
+
+    public void test_margin_notes_expire_with_their_chapter()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        var lines = new List<string>();
+        s.LineTriggered += (id, _, _) => lines.Add(id);
+        foreach (int chapter in new[] { StoryScript.ChapterIndex(StoryScript.Marks), StoryScript.ChapterIndex(StoryScript.Epilogue) })
+        {
+            s.SetPosition(chapter, 0);
+            foreach (string ev in new[] { StoryEvents.StoneSunk, StoryEvents.PlacePierEnd, StoryEvents.PlaceTrailhead, StoryEvents.LogCarried, StoryEvents.LanternLit, StoryEvents.TentEntered })
+                s.Raise(ev);
+        }
+        assert_eq(lines.Count, 0, "Arrival's notes (m1 to m6) cannot play in a later chapter");
+        s.SetPosition(0, 0);
+        s.Raise(StoryEvents.StoneSunk);
+        s.Raise(StoryEvents.PlacePierEnd);
+        assert_eq(string.Join(" ", lines), "m3 m4", "they play in their own chapter");
+    }
+
+    public void test_tin_waits_for_the_old_ring()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        s.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 0);
+        assert_false(s.TinAvailable, "the tin is not offered before the old ring");
+        s.Raise(StoryEvents.TinOpened);
+        assert_false(s.Facts.Contains(StoryEvents.TinOpened), "opening it early does nothing");
+        assert_false(s.LinesPlayed.Contains("m7"), "and plays nothing");
+        s.Raise(StoryEvents.PlaceOldRing);
+        assert_true(s.TinAvailable, "after the old ring the tin is offered");
+        s.Raise(StoryEvents.TinOpened);
+        assert_true(s.BandDone, "ring then tin completes the morning");
+        var game = new StoryState();
+        game.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 0);
+        assert_true(game.TinAvailable, "while the old ring is not built, nothing gates the tin");
+    }
+
+    public void test_rest_ends_a_band_only_while_its_real_act_is_unbuilt()
+    {
+        var finished = new StoryState { RequireUnbuilt = true };
+        assert_true(finished.EndActFor(StoryEvents.RestBedroll) == null, "once the pier seat exists, rest does not end the evening");
+        assert_true(finished.EndActFor(StoryEvents.SatPier) != null, "the evening ends by sitting at the pier end");
+        finished.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 1);
+        assert_true(finished.EndActFor(StoryEvents.RestBedroll) == null, "once the step exists, rest does not end the climb");
+        var game = new StoryState();
+        assert_true(game.EndActFor(StoryEvents.RestBedroll) != null, "while the pier seat is unbuilt, rest is the way on");
+    }
+
+    public void test_sunset_sit_moves_the_clock_forward_and_holds_there()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        s.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 1);
+        Band evening = s.Band;
+        s.Raise(StoryEvents.PlaceOldRing);
+        s.Raise(StoryEvents.TinOpened);
+        s.Raise(StoryEvents.BlazeFound);
+        s.Raise(StoryEvents.SatLookout);
+        for (int i = 0; i <= 20; i++)
+        {
+            double hour = Mathf.Lerp(evening.Hold - 0.1, evening.Limit, i / 20.0);
+            s.HoldAt(hour);
+            assert_true(s.AllowedClock(hour) >= hour - 1e-9, $"the sunset's clock {hour:F2} is never pulled back");
+        }
+        assert_false(s.BandDone, "the step is not lifted yet");
+        assert_near(s.AllowedClock(23.0), evening.Limit, 1e-9, "after the sit the band holds at the later time");
+        assert_near(s.AllowedClock(evening.Limit), evening.Limit, 1e-9, "not at the earlier hold");
+        s.Raise(StoryEvents.StepLifted);
+        s.Advance(StoryEvents.StepLifted);
+        assert_near(s.ClockHeldAt, -1, 0, "the next band starts with its own holds");
+    }
+
+    public void test_storm_fire_reading_starts_with_the_rain_and_needs_three_seconds_out()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        s.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 2);
+        double rainStarts = StoryScript.GatheringSeconds + StoryScript.StormRainStartSeconds;
+        for (double t = 0; t < rainStarts - 1; t += 0.5) s.StormTick(0.5, 0.0, false);
+        assert_false(s.StormFireWentOut, "a fire that is out before the rain does not count");
+        while (s.BandSeconds < rainStarts + 1) s.StormTick(0.5, 1.0, false);
+        for (int i = 0; i < 5; i++) s.StormTick(0.5, 0.01, false);
+        s.StormTick(0.5, 0.5, false);
+        assert_false(s.StormFireWentOut, "2.5 s below the floor is a flicker, not out");
+        s.StormTick(0.5, StoryScript.StormFireFloor, false);
+        assert_false(s.StormFireWentOut, "at the visible floor the fire is still alive");
+        for (int i = 0; i < 6; i++) s.StormTick(0.5, 0.0, false);
+        assert_true(s.StormFireWentOut, "three seconds below the floor in the rain is out");
+        for (int i = 0; i < 4; i++) s.StormTick(0.5, 1.5, false);
+        assert_true(s.StormFireWentOut, "relighting does not undo it");
+    }
+
+    public void test_malformed_saves_are_rejected_kept_and_never_overwritten()
+    {
+        StorySave slot = FreshSlot("fuzz");
+        assert_true(slot.Save(Full()), "a good save to start from");
+        string real = ProjectSettings.GlobalizePath(slot.SlotPath);
+        string good = File.ReadAllText(real);
+        var bad = new List<string>
+        {
+            good.Replace("\"facts\": [", "\"facts\": [null, "),
+            good.Replace("\"items\": [", "\"items\": [null, "),
+            good.Replace("\"lines_played\": [", "\"lines_played\": [null, "),
+            good.Replace("\"lines_played\": [", "\"lines_played\": [7, "),
+            good.Replace("\"facts\": [", "\"facts\": [{}, "),
+            good.Replace("\"clock\": 21.25", "\"clock\": \"late\""),
+            good.Replace("\"clock\": 21.25", "\"clock\": null"),
+            good.Replace("\"chapter\": \"arrival\"", "\"chapter\": 3"),
+            good.Replace("\"finished\": false", "\"finished\": \"no\""),
+            good.Replace("\"position\": {", "\"position\": [1, 2], \"unused\": {"),
+            good.Replace("\"weather\": {", "\"weather\": null, \"unused\": {"),
+            good.Replace("\"objectives\": {", "\"objectives\": [], \"unused\": {"),
+            good.Replace("\"version\": 1", "\"version\": 2"),
+            good.Replace("\"version\": 1", "\"version\": \"1\""),
+            good[..(good.Length * 3 / 4)],
+            good[..1],
+            "[]",
+            "null",
+            "\u0000\u0001",
+        };
+        int index = 0;
+        foreach (string text in bad)
+        {
+            index++;
+            assert_false(text == good, $"shape {index} really differs from the good save");
+            File.WriteAllText(real, text);
+            StoryState? loaded = null;
+            try { loaded = slot.Load(); }
+            catch (Exception error) { _fail($"shape {index}: Load threw {error.GetType().Name}"); }
+            assert_true(loaded == null, $"shape {index} is rejected");
+            assert_true(slot.Rejected.Length > 0 && File.Exists(slot.Rejected) && File.ReadAllText(slot.Rejected) == text,
+                $"shape {index} is copied aside before anything saves");
+            assert_true(slot.Save(new StoryState()), $"a fresh story saves after shape {index}");
+            assert_true(slot.Load() != null, $"the fresh story loads after shape {index}");
+        }
+        Remove(slot);
     }
 
     public void test_band_clock_holds_until_its_objectives_are_done()
@@ -287,7 +439,7 @@ public partial class TestStory : TestCase
         Band evening = s.Band;
         assert_near(s.AllowedClock(evening.Start + 0.1), evening.Start + 0.1, 1e-9, "the clock runs inside the band");
         assert_near(s.AllowedClock(23.0), evening.Hold, 1e-9, "the clock stops at the band's end");
-        assert_true(s.Advance(StoryEvents.RestBedroll) == null, "the band cannot end before its objectives");
+        assert_true(s.Advance(StoryEvents.SatPier) == null, "the band cannot end before its objectives");
         s.Raise(StoryEvents.LetterRead);
         s.Raise(StoryEvents.LogCarried);
         s.Raise(StoryEvents.LogCarried);
@@ -310,6 +462,7 @@ public partial class TestStory : TestCase
         var s = new StoryState();
         assert_eq(string.Join(",", s.Required(s.Band).Select(o => o.Id)), "logs,skips", "the letter waits for its table");
         assert_true(s.EndActFor(StoryEvents.SatPier) == null && s.EndActFor(StoryEvents.RestBedroll) != null, "rest ends the evening until the pier seat exists");
+        assert_true(s.Advance(StoryEvents.RestBedroll) == null, "but not before the evening's objectives");
         foreach ((Chapter chapter, Band band) in StoryScript.AllBands())
         {
             if (chapter.Id == StoryScript.Epilogue) continue;

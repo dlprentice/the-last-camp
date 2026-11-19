@@ -269,6 +269,12 @@ public partial class TraversalCheck : Node
         await _aim_and_interact(fire.GlobalPosition + Vector3.Up * 0.3f, fire.body);
         _check("feeding consumes the carried log and increases the fire", _player.held_item == "" && fire.intensity > fuelBefore + 0.3);
         await _screenshot("fire_fed");
+        if (Game.Instance.session != null)
+        {
+            // The story's evening asks for three logs: carry the other two for real.
+            await _carry_log_to_fire();
+            await _carry_log_to_fire();
+        }
         await _aim_and_interact(fire.GlobalPosition + Vector3.Up * 0.3f, fire.body);
         _check("empty-handed fire interaction starts resting", _player.resting);
         Input.ActionPress("move_back");
@@ -325,16 +331,21 @@ public partial class TraversalCheck : Node
         await _screenshot("after_quality_change");
         if (Game.Instance.session is CampSession evening)
         {
-            // The route carries one log and throws one stone; the story counts
-            // both, and the rest of the evening's objectives go in through the
-            // same story events so the rest and sleep below can be checked.
+            // The three logs and the throw above went through the real carry and
+            // throw. Injected, because the route cannot do them yet: June's letter
+            // (the camp table's letter is not built; the game does not require it
+            // until it is), and three skips only if the route's single fixed throw
+            // fell short of three (it is tuned for at least two).
             var story = evening.Story;
-            _check("story counts the carried log and the throw", story.Facts.Contains(LastCamp.Story.StoryEvents.LogCarried) &&
+            var logs = story.Band.Objectives.First(o => o.Event == LastCamp.Story.StoryEvents.LogCarried);
+            _check("story counts the three carried logs and the throw", story.ProgressOf(logs) == 3 &&
                 story.Facts.Contains(LastCamp.Story.StoryEvents.StoneSkips));
             evening.ReadLetter();
-            evening.TendFire();
-            evening.TendFire();
-            evening.RecordSkips(3);
+            if (Game.Instance.camp.pond.last_skips < 3)
+            {
+                G.print(G.format("TRAVERSAL injected=stone_skips:3 thrown=%d", (long)Game.Instance.camp.pond.last_skips));
+                evening.Story.Raise(LastCamp.Story.StoryEvents.StoneSkips + ":3");
+            }
             _check("camp journal recognises completed evening activities", evening.BandDone);
             _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = true });
             await ToSignal(GetTree().CreateTimer(0.2, true), SceneTreeTimer.SignalName.Timeout);
@@ -358,14 +369,32 @@ public partial class TraversalCheck : Node
             await _aim_and_interact(bed.GlobalPosition, bed);
             await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
             _check("resting at the tent advances to dusk and restores control", !evening.Resting && _player.enabled && Game.Instance.world.hour > 20);
-            evening.TendFire();
+            // Night: light the fire with a real log, light the lantern, walk back.
+            await _go_to("night_leave_tent", new Vector2(3.6f, -2.8f));
+            await _carry_log_to_fire();
             if (!_player.lantern_on) _player.toggle_lantern();
             _check("lighting the fire and the lantern completes the night", evening.BandDone);
+            await _go_to("night_seats", new Vector2(3.8f, 3.8f));
+            await _go_to("night_door", new Vector2(4.4f, -0.4f));
+            await _go_to("night_around_woodpile", new Vector2(3.6f, -2.8f));
+            await _go_to("night_tent_entrance", new Vector2(entrance.X, entrance.Z));
             await _aim_and_interact(bed.GlobalPosition, bed);
             await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
             _check("sleeping completes the evening and returns to playable dawn", evening.Story.Chapter.Id == LastCamp.Story.StoryScript.Marks && _player.enabled && Game.Instance.world.hour < 7);
             await _screenshot("morning_completed");
         }
+    }
+
+    /// Walks to the woodpile, takes a log, walks to the fire and adds it.
+    private async Task _carry_log_to_fire()
+    {
+        await _go_to("woodpile_approach", new Vector2(4.6f, -0.05f));
+        Interactable wood = Game.Instance.camp.campsite.woodpile;
+        await _aim_and_interact(wood.GlobalPosition + Vector3.Up * 0.28f, wood);
+        await _go_to("fire_feed_approach", new Vector2(1.7f, 1.8f));
+        Firepit fire = Game.Instance.camp.campsite.firepit;
+        await _aim_and_interact(fire.GlobalPosition + Vector3.Up * 0.3f, fire.body);
+        _check("a carried log reaches the fire", _player.held_item == "");
     }
 
     private async Task _aim_and_interact(Vector3 target, Node expected)

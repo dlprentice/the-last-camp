@@ -43,7 +43,12 @@ public sealed class StoryState
     public readonly List<string> Items = new();
     /// "", then "survived" or "went_out" once the storm band has ended.
     public string StormOutcome = "";
-    public double StormMinFire = double.PositiveInfinity;
+    /// Continuous seconds the fire has been below its visible floor in the storm's rain.
+    public double StormFireOutSeconds;
+    /// Latched once the fire has stayed out for `StoryScript.StormFireOutSeconds`.
+    public bool StormFireWentOut;
+    /// A sunset sit ran the clock to here; the band holds here rather than earlier.
+    public double ClockHeldAt = -1;
     public double BandSeconds;
     public double ShelterSeconds;
     public double ClearingElapsed = -1;
@@ -89,14 +94,23 @@ public sealed class StoryState
     public bool BandDone => !Finished && Required(Band).All(IsDone);
 
     /// June says nothing at all, entries included, from the opening of Tom's tin
-    /// until the lookout (the tin's own note m7 and the lookout's entry e5 are the
-    /// edges), and nothing after her last note until the postcard.
+    /// until the lookout (the tin's own note m7 and the lookout's entry e5 are the edges).
     public bool JuneSilent => Facts.Contains(StoryEvents.TinOpened) && !Facts.Contains(StoryEvents.SatLookout);
+
+    /// Her margin notes stay silent longer: from the tin until she wakes you after
+    /// the storm (m8 is that edge).
+    public bool MarginsSilent => JuneSilent || Facts.Contains(StoryEvents.TinOpened) && !Facts.Contains(StoryEvents.WokeAfterStorm);
+
+    /// Tom's tin can be opened only after the old fire ring (while that place is
+    /// not built, nothing gates it).
+    public bool TinAvailable => !Counts(StoryEvents.PlaceOldRing) || Facts.Contains(StoryEvents.PlaceOldRing) &&
+        StoryScript.ChapterIndex(StoryScript.Marks) <= ChapterIndex;
 
     /// Records an event. Returns true when it moved an objective of the active band.
     public bool Raise(string ev)
     {
         if (string.IsNullOrEmpty(ev)) return false;
+        if (ev == StoryEvents.TinOpened && !TinAvailable) return false;
         bool tinOpen = Facts.Contains(StoryEvents.TinOpened);
         Facts.Add(ev);
         Facts.Add(StoryEvents.BaseName(ev));
@@ -125,8 +139,9 @@ public sealed class StoryState
             if (LinesPlayed.Contains(line.Id) || !StoryEvents.Satisfies(ev, line.Event)) continue;
             if (line.Chapter.Length > 0 && (line.Chapter != Chapter.Id || Finished)) continue;
             if (line.Band.Length > 0 && line.Band != Band.Id) continue;
-            if (line.Id != "e7" && Facts.Contains(StoryEvents.AshRaked) && ev != StoryEvents.AshRaked) continue;
-            if (JuneSilent && ev != StoryEvents.TinOpened) continue;
+            // Nothing follows June's last note (m9) until the postcard.
+            if (line.Id != "e7" && LinesPlayed.Contains("m9")) continue;
+            if (ev != StoryEvents.TinOpened && (line.Kind == LineKind.Entry ? JuneSilent : MarginsSilent)) continue;
             LinesPlayed.Add(line.Id);
             string variant = line.Id == "e7" ? (StormOutcome.Length > 0 ? StormOutcome : FireSurvivingStorm ? "survived" : "went_out") : "";
             LineTriggered?.Invoke(line.Id, line.Kind, variant);
@@ -134,7 +149,8 @@ public sealed class StoryState
     }
 
     /// The end acts this band accepts now (built ones only in the game).
-    public IEnumerable<EndAct> EndActs => Finished ? Enumerable.Empty<EndAct>() : Band.EndActs.Where(a => Counts(a.Event));
+    public IEnumerable<EndAct> EndActs => Finished ? Enumerable.Empty<EndAct>() :
+        Band.EndActs.Where(a => Counts(a.Event) && (a.FallbackFor.Length == 0 || !Counts(a.FallbackFor)));
 
     public EndAct? EndActFor(string ev) => EndActs.FirstOrDefault(a => a.Event == ev);
 
@@ -174,21 +190,33 @@ public sealed class StoryState
         BandSeconds = 0;
         ShelterSeconds = 0;
         ClearingElapsed = -1;
-        if (toBand != null && toBand.Storm) StormMinFire = double.PositiveInfinity;
+        ClockHeldAt = -1;
+        if (toBand != null && toBand.Storm)
+        {
+            StormFireOutSeconds = 0;
+            StormFireWentOut = false;
+        }
         if (toChapter != null && toChapter.Id == StoryScript.Epilogue && StormOutcome.Length > 0)
             Raise(StoryEvents.WokeAfterStorm);
         return new BandTransition(fromChapter, fromBand, toChapter, toBand, endAct);
     }
 
     /// The clock the band allows: it stops at `Hold` until the band is done, then
-    /// at `Limit`. The clock never runs backwards here; jumps come from transitions.
+    /// at `Limit`; after a sunset sit it holds at the later time the sit reached.
+    /// It only ever lowers a clock that ran past the hold, never below the sit.
     public double AllowedClock(double hour)
     {
         if (Finished) return hour;
-        return Math.Min(hour, BandDone ? Band.Limit : Band.Hold);
+        return Math.Min(hour, Math.Max(BandDone ? Band.Limit : Band.Hold, ClockHeldAt));
     }
 
-    public bool FireSurvivingStorm => double.IsPositiveInfinity(StormMinFire) || StormMinFire > StoryScript.StormFireThreshold;
+    /// Records that a sunset sit carried the clock to `hour`.
+    public void HoldAt(double hour) => ClockHeldAt = Math.Max(ClockHeldAt, hour);
+
+    public bool FireSurvivingStorm => !StormFireWentOut;
+
+    /// The rain has started falling in this storm band (the fire reading runs from here).
+    public bool StormRaining => Band.Storm && (Sheltered || BandSeconds >= StoryScript.GatheringSeconds + StoryScript.StormRainStartSeconds);
 
     public bool Sheltered => !Finished && Band.Storm && Band.Objectives.Any(o => o.Event == StoryEvents.StormSheltered && IsDone(o));
 
@@ -198,7 +226,11 @@ public sealed class StoryState
     {
         if (Finished || !Band.Storm) return new WeatherPhase("", 0, 1);
         BandSeconds += delta;
-        StormMinFire = Math.Min(StormMinFire, fireIntensity);
+        if (StormRaining && !StormFireWentOut)
+        {
+            StormFireOutSeconds = fireIntensity < StoryScript.StormFireFloor ? StormFireOutSeconds + delta : 0;
+            if (StormFireOutSeconds >= StoryScript.StormFireOutSeconds) StormFireWentOut = true;
+        }
         WeatherPhase phase = StormWeather();
         bool raining = phase.Chapter is "storm" or "shelter_rain";
         if (!Sheltered && raining && inTent)

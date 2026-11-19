@@ -30,10 +30,19 @@ public sealed class StorySave
         ? ProjectSettings.GlobalizePath(path) : path;
 
     public bool Exists => File.Exists(Real(SlotPath));
+    /// Where the last rejected slot was copied, or "".
+    public string Rejected { get; private set; } = "";
+    /// True when a rejected slot could not be copied aside: saves are refused.
+    public bool Blocked { get; private set; }
 
     /// Writes the state. Returns false, keeps the old slot and sets `LastError` on failure.
     public bool Save(StoryState state)
     {
+        if (Blocked)
+        {
+            LastError = "Not saving over a story save that could not be read or kept.";
+            return false;
+        }
         string text = Serialize(state);
         string temp = Real(TempPath), slot = Real(SlotPath);
         try
@@ -78,8 +87,16 @@ public sealed class StorySave
             return null;
         }
         StoryState? state = Parse(text, out string problem);
-        LastError = state == null ? $"The story save was not used: {problem}" : "";
-        return state;
+        if (state != null)
+        {
+            LastError = "";
+            return state;
+        }
+        LastError = $"The story save was not used: {problem}";
+        Rejected = PreserveRejected();
+        // Never save over a slot that could not be read and could not be kept.
+        if (Rejected.Length == 0) Blocked = true;
+        return null;
     }
 
     /// Copies a slot that failed to load beside it (`story.rejected-<stamp>.json`)
@@ -88,7 +105,7 @@ public sealed class StorySave
     {
         string slot = Real(SlotPath);
         if (!File.Exists(slot)) return "";
-        string copy = Real(Directory.TrimEnd('/') + $"/story.rejected-{DateTime.UtcNow:yyyyMMddHHmmss}.json");
+        string copy = Real(Directory.TrimEnd('/') + $"/story.rejected-{DateTime.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}.json");
         try
         {
             File.Copy(slot, copy, false);
@@ -130,6 +147,7 @@ public sealed class StorySave
             ["facts"] = new JsonArray(s.Facts.OrderBy(f => f, StringComparer.Ordinal).Select(f => (JsonNode)f).ToArray()),
             ["clock"] = w.Clock,
             ["band_seconds"] = s.BandSeconds,
+            ["clock_held_at"] = s.ClockHeldAt,
             ["weather"] = new JsonObject
             {
                 ["chapter"] = w.WeatherChapter, ["seconds"] = w.WeatherSeconds, ["duration"] = w.WeatherDuration,
@@ -141,7 +159,8 @@ public sealed class StorySave
             ["storm"] = new JsonObject
             {
                 ["outcome"] = s.StormOutcome,
-                ["min_fire"] = double.IsPositiveInfinity(s.StormMinFire) ? -1 : s.StormMinFire,
+                ["fire_out_seconds"] = s.StormFireOutSeconds,
+                ["fire_went_out"] = s.StormFireWentOut,
                 ["shelter_seconds"] = s.ShelterSeconds,
                 ["clearing_seconds"] = s.ClearingElapsed,
             },
@@ -178,10 +197,11 @@ public sealed class StorySave
                     if (value < 0 || value > objective.Count) { problem = $"objective {key} out of range"; return null; }
                     if (value > 0) s.Progress[key] = value;
                 }
-            foreach (JsonNode? fact in Need(root, "facts").AsArray()) s.Facts.Add(fact!.GetValue<string>());
+            foreach (JsonNode? fact in Need(root, "facts").AsArray()) s.Facts.Add(Text(fact));
             WorldSnapshot w = s.World;
             w.Clock = Finite(Need(root, "clock").GetValue<double>(), 0, 24);
             s.BandSeconds = Finite(Need(root, "band_seconds").GetValue<double>(), 0, 1e7);
+            s.ClockHeldAt = Finite(Need(root, "clock_held_at").GetValue<double>(), -1, 24);
             JsonObject weather = Need(root, "weather").AsObject();
             w.WeatherChapter = Need(weather, "chapter").GetValue<string>();
             w.WeatherSeconds = Finite(Need(weather, "seconds").GetValue<double>(), 0, 1e7);
@@ -190,21 +210,22 @@ public sealed class StorySave
             w.Rain = Finite(Need(weather, "rain").GetValue<double>(), 0, 1);
             w.Wet = Finite(Need(weather, "wet").GetValue<double>(), 0, 1);
             w.FireIntensity = Finite(Need(root, "fire_intensity").GetValue<double>(), 0, Firepit.MAX_INTENSITY);
-            foreach (JsonNode? item in Need(root, "items").AsArray()) s.AddItem(item!.GetValue<string>());
+            foreach (JsonNode? item in Need(root, "items").AsArray()) s.AddItem(Text(item));
             foreach (JsonNode? line in Need(root, "lines_played").AsArray())
             {
-                string id = line!.GetValue<string>();
+                string id = Text(line);
                 if (!StoryScript.Lines.Any(l => l.Id == id)) { problem = $"unknown line '{id}'"; return null; }
                 s.LinesPlayed.Add(id);
             }
             JsonObject storm = Need(root, "storm").AsObject();
             s.StormOutcome = Need(storm, "outcome").GetValue<string>();
             if (s.StormOutcome is not ("" or "survived" or "went_out")) { problem = $"unknown storm outcome '{s.StormOutcome}'"; return null; }
-            double minFire = Need(storm, "min_fire").GetValue<double>();
-            s.StormMinFire = minFire < 0 ? double.PositiveInfinity : Finite(minFire, 0, Firepit.MAX_INTENSITY);
+            s.StormFireOutSeconds = Finite(Need(storm, "fire_out_seconds").GetValue<double>(), 0, 1e7);
+            s.StormFireWentOut = Need(storm, "fire_went_out").GetValue<bool>();
             s.ShelterSeconds = Finite(Need(storm, "shelter_seconds").GetValue<double>(), 0, 1e7);
             s.ClearingElapsed = Finite(Need(storm, "clearing_seconds").GetValue<double>(), -1, 1e7);
             if (!root.ContainsKey("position")) { problem = "missing position"; return null; }
+            if (root["position"] is not (null or JsonObject)) { problem = "position is not an object"; return null; }
             if (root["position"] is JsonObject position)
             {
                 w.HasPosition = true;
@@ -217,8 +238,9 @@ public sealed class StorySave
             s.RecordsMigrated = Need(root, "records_migrated").GetValue<bool>();
             return s;
         }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException or FormatProblem or KeyNotFoundProblem or ArgumentException)
+        catch (Exception error)
         {
+            // Any failure at all while reading means the slot is not trusted.
             problem = error.Message;
             return null;
         }
@@ -229,6 +251,9 @@ public sealed class StorySave
 
     private static JsonNode Need(JsonObject node, string key) =>
         node.TryGetPropertyValue(key, out JsonNode? value) && value != null ? value : throw new KeyNotFoundProblem(key);
+
+    private static string Text(JsonNode? node) =>
+        node is JsonValue value && value.TryGetValue(out string? text) && text.Length > 0 ? text : throw new FormatProblem("an entry is not text");
 
     private static double Finite(double value, double min, double max) =>
         double.IsFinite(value) && value >= min && value <= max ? value : throw new FormatProblem($"value {value} outside {min}..{max}");
