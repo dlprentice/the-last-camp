@@ -10,6 +10,8 @@ line has been checked first-hand.
 
 Work paused when the machine was given to other games; it resumes here.
 
+Maintainer notes for resuming are in the untracked local-data/RESUME.md.
+
 - **On `master`:** Godot 4.8 beta4 with the C# engine workarounds (script pins, collection
   keep-alive, an audio-thread volume rule); the story spine from arrival to the ending,
   the save, and every story interaction; the places (trailhead post, old fire ring, Tom's
