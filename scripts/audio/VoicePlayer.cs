@@ -9,7 +9,7 @@ namespace LastCamp;
 
 /// One paragraph of one of June's lines. `Variant` is empty, or the storm outcome
 /// ("survived", "went_out") the paragraph belongs to.
-public sealed record VoiceParagraph(string Id, string Line, string Variant, string Text, string File, double Lufs);
+public sealed record VoiceParagraph(string Id, string Line, string Variant, string Text, string File, double Lufs, double TruePeak);
 
 /// June's lines as `audio/generated/voice.json` lists them, paragraph by paragraph
 /// in playing order. The text is tracked; the voice files are licensed and may be
@@ -49,7 +49,8 @@ public sealed class VoiceScript
                     p["variant"]?.GetValue<string>() ?? "",
                     p["text"]?.GetValue<string>() ?? "",
                     p["file"]?.GetValue<string>() ?? "",
-                    p["lufs"]?.GetValue<double>() ?? double.NaN));
+                    p["lufs"] is JsonValue lufs ? lufs.GetValue<double>() : double.NaN,
+                    p["true_peak"] is JsonValue peak ? peak.GetValue<double>() : double.NaN));
             }
         }
         catch (Exception error) when (error is System.Text.Json.JsonException or InvalidOperationException or FormatException)
@@ -70,6 +71,16 @@ public sealed class VoiceScript
 
     /// How long a subtitle stays up when there is no voice file: an unhurried
     /// reading pace, never shorter than a glance.
+    /// Levelled alike: each take is brought to the voice target (-16 LUFS) from its
+    /// measured loudness, never above the true-peak ceiling (an unmeasured peak counts
+    /// as full scale).
+    public static double GainDb(VoiceParagraph paragraph)
+    {
+        double gain = double.IsFinite(paragraph.Lufs) ? Math.Clamp(AudioDirector.TARGET_LUFS["voice"] - paragraph.Lufs, -20, 20) : 0.0;
+        double peak = double.IsFinite(paragraph.TruePeak) ? paragraph.TruePeak : 0.0;
+        return Math.Min(gain, AudioDirector.PEAK_CEILING_DBTP - peak);
+    }
+
     public static double ReadingSeconds(string text)
     {
         int words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
@@ -191,9 +202,7 @@ public partial class VoicePlayer : Node
         if (_voiced)
         {
             _player.Stream = stream;
-            // Levelled alike: each take is brought to the voice target from its measured loudness.
-            double target = AudioDirector.TARGET_LUFS["voice"];
-            _player.VolumeDb = (float)(double.IsFinite(Current.Lufs) ? Math.Clamp(target - Current.Lufs, -20, 20) : 0.0);
+            _player.VolumeDb = (float)VoiceScript.GainDb(Current);
             _player.Play();
             // A short floor so a stream that has not started yet is not taken for finished.
             Remaining = 0.2;

@@ -52,7 +52,11 @@ public partial class AudioDirector : Node
     };
 
     public const double VOICE_DUCK_DB = -6.0;
-    public const double LIMITER_CEILING_DB = -1.5;
+    /// The bus limiters are a safety net only: files are levelled offline and no
+    /// single sound may play above [constant PEAK_CEILING_DBTP].
+    public const double LIMITER_CEILING_DB = -1.0;
+    /// No file plays above this true peak, whatever gain the mix asks for.
+    public const double PEAK_CEILING_DBTP = -1.0;
     public const double SILENT_DB = -80.0;
     public const double START_FADE_SECONDS = 2.5;
     public const long SCHEDULER_SEED = 7;
@@ -86,8 +90,14 @@ public partial class AudioDirector : Node
         return id.StartsWith("step_", StringComparison.Ordinal) ? "footsteps" : "actions";
     }
 
-    /// The level that plays one file of `id` at its category's target.
+    /// The trim that plays one file of `id` at its category's target. The files are
+    /// levelled offline (tools/prepare_audio.py), so this is small.
     public double level_db(string id, int variant) => bank.GainDb(id, variant, TARGET_LUFS[category_of(id)]);
+
+    /// The level to play one file at: its trim plus `extra_db` (jitter, fades,
+    /// intensity), capped so the file's true peak never passes [constant PEAK_CEILING_DBTP].
+    public double play_db(string id, int variant, double extra_db = 0.0) =>
+        Math.Min(level_db(id, variant) + extra_db, PEAK_CEILING_DBTP - bank.TruePeak(id, variant));
 
     /// First-order smoother for levels and pitch; avoids zipper noise and hard cuts.
     public partial class SmoothedValue : RefCounted
@@ -387,7 +397,7 @@ public partial class AudioDirector : Node
         AudioStreamPlayer player = _footstep_pool.next();
         player.Stream = stream;
         player.PitchScale = pitch;
-        player.VolumeDb = (float)(level_db(id, variant) + FOOTSTEP_TRIM_DB[surface] + jitter + (running ? 3.0 : 0.0) + gain_db);
+        player.VolumeDb = (float)play_db(id, variant, FOOTSTEP_TRIM_DB[surface] + jitter + (running ? 3.0 : 0.0) + gain_db);
         player.Play();
     }
 
@@ -420,7 +430,7 @@ public partial class AudioDirector : Node
         AudioStreamPlayer player = category_of(id) == "ui" ? _ui_pool.next() : _interact_pool.next();
         player.Stream = stream;
         player.PitchScale = pitch;
-        player.VolumeDb = (float)(level_db(id, variant) + jitter);
+        player.VolumeDb = (float)play_db(id, variant, jitter);
         player.Play();
     }
 
@@ -462,7 +472,7 @@ public partial class AudioDirector : Node
         emitter.Stream = stream;
         emitter.Position = at;
         emitter.PitchScale = (float)(1.0 + Math.Min(hop, 6) * 0.05);
-        emitter.VolumeDb = (float)(level_db(id, variant) - Math.Min(hop, 6) * 1.5);
+        emitter.VolumeDb = (float)play_db(id, variant, -Math.Min(hop, 6) * 1.5);
         emitter.Play();
     }
 
@@ -484,7 +494,7 @@ public partial class AudioDirector : Node
         AudioStreamPlayer player = _thunder_pool.next();
         player.Stream = stream;
         player.PitchScale = pitch;
-        player.VolumeDb = (float)(level_db(Sounds.Thunder, variant) + linear_to_db(maxf(power, 0.3)) + (sheltered ? -4.0 : 0.0));
+        player.VolumeDb = (float)play_db(Sounds.Thunder, variant, linear_to_db(maxf(power, 0.3)) + (sheltered ? -4.0 : 0.0));
         player.Play();
     }
 
@@ -697,8 +707,8 @@ public partial class AudioDirector : Node
             _lap_beds.Add(_add_bed(lap, Sounds.BedPondLap, 1.5));
         }
 
-        _water_in = _make_player("WaterIn", bank.Stream(Sounds.WaterIn, 0), BUS_WATER_FOLEY, level_db(Sounds.WaterIn, 0));
-        _water_out = _make_player("WaterOut", bank.Stream(Sounds.WaterOut, 0), BUS_WATER_FOLEY, level_db(Sounds.WaterOut, 0));
+        _water_in = _make_player("WaterIn", bank.Stream(Sounds.WaterIn, 0), BUS_WATER_FOLEY, play_db(Sounds.WaterIn, 0));
+        _water_out = _make_player("WaterOut", bank.Stream(Sounds.WaterOut, 0), BUS_WATER_FOLEY, play_db(Sounds.WaterOut, 0));
 
         _fill_pool(_wildlife_pool, "Wildlife", WILDLIFE_POOL_SIZE, BUS_AMBIENCE);
         _fill_pool(_footstep_pool, "Footstep", FOOTSTEP_POOL_SIZE, BUS_SFX);
@@ -749,6 +759,8 @@ public partial class AudioDirector : Node
         emitter.MaxDistance = (float)max_distance;
         emitter.VolumeDb = (float)SILENT_DB;
         emitter.AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.InverseDistance;
+        // Never louder than at the unit distance, so the true-peak cap holds up close.
+        emitter.MaxDb = 0.0f;
         AddChild(emitter);
         return emitter;
     }
@@ -870,11 +882,8 @@ public partial class AudioDirector : Node
             {
                 amp *= canopy_swell;
             }
-            double db = amp < 0.003 ? SILENT_DB : level_db(bed.id, 0) + linear_to_db(amp);
-            if (bed == _fire_bed && amp >= 0.003)
-            {
-                db += _fire_flare_db;
-            }
+            double flare = bed == _fire_bed ? _fire_flare_db : 0.0;
+            double db = amp < 0.003 ? SILENT_DB : play_db(bed.id, 0, linear_to_db(amp) + flare);
             bed.set_level(db);
         }
         ((AudioStreamPlayer3D)_fire_bed.player).PitchScale = (float)_fire_pitch.step(delta);
@@ -969,7 +978,7 @@ public partial class AudioDirector : Node
         }
         _fire_hiss.Stream = stream;
         _fire_hiss.PitchScale = _rng.RandfRange(0.95f, 1.05f);
-        _fire_hiss.VolumeDb = (float)(level_db(Sounds.FireHiss, variant) + linear_to_db(maxf(_rain, 0.3)));
+        _fire_hiss.VolumeDb = (float)play_db(Sounds.FireHiss, variant, linear_to_db(maxf(_rain, 0.3)));
         _fire_hiss.Play();
     }
 
@@ -989,7 +998,7 @@ public partial class AudioDirector : Node
         AudioStreamPlayer player = _wildlife_pool.next();
         player.Stream = stream;
         player.PitchScale = pitch;
-        player.VolumeDb = (float)(level_db(id, variant) + gain_db);
+        player.VolumeDb = (float)play_db(id, variant, gain_db);
         player.Play();
     }
 

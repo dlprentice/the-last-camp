@@ -6,217 +6,279 @@
    "line": "e1",
    "variant": "",
    "text": "Well, you found the table, so you found the camp. I'm sorry about the trail. It used to be shorter, or I used to be younger.",
-   "file": "voice/e1-p1.mp3"
+   "file": "voice/e1-p1.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e1-p2",
    "line": "e1",
    "variant": "",
    "text": "I want three things, love. Light the fire one more time. Find our marks, the places your grandfather and I kept going back to. And on the last morning, leave it the way we found it. The state wants it back by the first, and they're welcome to it, as long as it goes back clean.",
-   "file": "voice/e1-p2.mp3"
+   "file": "voice/e1-p2.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e1-p3",
    "line": "e1",
    "variant": "",
    "text": "Tom spent his last summer up here on his own. Watching his herons, he said. I never asked what he was really doing. I wish I had.",
-   "file": "voice/e1-p3.mp3"
+   "file": "voice/e1-p3.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e2-p1",
    "line": "e2",
    "variant": "",
    "text": "Three. That's a start.",
-   "file": "voice/e2-p1.mp3"
+   "file": "voice/e2-p1.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e2-p2",
    "line": "e2",
    "variant": "",
    "text": "Tom's record was nine. He picked his stones a week ahead and kept them in his tackle tin like they were something precious. Flat, a bit heavier than you'd think, and never from the water's edge, because the edge ones are always wet and round.",
-   "file": "voice/e2-p2.mp3"
+   "file": "voice/e2-p2.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e2-p3",
    "line": "e2",
    "variant": "",
    "text": "I never beat him. I'm not sure I tried very hard. It was nice to watch him be pleased.",
-   "file": "voice/e2-p3.mp3"
+   "file": "voice/e2-p3.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e3-p1",
    "line": "e3",
    "variant": "",
    "text": "We lit our first fire here in the rain, in 1974. A whole box of matches. Tom swore at every one of them, very politely.",
-   "file": "voice/e3-p1.mp3"
+   "file": "voice/e3-p1.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e3-p2",
    "line": "e3",
    "variant": "",
    "text": "I always waited for the first star. It isn't a rule. It's just that if you light it in daylight you don't see it catch, and the catching is the best part.",
-   "file": "voice/e3-p2.mp3"
+   "file": "voice/e3-p2.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e3-p3",
    "line": "e3",
    "variant": "",
    "text": "Keep it small. A fire's for sitting by, not for showing off.",
-   "file": "voice/e3-p3.mp3"
+   "file": "voice/e3-p3.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e4-p1",
    "line": "e4",
    "variant": "",
    "text": "This is where we camped the first summer, before we knew where the wind came from. The smoke followed us all week. We moved down to the pond the next year and never came back up here except to sit.",
-   "file": "voice/e4-p1.mp3"
+   "file": "voice/e4-p1.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e4-p2",
    "line": "e4",
    "variant": "",
    "text": "The log was already lying there then. Tom said it was a bench that hadn't been told yet.",
-   "file": "voice/e4-p2.mp3"
+   "file": "voice/e4-p2.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e5-p1",
    "line": "e5",
    "variant": "",
    "text": "I came up here in 2014 with his ashes, because it was the highest place I could still climb to and you can see the whole pond. I sat on this rock and I thought how lucky, how lucky that there's a flat stone just here, the right height.",
-   "file": "voice/e5-p1.mp3"
+   "file": "voice/e5-p1.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e5-p2",
    "line": "e5",
    "variant": "",
    "text": "I didn't let him go all at once. A little every year. I brought the last of him up last autumn, and it took me most of the afternoon, and I knew on the way down I wouldn't manage it again. That's why it's you.",
-   "file": "voice/e5-p2.mp3"
+   "file": "voice/e5-p2.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e5-p3",
    "line": "e5",
    "variant": "",
    "text": "Sit a while, love. The sun's in no hurry, and neither was he.",
-   "file": "voice/e5-p3.mp3"
+   "file": "voice/e5-p3.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e6-p1",
    "line": "e6",
    "variant": "",
    "text": "In 1996 a storm like this one took the tent right down on top of us. Tom held up the middle pole with both hands for an hour, saying it was fine. It was not fine.",
-   "file": "voice/e6-p1.mp3"
+   "file": "voice/e6-p1.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e6-p2",
    "line": "e6",
    "variant": "",
    "text": "We spent the rest of that night under the canoe, on the wet ground, laughing like idiots. I don't remember being cold. I'm sure I was.",
-   "file": "voice/e6-p2.mp3"
+   "file": "voice/e6-p2.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e6-p3",
    "line": "e6",
    "variant": "",
    "text": "The fire will do what it does. You'll be all right in there.",
-   "file": "voice/e6-p3.mp3"
+   "file": "voice/e6-p3.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e7-p1",
    "line": "e7",
    "variant": "",
    "text": "Love. You found it. Forty years, and he goes and builds it into a hill.",
-   "file": "voice/e7-p1.mp3"
+   "file": "voice/e7-p1.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e7-p2",
    "line": "e7",
    "variant": "",
    "text": "I've read it more times than I'll tell you.",
-   "file": "voice/e7-p2.mp3"
+   "file": "voice/e7-p2.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e7-p3-kept",
    "line": "e7",
    "variant": "survived",
    "text": "You kept the fire through the storm. He'd have liked that. He never once managed it.",
-   "file": "voice/e7-p3-kept.mp3"
+   "file": "voice/e7-p3-kept.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e7-p4-lost",
    "line": "e7",
    "variant": "went_out",
    "text": "The fire went out in the storm, I expect. It always did. He never once managed to keep it either.",
-   "file": "voice/e7-p4-lost.mp3"
+   "file": "voice/e7-p4-lost.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "e7-p5",
    "line": "e7",
    "variant": "",
    "text": "Thank you for leaving it clean. Come and tell me about the herons.",
-   "file": "voice/e7-p5.mp3"
+   "file": "voice/e7-p5.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m1",
    "line": "m1",
    "variant": "",
    "text": "Tom carved that post. The seven is backwards. He said it was on purpose.",
-   "file": "voice/m1.mp3"
+   "file": "voice/m1.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m2",
    "line": "m2",
    "variant": "",
    "text": "Take them from the top. The bottom ones are holding the top ones up.",
-   "file": "voice/m2.mp3"
+   "file": "voice/m2.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m3",
    "line": "m3",
    "variant": "",
    "text": "They all do that at first.",
-   "file": "voice/m3.mp3"
+   "file": "voice/m3.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m4",
    "line": "m4",
    "variant": "",
    "text": "He built this the summer you were born. He measured it with his feet.",
-   "file": "voice/m4.mp3"
+   "file": "voice/m4.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m5",
    "line": "m5",
    "variant": "",
    "text": "Wick down a little. It smokes if you're greedy.",
-   "file": "voice/m5.mp3"
+   "file": "voice/m5.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m6",
    "line": "m6",
    "variant": "",
    "text": "Mind the left corner, it's been damp since 1996.",
-   "file": "voice/m6.mp3"
+   "file": "voice/m6.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m7",
    "line": "m7",
    "variant": "",
    "text": "His stones. I never touched them. Go on, though.",
-   "file": "voice/m7.mp3"
+   "file": "voice/m7.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m8",
    "line": "m8",
    "variant": "",
    "text": "Whatever the sky said last night, I'll have said it'd be fine.",
-   "file": "voice/m8.mp3"
+   "file": "voice/m8.mp3",
+   "lufs": null,
+   "true_peak": null
   },
   {
    "id": "m9",
    "line": "m9",
    "variant": "",
    "text": "All of it, love. They'll never know we were here.",
-   "file": "voice/m9.mp3"
+   "file": "voice/m9.mp3",
+   "lufs": null,
+   "true_peak": null
   }
  ]
 }

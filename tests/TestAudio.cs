@@ -47,6 +47,63 @@ public partial class TestAudio : TestCase
             assert_true(AudioDirector.TARGET_LUFS.ContainsKey(category), $"category {category} has a loudness target");
     }
 
+    public void test_files_are_levelled_offline_to_the_game_targets()
+    {
+        SoundBank bank = SoundBank.Load();
+        foreach (SoundBank.Entry entry in bank.Entries.Values)
+        {
+            assert_near(entry.Target, AudioDirector.TARGET_LUFS[AudioDirector.category_of(entry.Id)], 1e-9,
+                $"{entry.Id} was levelled to its category's target (tools/prepare_audio.py agrees with the game)");
+            assert_eq(entry.TruePeak.Length, entry.Variants, $"{entry.Id} has a true peak per file");
+            assert_true(entry.TruePeak.All(p => double.IsFinite(p) && p <= -1.4), $"{entry.Id} files peak at or under -1.5 dBTP");
+        }
+    }
+
+    public void test_no_file_can_play_above_the_true_peak_ceiling()
+    {
+        var director = new AudioDirector { bank = SoundBank.Load() };
+        foreach (SoundBank.Entry entry in director.bank.Entries.Values)
+            for (int v = 0; v < entry.Variants; v++)
+                foreach (double extra in new[] { -6.0, 0.0, 3.0, 9.0, 24.0 })
+                    assert_true(director.play_db(entry.Id, v, extra) + entry.TruePeak[v] <= AudioDirector.PEAK_CEILING_DBTP + 1e-9,
+                        $"{entry.Id} take {v + 1} with {extra:+0;-0} dB stays at or under -1 dBTP");
+        // Unmeasured peaks count as full scale; null measurements are read as unmeasured.
+        SoundBank unmeasured = SoundBank.Parse("""{ "sounds": { "ui_move": { "kind": "oneshot", "files": ["sfx/x.wav"], "lufs": [null], "true_peak": [null] } } }""");
+        assert_eq(unmeasured.Entries.Count, 1, "a null measurement does not break the manifest");
+        assert_near(unmeasured.Lufs(Sounds.UiMove, 0, -27.0), -27.0, 1e-9, "a null loudness falls back to the target");
+        assert_near(unmeasured.TruePeak(Sounds.UiMove, 0), 0.0, 1e-9, "a null true peak counts as full scale");
+        director.bank = unmeasured;
+        assert_true(director.play_db(Sounds.UiMove, 0, 12.0) <= AudioDirector.PEAK_CEILING_DBTP, "an unmeasured file is never raised past the ceiling");
+        assert_near(VoiceScript.GainDb(new VoiceParagraph("a", "a", "", "", "", -20.0, -6.0)), 4.0, 1e-9, "voice is levelled to -16 LUFS");
+        assert_near(VoiceScript.GainDb(new VoiceParagraph("a", "a", "", "", "", -30.0, -3.0)), 2.0, 1e-9, "voice gain stops at the true-peak ceiling");
+        assert_near(VoiceScript.GainDb(new VoiceParagraph("a", "a", "", "", "", double.NaN, double.NaN)), -1.0, 1e-9, "an unmeasured voice file is held under the ceiling");
+        director.Free();
+    }
+
+    public void test_every_action_sound_has_a_caller()
+    {
+        var source = new System.Text.StringBuilder();
+        var dirs = new Stack<string>(new[] { "res://scripts" });
+        while (dirs.Count > 0)
+        {
+            string dir = dirs.Pop();
+            if (dir == "res://scripts/audio") continue; // the director itself is not a caller
+            foreach (string sub in DirAccess.GetDirectoriesAt(dir)) dirs.Push($"{dir}/{sub}");
+            foreach (string file in DirAccess.GetFilesAt(dir).Where(f => f.EndsWith(".cs", StringComparison.Ordinal)))
+                source.Append(FileAccess.GetFileAsString($"{dir}/{file}"));
+        }
+        string text = source.ToString();
+        var names = typeof(Sounds).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.IsLiteral)
+            .ToDictionary(f => (string)f.GetRawConstantValue()!, f => f.Name);
+        foreach (string id in Sounds.Interactions)
+        {
+            // Skips and the sink play through water_impact, which the pond calls.
+            bool called = text.Contains("Sounds." + names[id], StringComparison.Ordinal)
+                || (id is Sounds.StoneSkip or Sounds.StoneSink && text.Contains("water_impact(", StringComparison.Ordinal));
+            assert_true(called, $"action sound {id} has a caller");
+        }
+    }
+
     public void test_levels_normalise_by_measured_loudness()
     {
         var director = new AudioDirector { bank = SoundBank.Load() };

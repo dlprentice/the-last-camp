@@ -14,7 +14,9 @@ public sealed class SoundBank
     public const string ManifestPath = "res://audio/generated/manifest.json";
     public const string Root = "res://audio/generated/";
 
-    public sealed record Entry(string Id, string Kind, string[] Files, double[] Lufs)
+    /// `Lufs` and `TruePeak` are measured per file by tools/prepare_audio.py after it
+    /// has levelled the file to `Target`; an unmeasured value is NaN.
+    public sealed record Entry(string Id, string Kind, string[] Files, double[] Lufs, double[] TruePeak, double Target)
     {
         public bool IsBed => Kind == "bed";
         public int Variants => Files.Length;
@@ -49,8 +51,10 @@ public sealed class SoundBank
                 if (node is not JsonObject entry) continue;
                 string kind = entry["kind"]?.GetValue<string>() ?? "oneshot";
                 string[] files = entry["files"]?.AsArray().Select(f => f!.GetValue<string>()).ToArray() ?? Array.Empty<string>();
-                double[] lufs = entry["lufs"]?.AsArray().Select(l => l!.GetValue<double>()).ToArray() ?? Array.Empty<double>();
-                bank.Entries[id] = new Entry(id, kind, files, lufs);
+                double[] lufs = Numbers(entry["lufs"]);
+                double[] peaks = Numbers(entry["true_peak"]);
+                double target = entry["target"] is JsonValue t ? t.GetValue<double>() : double.NaN;
+                bank.Entries[id] = new Entry(id, kind, files, lufs, peaks, target);
             }
         }
         catch (Exception error) when (error is System.Text.Json.JsonException or InvalidOperationException or FormatException)
@@ -60,6 +64,10 @@ public sealed class SoundBank
         }
         return bank;
     }
+
+    /// A JSON array of numbers where any element may be null (unmeasured).
+    private static double[] Numbers(JsonNode? node) =>
+        node is JsonArray array ? array.Select(n => n is JsonValue v ? v.GetValue<double>() : double.NaN).ToArray() : Array.Empty<double>();
 
     public bool Has(string id) => Entries.ContainsKey(id);
 
@@ -74,6 +82,14 @@ public sealed class SoundBank
         if (!Entries.TryGetValue(id, out Entry? entry) || variant < 0 || variant >= entry.Lufs.Length) return fallback;
         double value = entry.Lufs[variant];
         return double.IsFinite(value) ? value : fallback;
+    }
+
+    /// The measured true peak of one file (dBTP). Unmeasured counts as full scale.
+    public double TruePeak(string id, int variant)
+    {
+        if (!Entries.TryGetValue(id, out Entry? entry) || variant < 0 || variant >= entry.TruePeak.Length) return 0.0;
+        double value = entry.TruePeak[variant];
+        return double.IsFinite(value) ? value : 0.0;
     }
 
     /// The gain that brings a file from its measured loudness to `target_lufs`.

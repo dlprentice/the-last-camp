@@ -18,6 +18,11 @@ exists:
 - [`generated/voice.json`](generated/voice.json): June's lines paragraph by paragraph,
   with their text and file names.
 
+`tools/prepare_audio.py` makes the game files from the raw ElevenLabs takes: it
+levels each one offline to its category's loudness target under a -1.5 dBTP true
+peak (limiting the few takes too peaky to get there) and writes the measured
+loudness and true peak into the manifest.
+
 A copy of the repository without the files builds, runs and passes its tests; it
 plays silently, with June's lines as subtitles.
 
