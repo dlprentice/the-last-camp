@@ -140,7 +140,7 @@ def copy_runtime_notices(game: Path) -> list[Path]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", help="fresh directory beneath local-data/")
-    parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"), help="Godot 4.8 beta1 .NET executable")
+    parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"), help="Godot 4.8 beta4 .NET executable")
     parser.add_argument("--timeout", type=int, default=900)
     args = parser.parse_args(argv)
     if not 1 <= args.timeout <= 7200:
@@ -158,14 +158,14 @@ def main(argv: list[str] | None = None) -> int:
         env = {**os.environ, "TMPDIR": str(logs), "XDG_DATA_HOME": str(user / "data"),
                "XDG_CONFIG_HOME": str(user / "config"), "XDG_CACHE_HOME": str(user / "cache")}
         templates = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "godot/export_templates"
-        if not (templates / "4.8.beta1.mono").is_dir():
-            raise ExportFailure("Install matching Godot 4.8 beta1 .NET export templates first")
+        if not (templates / "4.8.beta4.mono").is_dir():
+            raise ExportFailure("Install matching Godot 4.8 beta4 .NET export templates first")
         template_link = user / "data/godot/export_templates"
         template_link.parent.mkdir(parents=True)
         template_link.symlink_to(templates, target_is_directory=True)
         version = budget.run("version", [engine, "--version"], REPO, logs, env).strip()
-        if not version.startswith("4.8.beta1.mono."):
-            raise ExportFailure(f"Expected Godot 4.8 beta1 .NET, got {version}")
+        if not version.startswith("4.8.beta4.mono."):
+            raise ExportFailure(f"Expected Godot 4.8 beta4 .NET, got {version}")
         budget.run("build", ["dotnet", "build", "--nologo"], REPO, logs, env)
         budget.run("export", [engine, "--headless", "--path", str(REPO), "--frame-delay", "1000",
                               "--export-release", "Linux", str(game / EXECUTABLE)], REPO, logs, env)

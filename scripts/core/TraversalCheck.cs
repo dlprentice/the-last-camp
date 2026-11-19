@@ -251,6 +251,8 @@ public partial class TraversalCheck : Node
 
         _player.toggle_lantern();
         bool lit = _player.lantern_on;
+        await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
+        await _screenshot("lantern_held");
         _player.toggle_lantern();
         _check("lantern toggles on and off", lit && !_player.lantern_on);
 

@@ -2,7 +2,7 @@
 
 ## Toolchain
 
-Use **Godot 4.8 beta1 .NET**, the matching .NET export templates, and the **.NET 10
+Use **Godot 4.8 beta4 .NET**, the matching .NET export templates, and the **.NET 10
 SDK** pinned by `global.json`. Godot is the engine; C# constructs the complete
 world, UI, materials and behavior. No editor workflow, addons or GDExtensions
 are required. GPU shaders remain shader source; offline asset tools use Python
