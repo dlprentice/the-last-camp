@@ -203,14 +203,10 @@ public partial class TerrainField
                 h = lerpf(h, bed, w);
             }
         }
-        // Tom's Rock: a granite outcrop standing above the south-east slope.
-        if (places_enabled)
+        // Tom's Rock: a granite knob standing above the south-east slope.
+        if (places_enabled && p.DistanceTo(PlacesLayout.TOMS_ROCK) < PlacesLayout.ROCK_REACH)
         {
-            double dk = p.DistanceTo(PlacesLayout.TOMS_ROCK);
-            if (dk < PlacesLayout.ROCK_BASE_RADIUS)
-            {
-                h += PlacesLayout.ROCK_RISE * (1.0 - smoothstep(PlacesLayout.ROCK_TOP_RADIUS, PlacesLayout.ROCK_BASE_RADIUS, dk));
-            }
+            h += PlacesLayout.rock_rise(p);
         }
         return h;
     }
@@ -254,11 +250,46 @@ public partial class TerrainField
             }
             double w = exp(-(distances[i] - nearest) / 0.2);
             Vector2 c = PlacesLayout.closest_on_segment(p, line[i], line[i + 1]);
-            double target = _landform(c.X, c.Y, out double fine);
             weight_sum += w;
-            target_sum += w * (target - fine);
+            target_sum += w * _step_profile_at(_step_starts[i] + line[i].DistanceTo(c));
         }
         return lerpf(h, target_sum / weight_sum, strength);
+    }
+
+    /// The step line's ground along its length, never falling on the way up: the
+    /// smooth landform where it climbs, built up level where it would dip.
+    double[] _step_profile;
+    static readonly double[] _step_starts = _segment_starts(PlacesLayout.STEP_LINE);
+    const double STEP_PROFILE_DS = 0.25;
+
+    static double[] _segment_starts(Vector2[] line)
+    {
+        var starts = new double[line.Length];
+        for (int i = 0; i + 1 < line.Length; i++) starts[i + 1] = starts[i] + line[i].DistanceTo(line[i + 1]);
+        return starts;
+    }
+
+    double _step_profile_at(double s)
+    {
+        double[] profile = _step_profile;
+        if (profile == null)
+        {
+            Vector2[] line = PlacesLayout.STEP_LINE;
+            int n = (int)(PlacesLayout.length(line) / STEP_PROFILE_DS) + 2;
+            profile = new double[n];
+            double running = double.NegativeInfinity;
+            for (int k = 0; k < n; k++)
+            {
+                Vector2 q = PlacesLayout.point_at(line, k * STEP_PROFILE_DS, out _);
+                double ground = _landform(q.X, q.Y, out double fine) - fine;
+                running = maxf(running, ground);
+                profile[k] = running;
+            }
+            _step_profile = profile;
+        }
+        double f = clampf(s / STEP_PROFILE_DS, 0.0, profile.Length - 1.001);
+        int i0 = (int)f;
+        return lerpf(profile[i0], profile[i0 + 1], f - i0);
     }
 
     public double height_fast(double x, double z)

@@ -183,21 +183,26 @@ public partial class TestPlaces : TestCase
 
     public void test_outcrop_boulders_and_old_ring_are_grounded()
     {
-        List<TomsRock.Ledge> ledges = TomsRock.ledges(land);
-        assert_gt(ledges.Count, 14, $"the outcrop shows its granite bedrock ({ledges.Count} ledges)");
-        foreach (TomsRock.Ledge l in ledges)
+        List<OutcropRock.Piece> rock = OutcropRock.pieces(land);
+        int masses = 0;
+        foreach (OutcropRock.Piece p in rock)
         {
-            // The lower part of every ledge is in the ground all round (no floating).
-            for (int k = 0; k < 16; k++)
+            // The lower part of every piece is in the ground all round (no floating).
+            Aabb b = OutcropRock.bounds(p.model, p.variant);
+            Vector3 c = b.GetCenter();
+            for (int k = 0; k < 20; k++)
             {
-                double a = k / 16.0 * Math.Tau;
-                Vector3 w = l.pose * new Vector3((float)(Math.Cos(a) * l.shape.size.X * 0.45), -l.shape.size.Y * 0.2f, (float)(Math.Sin(a) * l.shape.size.Z * 0.45));
-                assert_lt(w.Y, land.height(w.X, w.Z) + 0.001, "a ledge's lower part is buried");
+                double a = k / 20.0 * Math.Tau;
+                Vector3 w = p.pose * new Vector3((float)(c.X + Math.Cos(a) * b.Size.X * 0.42), (float)(b.Position.Y + (p.bury - 0.02) * b.Size.Y), (float)(c.Z + Math.Sin(a) * b.Size.Z * 0.42));
+                assert_lt(w.Y, land.height(w.X, w.Z) + 0.001, $"the rock at {p.centre} is sunk into the ground all round");
             }
-            Vector2 at = new(l.pose.Origin.X, l.pose.Origin.Z);
-            double reach = Math.Max(l.shape.size.X, l.shape.size.Z) * 0.5;
-            assert_gt(PlacesLayout.distance_to(at, PlacesLayout.STEP_LINE, out _), reach + 0.6, "ledges keep off the steps");
+            if (!p.collide) continue;
+            masses++;
+            assert_gt(PlacesLayout.distance_to(p.centre, PlacesLayout.STEP_LINE, out _), p.reach * 0.75 + 0.55, $"the rock at {p.centre} keeps off the steps");
         }
+        assert_gt(masses, 14, $"the outcrop shows its granite bedrock ({masses} masses)");
+        double knob = land.height(PlacesLayout.TOMS_ROCK.X, PlacesLayout.TOMS_ROCK.Y) - new TerrainFieldEnhanced { places_enabled = false }.height(PlacesLayout.TOMS_ROCK.X, PlacesLayout.TOMS_ROCK.Y);
+        assert_gt(knob, 8.0, $"the knob stands well above the ground it rises from ({knob:F1} m)");
         assert_lt(land.grass_suitability(PlacesLayout.TOMS_ROCK.X + 4.0, PlacesLayout.TOMS_ROCK.Y + 3.0), 0.2, "little grass grows on the outcrop");
         foreach (OldFireRing.Stone s in OldFireRing.stones(land))
         {
