@@ -97,8 +97,9 @@ void fragment() {
 	float wsum = max(wa + wb, 1e-4);
 	vec3 albedo = (ca.rgb * wa + cb.rgb * wb) / wsum;
 	float alpha = mix(ca.a, cb.a, f);
-	ALPHA = alpha;
-	ALPHA_SCISSOR_THRESHOLD = alpha_cutoff;
+	if (!leaf_alpha_keep(alpha, alpha_cutoff, length(world_pos - CAMERA_POSITION_WORLD), FRAGCOORD.xy, TIME, IN_SHADOW_PASS)) {
+		discard;
+	}
 	// Baked normals are relative to the baking camera: x right, y up, z towards it.
 	vec3 nva = na.xyz * 2.0 - 1.0;
 	vec3 nvb = nb.xyz * 2.0 - 1.0;

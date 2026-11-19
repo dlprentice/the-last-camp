@@ -27,8 +27,8 @@ void fragment() {
 	vec4 tex = texture(needles, UV);
 	bool bark = UV.x < 0.0;
 	float mip = textureQueryLod(needles, UV).x;
-	ALPHA = bark ? 1.0 : tex.a * (1.0 + clamp(mip, 0.0, 6.0) * 0.22);
-	ALPHA_SCISSOR_THRESHOLD = 0.34;
+	float alpha = bark ? 1.0 : tex.a * (1.0 + clamp(mip, 0.0, 6.0) * 0.22);
+	if (!leaf_alpha_keep(alpha, 0.34, length(world_pos - CAMERA_POSITION_WORLD), FRAGCOORD.xy, TIME, IN_SHADOW_PASS)) { discard; }
 	vec3 albedo = COLOR.rgb * (bark ? vec3(1.0) : tex.rgb) * mix(vec3(0.91, 0.96, 1.0), vec3(1.02, 1.0, 0.92), variation);
 	// Native NORMAL already faces the viewer for two-sided cards. Preserve
 	// the outward crown gradient so low sunlight models separate leaf masses.
