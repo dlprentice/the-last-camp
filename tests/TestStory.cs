@@ -184,10 +184,11 @@ public partial class TestStory : TestCase
         Step(StoryEvents.TentEntered);
         End(StoryEvents.TurnedIn);
 
-        Step(StoryEvents.TinOpened);
         Step(StoryEvents.PlaceOldRing);
         Step(StoryEvents.BlazeFound);
+        Step(StoryEvents.TinOpened);
         End(StoryEvents.RestFire);
+        Step(StoryEvents.BlazeFound);
         Step(StoryEvents.SatLookout);
         Step(StoryEvents.StepLifted);
         End(StoryEvents.StepLifted);
@@ -223,12 +224,45 @@ public partial class TestStory : TestCase
         foreach (LineTrigger line in StoryScript.Lines)
             assert_eq(lines.Count(l => l == line.Id), 1, $"{line.Id} plays exactly once");
         assert_eq(string.Join(" ", lines.Where(l => !l.Contains(':'))),
-            "m1 e1 m2 m3 m4 e2 e3 m5 m6 m7 e4 e5 e6 m8 m9 e7", "June's lines come in story order");
+            "m1 e1 m2 m3 m4 e2 e3 m5 m6 e4 m7 e5 e6 m8 m9 e7", "June's lines come in story order");
         assert_true(lines.Contains("e7:survived"), "the postcard records the storm outcome");
         assert_eq(s.Items.Count, 0, "the pure state adds items only through the session's hooks");
     }
 
-    public void test_margin_notes_fall_silent_from_the_tin_to_the_lookout()
+    public void test_no_june_line_fires_between_the_tin_and_the_lookout()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        var lines = new List<string>();
+        s.LineTriggered += (id, _, _) => lines.Add(id);
+        s.Raise(StoryEvents.TinOpened);
+        assert_eq(string.Join(" ", lines), "m7", "the tin's own note plays");
+        // Every other trigger June has, entries and notes, from every band.
+        foreach (LineTrigger line in StoryScript.Lines)
+        {
+            if (line.Event == StoryEvents.SatLookout || line.Event == StoryEvents.TinOpened) continue;
+            foreach ((Chapter chapter, Band band) in StoryScript.AllBands())
+            {
+                s.SetPosition(StoryScript.ChapterIndex(chapter.Id), Array.IndexOf(chapter.Bands, band));
+                s.Raise(line.Event);
+            }
+        }
+        assert_eq(string.Join(" ", lines), "m7", "no entry or note plays while the tin is open");
+        assert_false(s.Facts.Contains(StoryEvents.SatLookout), "the lookout has not been reached");
+    }
+
+    public void test_blaze_counts_only_after_the_tin()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        s.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 1);
+        Objective blaze = s.Band.Objectives.First(o => o.Event == StoryEvents.BlazeFound);
+        s.Raise(StoryEvents.BlazeFound);
+        assert_eq(s.ProgressOf(blaze), 0, "the notch means nothing before the tally book");
+        s.Raise(StoryEvents.TinOpened);
+        s.Raise(StoryEvents.BlazeFound);
+        assert_eq(s.ProgressOf(blaze), 1, "after the tin it is Tom's first blaze");
+    }
+
+    public void test_margin_notes_return_after_the_lookout()
     {
         var s = new StoryState { RequireUnbuilt = true };
         var lines = new List<string>();

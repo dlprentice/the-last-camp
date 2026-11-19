@@ -88,14 +88,16 @@ public static class StoryScript
             new("morning", "Morning", 6.3, 12.0, 13.0, 420,
                 new Objective[]
                 {
-                    new("tin", StoryEvents.TinOpened, 1, "Open Tom's tackle tin in the tent."),
                     new("old_ring", StoryEvents.PlaceOldRing, 1, "Follow the footpath to the old fire ring."),
-                    new("blaze", StoryEvents.BlazeFound, 1, "Find Tom's first mark."),
+                    new("tin", StoryEvents.TinOpened, 1, "Open Tom's tackle tin in the tent."),
                 },
                 new EndAct[] { new(StoryEvents.RestFire), new(StoryEvents.RestBedroll) }),
             new("evening", "Evening", 18.25, 19.0 + 40.0 / 60.0, 20.5, 420,
                 new Objective[]
                 {
+                    // The notch on the old ring's log counts only once the tin's
+                    // tally book has shown what it is.
+                    new("blaze", StoryEvents.BlazeFound, 1, "Find Tom's first mark."),
                     new("lookout", StoryEvents.SatLookout, 1, "Follow Tom's marks up to the rock and sit on his bench."),
                     new("step", StoryEvents.StepLifted, 1, "Read what Tom left."),
                 },

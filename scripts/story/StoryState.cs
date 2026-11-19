@@ -88,18 +88,21 @@ public sealed class StoryState
 
     public bool BandDone => !Finished && Required(Band).All(IsDone);
 
-    /// June says nothing in the margins from the opening of Tom's tin until the
-    /// lookout, and nothing at all after her last note until the postcard.
-    public bool MarginsSilent => Facts.Contains(StoryEvents.TinOpened) && !Facts.Contains(StoryEvents.SatLookout);
+    /// June says nothing at all, entries included, from the opening of Tom's tin
+    /// until the lookout (the tin's own note m7 and the lookout's entry e5 are the
+    /// edges), and nothing after her last note until the postcard.
+    public bool JuneSilent => Facts.Contains(StoryEvents.TinOpened) && !Facts.Contains(StoryEvents.SatLookout);
 
     /// Records an event. Returns true when it moved an objective of the active band.
     public bool Raise(string ev)
     {
         if (string.IsNullOrEmpty(ev)) return false;
+        bool tinOpen = Facts.Contains(StoryEvents.TinOpened);
         Facts.Add(ev);
         Facts.Add(StoryEvents.BaseName(ev));
         bool moved = false;
-        if (!Finished)
+        // Tom's first blaze means nothing until his tally book has been read.
+        if (!Finished && !(ev == StoryEvents.BlazeFound && !tinOpen))
         {
             foreach (Objective objective in Band.Objectives)
             {
@@ -123,7 +126,7 @@ public sealed class StoryState
             if (line.Chapter.Length > 0 && (line.Chapter != Chapter.Id || Finished)) continue;
             if (line.Band.Length > 0 && line.Band != Band.Id) continue;
             if (line.Id != "e7" && Facts.Contains(StoryEvents.AshRaked) && ev != StoryEvents.AshRaked) continue;
-            if (line.Kind == LineKind.MarginNote && MarginsSilent && ev != StoryEvents.TinOpened) continue;
+            if (JuneSilent && ev != StoryEvents.TinOpened) continue;
             LinesPlayed.Add(line.Id);
             string variant = line.Id == "e7" ? (StormOutcome.Length > 0 ? StormOutcome : FireSurvivingStorm ? "survived" : "went_out") : "";
             LineTriggered?.Invoke(line.Id, line.Kind, variant);
