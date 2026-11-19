@@ -143,18 +143,18 @@ public partial class Cinematic : Node
         _black.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         _black.MouseFilter = Control.MouseFilterEnum.Ignore;
         _overlay.AddChild(_black);
-        _title = UiTheme.label("THE LAST CAMP", 64, new Color(0.93f, 0.89f, 0.79f));
+        _title = UiTheme.film_label("THE LAST CAMP", 64, new Color(0.93f, 0.89f, 0.79f));
         SystemFont serif = new SystemFont();
         serif.FontNames = new List<string>(new List<string> { "Noto Serif", "DejaVu Serif" }).ToArray();
         _title.AddThemeFontOverride("font", serif);
         _title.AddThemeConstantOverride("outline_size", 0);
         _place(_title, new Vector2(-600, -70), new Vector2(600, 30));
-        _subtitle = UiTheme.label("A F T E R G L O W", 18, UiTheme.MUTED);
+        _subtitle = UiTheme.film_label("A F T E R G L O W", 18, UiTheme.FILM_MUTED);
         _place(_subtitle, new Vector2(-600, 40), new Vector2(600, 80));
-        _end_title = UiTheme.label("Stay a little longer.", 46, new Color(0.93f, 0.89f, 0.79f));
+        _end_title = UiTheme.film_label("Stay a little longer.", 46, new Color(0.93f, 0.89f, 0.79f));
         _end_title.AddThemeFontOverride("font", serif);
         _place(_end_title, new Vector2(-600, -60), new Vector2(600, 20));
-        _end_note = UiTheme.label("THE LAST CAMP\nCaptured in Godot 4.8", 18, UiTheme.MUTED);
+        _end_note = UiTheme.film_label("THE LAST CAMP\nCaptured in Godot 4.8", 18, UiTheme.FILM_MUTED);
         _place(_end_note, new Vector2(-600, 30), new Vector2(600, 110));
         foreach (Label label in new[] { _title, _subtitle, _end_title, _end_note })
         {
@@ -162,18 +162,18 @@ public partial class Cinematic : Node
             color.A = 0.0f;
             label.Modulate = color;
         }
-        _clock = UiTheme.label("", 23, new Color(0.87f, 0.86f, 0.79f, 0.85f));
+        _clock = UiTheme.film_label("", 23, new Color(0.87f, 0.86f, 0.79f, 0.85f));
         _clock.Position = new Vector2(58, 994);
         _clock.Visible = false;
         _overlay.AddChild(_clock);
         // Lower-third for each shot: its name and the features on screen.
-        _caption_title = UiTheme.label("", 27, new Color(0.93f, 0.89f, 0.79f), HorizontalAlignment.Left);
+        _caption_title = UiTheme.film_label("", 27, new Color(0.93f, 0.89f, 0.79f), HorizontalAlignment.Left);
         _caption_title.AddThemeFontOverride("font", serif);
         _caption_title.AddThemeConstantOverride("outline_size", 0);
         _caption_title.Position = new Vector2(58, 918);
         _caption_title.Visible = false;
         _overlay.AddChild(_caption_title);
-        _caption = UiTheme.label("", 20, new Color(0.80f, 0.81f, 0.84f, 0.95f), HorizontalAlignment.Left);
+        _caption = UiTheme.film_label("", 20, new Color(0.80f, 0.81f, 0.84f, 0.95f), HorizontalAlignment.Left);
         _caption.AddThemeConstantOverride("outline_size", 0);
         _caption.Position = new Vector2(58, 958);
         _caption.Visible = false;
@@ -409,20 +409,20 @@ public partial class Cinematic : Node
         _roll.Position = new Vector2(210.0f, 1080.0f);
         _black.AddChild(_roll);
         _roll_line("THE LAST CAMP", 54, new Color(0.93f, 0.89f, 0.79f), true);
-        _roll_line("A rendering tech demo made with Godot 4.8", 24, UiTheme.MUTED);
+        _roll_line("A rendering tech demo made with Godot 4.8", 24, UiTheme.FILM_MUTED);
         _roll_gap(70);
         _roll_header("Created by");
-        _roll_line("David Prentice", 30, UiTheme.TEXT);
+        _roll_line("David Prentice", 30, UiTheme.FILM_TEXT);
         _roll_gap(50);
         _roll_header("Rendered in");
-        _roll_line("Godot Engine 4.8  ·  Forward+  ·  Vulkan", 24, UiTheme.TEXT);
-        _roll_line("Movie Maker mode, 1920x1080 at 60 frames per second", 22, UiTheme.MUTED);
+        _roll_line("Godot Engine 4.8  ·  Forward+  ·  Vulkan", 24, UiTheme.FILM_TEXT);
+        _roll_line("Movie Maker mode, 1920x1080 at 60 frames per second", 22, UiTheme.FILM_MUTED);
         _roll_gap(50);
         _roll_header("Everything grown by the project");
-        _roll_line("Terrain, trees, understory, water, sky, weather, camp and wildlife", 22, UiTheme.MUTED);
+        _roll_line("Terrain, trees, understory, water, sky, weather, camp and wildlife", 22, UiTheme.FILM_MUTED);
         _roll_gap(50);
         _roll_header("Surfaces");
-        _roll_line("Photoscanned by Poly Haven  ·  CC0 1.0", 22, UiTheme.MUTED);
+        _roll_line("Photoscanned by Poly Haven  ·  CC0 1.0", 22, UiTheme.FILM_MUTED);
         Godot.Collections.Array surfaces = _credit_rows("res://textures/SOURCES.md", 1, 2, 4);
         if ((surfaces.Count == 0))
         {
@@ -434,7 +434,7 @@ public partial class Cinematic : Node
         }
         _roll_gap(50);
         _roll_header("Photoscanned models");
-        _roll_line("Poly Haven  ·  CC0 1.0", 22, UiTheme.MUTED);
+        _roll_line("Poly Haven  ·  CC0 1.0", 22, UiTheme.FILM_MUTED);
         Godot.Collections.Array models = _credit_rows("res://models/SOURCES.md", 1, 2, 4);
         if ((models.Count == 0))
         {
@@ -460,12 +460,12 @@ public partial class Cinematic : Node
         }
         _roll_gap(50);
         _roll_header("Sound");
-        _roll_line("Sound effects, ambience and voice generated with ElevenLabs", 22, UiTheme.MUTED);
-        _roll_line("Licensed for this game; not redistributed with the source  ·  no music", 20, UiTheme.MUTED);
+        _roll_line("Sound effects, ambience and voice generated with ElevenLabs", 22, UiTheme.FILM_MUTED);
+        _roll_line("Licensed for this game; not redistributed with the source  ·  no music", 20, UiTheme.FILM_MUTED);
         _roll_gap(80);
         _roll_line("Thank you for watching", 34, new Color(0.93f, 0.89f, 0.79f), true);
         _roll_gap(40);
-        _roll_line("github.com/dlprentice/the-last-camp", 20, UiTheme.MUTED);
+        _roll_line("github.com/dlprentice/the-last-camp", 20, UiTheme.FILM_MUTED);
         _roll_height = _roll.GetCombinedMinimumSize().Y;
     }
 
@@ -481,7 +481,7 @@ public partial class Cinematic : Node
 
     public void _roll_line(string text, long size, Color color, bool serif = false)
     {
-        Label l = UiTheme.label(text, size, color);
+        Label l = UiTheme.film_label(text, size, color);
         if (serif)
         {
             l.AddThemeFontOverride("font", _roll_font());
@@ -493,7 +493,7 @@ public partial class Cinematic : Node
     public void _roll_header(string text)
     {
         _roll_gap(10);
-        Label l = UiTheme.label(text.ToUpperInvariant(), 22, UiTheme.ACCENT);
+        Label l = UiTheme.film_label(text.ToUpperInvariant(), 22, UiTheme.FILM_ACCENT);
         l.AddThemeFontOverride("font", _roll_font());
         l.AddThemeConstantOverride("outline_size", 0);
         _roll.AddChild(l);
@@ -505,10 +505,10 @@ public partial class Cinematic : Node
         HBoxContainer row = new HBoxContainer();
         row.MouseFilter = Control.MouseFilterEnum.Ignore;
         row.AddThemeConstantOverride("separation", 40);
-        Label a = UiTheme.label(left, size, UiTheme.MUTED, HorizontalAlignment.Right);
+        Label a = UiTheme.film_label(left, size, UiTheme.FILM_MUTED, HorizontalAlignment.Right);
         a.CustomMinimumSize = new Vector2(730.0f, 0.0f);
         a.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        Label b = UiTheme.label(right, size, UiTheme.TEXT, HorizontalAlignment.Left);
+        Label b = UiTheme.film_label(right, size, UiTheme.FILM_TEXT, HorizontalAlignment.Left);
         b.CustomMinimumSize = new Vector2(730.0f, 0.0f);
         b.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         foreach (Variant l in new Godot.Collections.Array { a, b })

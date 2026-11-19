@@ -304,8 +304,10 @@ public partial class Player : CharacterBody3D
         if (@event is InputEventMouseMotion)
         {
             InputEventMouseMotion motion = ((InputEventMouseMotion)@event);
-            yaw -= motion.Relative.X * MOUSE_SENSITIVITY;
-            pitch = clampf(pitch - motion.Relative.Y * MOUSE_SENSITIVITY, -MAX_PITCH, MAX_PITCH);
+            GameSettings look = GameSettings.Current;
+            double sensitivity = MOUSE_SENSITIVITY * look.MouseSensitivity;
+            yaw -= motion.Relative.X * sensitivity;
+            pitch = clampf(pitch - motion.Relative.Y * sensitivity * (look.InvertY ? -1.0 : 1.0), -MAX_PITCH, MAX_PITCH);
         }
         else if (@event.IsActionPressed("interact"))
         {
@@ -536,13 +538,15 @@ public partial class Player : CharacterBody3D
             _bob_phase = lerp_angle(_bob_phase, roundf(_bob_phase / PI) * PI, 1.0 - exp(-delta * 6.0));
         }
 
-        double amp = clampf(speed / RUN_SPEED, 0.0, 1.0) * (crouching ? 0.55 : 1.0);
+        double amp = clampf(speed / RUN_SPEED, 0.0, 1.0) * (crouching ? 0.55 : 1.0) * (GameSettings.Current.HeadBob ? 1.0 : 0.0);
         double bob_y = sin(_bob_phase * 2.0) * 0.024 * amp;
         double bob_x = sin(_bob_phase) * 0.016 * amp;
         head.Position = new Vector3((float)bob_x, (float)(_eye_height + bob_y - _land_dip), 0.0f);
         _lean = lerpf(_lean, -_strafe * 0.012, 1.0 - exp(-delta * 5.0));
 
-        double target_fov = running ? SPRINT_FOV : BASE_FOV;
+        // The player's field of view; running widens it by the same few degrees.
+        double base_fov = GameSettings.Current.Fov;
+        double target_fov = running ? base_fov + (SPRINT_FOV - BASE_FOV) : base_fov;
         camera.Fov = (float)lerpf(camera.Fov, target_fov, 1.0 - exp(-delta * 5.0));
     }
 

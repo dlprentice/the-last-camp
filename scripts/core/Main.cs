@@ -254,7 +254,23 @@ public partial class Main : Node3D
             capture4.run_capture(Game.Instance.arg_value("capture", "res://local-data/captures"), Game.Instance.arg_value("shots", ""));
             return;
         }
+        if (loading.TitleMode)
+        {
+            // The title takes over: the live camp behind the menu until the player
+            // chooses Continue or New Game.
+            loading.PlayRequested += _ => BeginPlay();
+            if (Game.Instance.has_flag("ui-shots")) _sceneRoot.AddChild(new UiShots());
+            loading.world_ready();
+            return;
+        }
         loading.finish();
+        BeginPlay();
+    }
+
+    /// Hands the built world to play: the story session, June's voice, then the
+    /// intro dolly or the player (and the traversal check when asked).
+    public void BeginPlay()
+    {
         if (!Game.Instance.is_tool_run() || Game.Instance.has_flag("session-check"))
         {
             _sceneRoot.AddChild(new CampSession { Name = "Evening" });

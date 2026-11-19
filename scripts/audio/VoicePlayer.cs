@@ -96,7 +96,9 @@ public partial class VoicePlayer : Node
 {
     /// Silence between paragraphs, and before a queued line starts.
     public const double ParagraphGap = 0.6;
-    public static readonly Color SubtitleColor = new(0.96f, 0.94f, 0.88f);
+    public static readonly Color SubtitleColor = UiTheme.PAPER;
+    /// Set while the line's own text is on screen (June's postcard): no subtitle under it.
+    public static bool SubtitlesHeld;
 
     /// A line finished playing (its last paragraph ended).
     public event Action<string>? LineHeard;
@@ -122,12 +124,9 @@ public partial class VoicePlayer : Node
         AddChild(_player);
         _layer = new CanvasLayer { Name = "Subtitles", Layer = 5 };
         AddChild(_layer);
-        _subtitle = UiTheme.label("", 22, SubtitleColor);
-        _subtitle.AddThemeFontOverride("font", new SystemFont { FontNames = new[] { "Noto Serif", "DejaVu Serif" } });
-        _subtitle.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.55f));
-        _subtitle.AddThemeConstantOverride("shadow_offset_x", 0);
-        _subtitle.AddThemeConstantOverride("shadow_offset_y", 2);
-        _subtitle.AddThemeConstantOverride("shadow_outline_size", 6);
+        // The kit's serif at body size, paper with a soft shadow over the world.
+        _subtitle = UiTheme.label("", UiTheme.BODY, SubtitleColor, shadow: true);
+        _subtitle.Theme = UiTheme.Kit;
         _subtitle.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _subtitle.VerticalAlignment = VerticalAlignment.Bottom;
         _subtitle.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.CenterBottom);
@@ -174,6 +173,8 @@ public partial class VoicePlayer : Node
     {
         if (_session == null) Attach(Game.Instance?.session);
         Step(delta);
+        // The subtitles setting applies at once, also to a line already showing.
+        if (_subtitle != null && Current != null) _subtitle.Visible = GameSettings.Current.Subtitles && !SubtitlesHeld;
     }
 
     /// Advances the line playback by `delta` seconds (the tree's pause stops it).
@@ -215,7 +216,7 @@ public partial class VoicePlayer : Node
         if (_subtitle != null)
         {
             _subtitle.Text = Current.Text;
-            _subtitle.Visible = true;
+            _subtitle.Visible = GameSettings.Current.Subtitles && !SubtitlesHeld;
         }
     }
 
