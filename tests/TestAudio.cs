@@ -251,7 +251,8 @@ public partial class TestAudio : TestCase
     {
         SceneTree tree = (SceneTree)Engine.GetMainLoop();
         var story = new StoryState { StormOutcome = "went_out" };
-        var player = new VoicePlayer { Name = "TestVoice" };
+        // Subtitle timing only: stepping by hand does not advance a playing stream.
+        var player = new VoicePlayer { Name = "TestVoice", Script = VoiceScript.Load(VoiceScript.ScriptPath, "res://local-data/no-voice/") };
         tree.Root.AddChild(player);
         story.LineTriggered += (id, kind, variant) => player.Enqueue(id, variant);
         story.Raise(StoryEvents.CreditsFinished);
@@ -268,5 +269,23 @@ public partial class TestAudio : TestCase
         assert_true(player.Speaking, "a margin note starts within a second when June is quiet");
         tree.Root.RemoveChild(player);
         player.Free();
+
+        var voiced = new VoicePlayer { Name = "TestVoiced" };
+        tree.Root.AddChild(voiced);
+        VoiceParagraph first = voiced.Script.For("m3", "")[0];
+        if (ResourceLoader.Exists(voiced.Script.PathOf(first)))
+        {
+            assert_true(double.IsFinite(first.Lufs) && double.IsFinite(first.TruePeak), "a present voice file has its measured loudness");
+            voiced.Enqueue("m3", "");
+            for (int i = 0; i < 3; i++) voiced.Step(0.05);
+            assert_true(voiced.GetNode<AudioStreamPlayer>("June").Playing, "a present voice file plays");
+            assert_eq((string)voiced.GetNode<AudioStreamPlayer>("June").Bus, (string)AudioDirector.BUS_VOICE, "June plays on the voice bus");
+        }
+        else
+        {
+            GD.Print("  TestAudio: voice files absent; voiced playback check not run");
+        }
+        tree.Root.RemoveChild(voiced);
+        voiced.Free();
     }
 }

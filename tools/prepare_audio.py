@@ -16,9 +16,11 @@ category's loudness target and writes it to --out (default audio/generated/sfx):
 
 The result is measured again (ebur128, true peak) and written into the manifest as
 each file's `lufs` and `true_peak`, with its `target` and `processing`. The game then
-only trims. Voice files present under audio/generated/voice are measured into
-voice.json (`lufs`, `true_peak`) and left as they are; the game levels them to the
-voice target. The targets mirror AudioDirector.TARGET_LUFS (a test compares them).
+only trims. June's raw voice takes (--voice-source, default local-data/audio/voice,
+<id>.mp3) are levelled the same way to the voice target, -16 LUFS, re-encoded as MP3
+into audio/generated/voice and measured into voice.json (`lufs`, `true_peak`); a
+paragraph without a take is recorded as unmeasured. The targets mirror
+AudioDirector.TARGET_LUFS (a test compares them).
 
 The audio is licensed: --source and --out stay out of Git.
 """
@@ -100,7 +102,7 @@ def linear_pass(src: Path, dst: Path, target: float, m: dict) -> bool:
     return True
 
 
-def level(src: Path, dst: Path, target: float, bed: bool) -> tuple[str, float]:
+def level(src: Path, dst: Path, target: float, bed: bool, times: tuple[int, int] | None = None) -> tuple[str, float]:
     """Returns (processing, limiter ceiling used or 0)."""
     m = measure_pass(src, target)
     if linear_pass(src, dst, target, m):
@@ -108,7 +110,7 @@ def level(src: Path, dst: Path, target: float, bed: bool) -> tuple[str, float]:
     gain = target - m["input_i"]
     # Beds release slowly so the limiter never pumps; one-shots release fast so a
     # knock keeps its body.
-    attack, release = (5, 80) if bed else (1, 20)
+    attack, release = times or ((5, 80) if bed else (1, 20))
     with tempfile.TemporaryDirectory(dir=dst.parent) as scratch:
         limited = Path(scratch) / "limited.wav"
         for limit_db in LIMITS_DB:
@@ -123,6 +125,25 @@ def level(src: Path, dst: Path, target: float, bed: bool) -> tuple[str, float]:
         # ceiling and fall short of the target instead.
         write(limited, dst, f"volume={CEILING_TP - lm['input_tp'] - 0.1:.3f}dB")
         return "limited-short", LIMITS_DB[-1]
+
+
+def level_voice(src: Path, dst: Path) -> str:
+    """Levels a take to the voice target like any other file (speech that is too
+    peaky goes through the limiter with speech timings), then encodes it as MP3.
+    Encoding can lift the true peak a little, so the gain steps down until the
+    encoded file fits."""
+    with tempfile.TemporaryDirectory(dir=dst.parent) as scratch:
+        wav = Path(scratch) / "level.wav"
+        processing, _ = level(src, wav, TARGETS["voice"], False, (3, 60))
+        gain = 0.0
+        for _ in range(6):
+            ffmpeg(["-y", "-i", str(wav), "-af", f"volume={gain:.3f}dB", "-ar", "44100", "-c:a", "libmp3lame",
+                    "-b:a", "192k", "-map_metadata", "-1", str(dst)])
+            _, tp = ebur(dst)
+            if tp <= CEILING_TP:
+                return processing
+            gain -= tp - CEILING_TP + 0.1
+    raise RuntimeError(f"{src}: could not encode under {CEILING_TP} dBTP")
 
 
 def prepare(job: tuple[str, int, str, Path, Path]) -> dict:
@@ -143,6 +164,7 @@ def main() -> int:
     p.add_argument("--out", type=Path, default=ROOT / "audio/generated/sfx")
     p.add_argument("--manifest", type=Path, default=ROOT / "audio/generated/manifest.json")
     p.add_argument("--voice", type=Path, default=ROOT / "audio/generated/voice.json")
+    p.add_argument("--voice-source", type=Path, default=ROOT / "local-data/audio/voice", help="raw voice takes: <id>.mp3")
     p.add_argument("--jobs", type=int, default=8)
     o = p.parse_args()
     manifest = json.loads(o.manifest.read_text(encoding="utf-8"))
@@ -173,16 +195,27 @@ def main() -> int:
 
     if o.voice.is_file():
         voice = json.loads(o.voice.read_text(encoding="utf-8"))
-        measured = 0
+        levelled = []
         for paragraph in voice["paragraphs"]:
-            path = o.voice.parent / paragraph.get("file", "")
-            if paragraph.get("file") and path.is_file():
-                paragraph["lufs"], paragraph["true_peak"] = (round(v, 1) for v in ebur(path))
-                measured += 1
+            name = paragraph.get("file", "")
+            src = o.voice_source / Path(name).name
+            dst = o.voice.parent / name
+            if name and src.is_file():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                processing = level_voice(src, dst)
+                paragraph["lufs"], paragraph["true_peak"] = (round(v, 1) for v in ebur(dst))
+                levelled.append((paragraph["id"], processing, paragraph["lufs"], paragraph["true_peak"]))
             else:
                 paragraph["lufs"] = paragraph["true_peak"] = None
         o.voice.write_text(json.dumps(voice, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-        print(f"voice: {measured} of {len(voice['paragraphs'])} files measured")
+        for pid, processing, lufs, tp in levelled:
+            if processing != "linear":
+                print(f"voice {processing}: {pid} -> {lufs} LUFS, {tp} dBTP")
+        if levelled:
+            print(f"voice: {len(levelled)} of {len(voice['paragraphs'])} levelled; LUFS {min(r[2] for r in levelled)} to "
+                  f"{max(r[2] for r in levelled)}, highest true peak {max(r[3] for r in levelled)} dBTP")
+        else:
+            print(f"voice: 0 of {len(voice['paragraphs'])} takes found in {o.voice_source}")
     return 0
 
 
