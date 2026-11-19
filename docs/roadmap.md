@@ -6,6 +6,40 @@ design](design.md) holds the wider world the cut draws on. The steps run in orde
 except performance, which runs alongside. A step is done only when every acceptance
 line has been checked first-hand.
 
+## Where we stopped (November 19, 2026)
+
+Work paused when the machine was given to other games; it resumes here.
+
+- **On `master`:** Godot 4.8 beta4 with the C# engine workarounds (script pins, collection
+  keep-alive, an audio-thread volume rule); the story spine from arrival to the ending,
+  the save, and every story interaction; the places (trailhead post, old fire ring, Tom's
+  Rock with its twenty steps); the paper-and-ink title, pause, settings, journal and
+  credits; and all audio from ElevenLabs, including June's voice (licensed, not in Git).
+  The build is clean, and the C# suite, the Python suite and the scene contract pass.
+  Open limits are in [validation](validation.md): the content fingerprints await a
+  rebaseline after the places review.
+- **On branches (pushed, unfinished):**
+  - `work/look`: camp ground, night, tent, daytime fire light and canopy. The reviewed
+    part is merged; a fourth round (wet ground, firelight reach, path detail, tent hem
+    and interior, day shadows) is coded but not reviewed or looked at.
+  - `work/places-look`: a site search for moving Tom's Rock so the seated view shows the
+    whole pond. The rock has not moved; the best site found fills too little of the
+    frame, and the probe test fails.
+  - `work/notch`: Tom's blaze carved as real geometry. It builds but has not been run or
+    seen.
+  - `work/perf`: preset levers measured on a loaded machine and the distant-grass floor
+    made a preset value. No default reaches 60 fps yet (about 25–30 ms a frame).
+- **Next three steps, in order:**
+  1. Move Tom's Rock so the seated view at sunset shows the pond filling the lower third
+     to half of the frame (terrain may need to change), reroute the steps so the view
+     appears only at the top, and finish the carved notch.
+  2. Rain and firelight: wet ground darker and never frosty, and the fire lighting the
+     circle and the nearest trees with a flicker.
+  3. The 60 fps default preset, with High as a capped 30 fps option, measured on a quiet
+     card; then the fingerprint rebaseline.
+- **Not yet seen or heard by anyone:** June's voice and every generated sound in play,
+  the full story played at length, the look round 4 stills, and the notch.
+
 Acceptance rules for every step:
 
 - **Build and tests.** `dotnet build` passes with zero warnings; the C# and Python
