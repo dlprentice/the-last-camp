@@ -20,7 +20,7 @@ public static class PlacesLayout
 
     // ------------------------------------------------------------ old fire ring
     public static readonly Vector2 OLD_RING = new(-30.0f, -45.0f);
-    public const double OLD_RING_RADIUS = 0.95;
+    public const double OLD_RING_RADIUS = 0.78;
     /// The fallen log seat lies along the ring's east side, facing the stones.
     public static readonly Vector2 OLD_LOG_A = new(-28.9f, -47.55f);
     public static readonly Vector2 OLD_LOG_B = new(-26.75f, -45.35f);
@@ -32,9 +32,9 @@ public static class PlacesLayout
     /// the field without the places; a test keeps the two in step.
     public static readonly Vector2 TOMS_ROCK = new(26.0f, 70.0f);
     /// The outcrop lifts the ground this far above the surrounding slope.
-    public const double ROCK_RISE = 3.6;
+    public const double ROCK_RISE = 6.0;
     public const double ROCK_TOP_RADIUS = 2.0;
-    public const double ROCK_BASE_RADIUS = 14.0;
+    public const double ROCK_BASE_RADIUS = 17.0;
     /// The summit is levelled out to this radius for the bench and its footstone.
     public const double SUMMIT_PAD_INNER = 1.9;
     public const double SUMMIT_PAD_OUTER = 3.4;
@@ -59,8 +59,8 @@ public static class PlacesLayout
     /// level across it, as a dug-in step path would be.
     public static readonly Vector2[] STEP_LINE =
     {
-        polar(12.5, 25.0), polar(10.4, 5.0), polar(8.2, 345.0), polar(6.4, 15.0), polar(4.6, 45.0),
-        polar(2.6, 30.0), polar(1.05, 35.0), LOOSE_STEP,
+        polar(15.0, 30.0), polar(12.5, 350.0), polar(10.0, 30.0), polar(7.0, 345.0), polar(4.4, 40.0),
+        polar(2.4, 20.0), polar(1.05, 35.0), LOOSE_STEP,
     };
     public const double STEP_CUT_INNER = 0.8;
     public const double STEP_CUT_OUTER = 2.4;
@@ -90,7 +90,7 @@ public static class PlacesLayout
         new(-28.6f, -49.2f), new(-22.4f, -51.6f), new(-14.0f, -57.0f), new(-4.0f, -57.6f), new(5.4f, -53.6f),
         new(13.0f, -47.6f), new(18.6f, -40.2f), new(24.8f, -33.6f), new(32.4f, -27.6f), new(38.4f, -18.6f),
         new(43.0f, -7.6f), new(44.0f, 4.4f), new(41.6f, 15.6f), new(37.6f, 26.0f), new(35.8f, 36.4f),
-        new(35.4f, 46.2f), new(33.6f, 52.2f), new(29.6f, 54.6f), STEP_LINE[0],
+        new(35.4f, 46.2f), new(34.4f, 52.6f), STEP_LINE[0],
     };
     public const double TOMS_ROUTE_TARGET = 208.0;
 
@@ -110,6 +110,8 @@ public static class PlacesLayout
     public static readonly (Vector2[] line, double offset)[] TRAIL_LINES =
     {
         (JUNE_FOOTPATH, 0.15), (TOMS_ROUTE, 0.35), (STEP_LINE, 0.0), (BENCH_LINE, 0.0), (PAINTED_PATH, 0.15),
+        // Where people sat on the old log, the grass is trodden short along it.
+        (new[] { OLD_LOG_A, OLD_LOG_B }, 0.5),
     };
     public static readonly Rect2[] TRAIL_LINE_BOUNDS = bounds_of(TRAIL_LINES);
     public static readonly Rect2 ALL_TRAIL_BOUNDS = merge(TRAIL_LINE_BOUNDS);
@@ -169,7 +171,7 @@ public static class PlacesLayout
     {
         new(TRAILHEAD_POST.X, TRAILHEAD_POST.Y, 1.0f), new(OLD_RING.X, OLD_RING.Y, 2.2f),
         new((OLD_LOG_A.X + OLD_LOG_B.X) * 0.5f, (OLD_LOG_A.Y + OLD_LOG_B.Y) * 0.5f, 2.0f),
-        new(TOMS_ROCK.X, TOMS_ROCK.Y, 4.2f),
+        new(TOMS_ROCK.X, TOMS_ROCK.Y, (float)(ROCK_BASE_RADIUS * 0.8)),
     };
 
     public static Vector2 bearing(double degrees)
@@ -243,23 +245,55 @@ public static class PlacesLayout
     public static bool keeps_trees_out(Vector2 p)
     {
         if (p.DistanceTo(TOMS_ROCK) < 9.0 || p.DistanceTo(OLD_RING) < 4.6 || p.DistanceTo(TRAILHEAD_POST) < 2.6) return true;
-        return in_lookout_view(p, 2.0);
+        return in_lookout_view(p, 0.0);
     }
 
-    /// Inside the wedge the bench looks down to the pond through, widened by `margin`.
+    /// The bench's view: a cone from the seat over the slope to the pond and the
+    /// western sky, from the sunset (about 289 degrees) across the whole pond
+    /// (about 305 to 331). Inside its core no tree or tall shrub stands; through its
+    /// edge they thin out by chance, so the opening has no cut wall. `margin` widens
+    /// the core by that many degrees.
     public static bool in_lookout_view(Vector2 p, double margin)
     {
-        Vector2 to_pond = TerrainField.POND_CENTRE - TOMS_ROCK;
-        double reach = to_pond.Length() - TerrainField.POND_RADIUS * 0.6;
-        Vector2 axis = to_pond.Normalized();
-        Vector2 d = p - TOMS_ROCK;
-        double along = d.Dot(axis);
-        if (along < 0.0 || along > reach) return false;
-        double across = Math.Abs(d.Dot(new Vector2(-axis.Y, axis.X)));
-        return across < 2.5 + along * LOOKOUT_SPREAD + margin;
+        double keep = lookout_openness(p, margin);
+        return keep >= 1.0 || (keep > 0.0 && hash01(p) < keep);
     }
-    /// Half-width growth of the view wedge per metre (about 9 degrees each side).
-    public const double LOOKOUT_SPREAD = 0.16;
+
+    /// 1 inside the view cone's core, falling to 0 across its edge, 0 outside.
+    public static double lookout_openness(Vector2 p, double margin = 0.0)
+    {
+        Vector2 d = p - BENCH;
+        double along = d.Length();
+        if (along < 0.5 || along > LOOKOUT_REACH) return along < 0.5 ? 1.0 : 0.0;
+        double angle = Math.Abs(Mathf.RadToDeg(bearing(LOOKOUT_BEARING_DEG).AngleTo(d)));
+        double core = LOOKOUT_CORE_DEG + margin;
+        // Far out the edge also thins towards the pond's bank, where the trees stand anyway.
+        double far = 1.0 - Math.Clamp((along - (LOOKOUT_REACH - 6.0)) / 6.0, 0.0, 1.0);
+        double open = 1.0 - Math.Clamp((angle - core) / (LOOKOUT_EDGE_DEG - LOOKOUT_CORE_DEG), 0.0, 1.0);
+        return open * open * (3.0 - 2.0 * open) * (far >= 1.0 ? 1.0 : far);
+    }
+
+    /// How much of the ground is the outcrop's bare, stony skin (1 on its upper
+    /// flanks, 0 beyond its foot): grass thins there and the soil shows.
+    public static double outcrop_cover(Vector2 p)
+    {
+        double d = p.DistanceTo(TOMS_ROCK);
+        if (d >= ROCK_BASE_RADIUS * 0.85) return 0.0;
+        double t = Math.Clamp((d - ROCK_BASE_RADIUS * 0.55) / (ROCK_BASE_RADIUS * 0.3), 0.0, 1.0);
+        return 1.0 - t * t * (3.0 - 2.0 * t);
+    }
+
+    public static double hash01(Vector2 p)
+    {
+        double h = Math.Sin(p.X * 12.9898 + p.Y * 78.233) * 43758.5453;
+        return h - Math.Floor(h);
+    }
+
+    public const double LOOKOUT_BEARING_DEG = 309.0;
+    public const double LOOKOUT_CORE_DEG = 24.0;
+    public const double LOOKOUT_EDGE_DEG = 36.0;
+    /// Across the near bank to the water: beyond it only the far bank's trees stand.
+    public const double LOOKOUT_REACH = 92.0;
 
     static Rect2[] bounds_of((Vector2[] line, double offset)[] lines)
     {

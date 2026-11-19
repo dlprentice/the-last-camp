@@ -25,6 +25,9 @@ public static class PlacesProbe
     /// A little more than half, so the bench itself (just behind the summit
     /// centre) still sees half the pond.
     public const double MIN_POND_VIEW = 0.55;
+    /// The probe judges a site by a modest outcrop; the built one (ROCK_RISE)
+    /// stands taller so the bench looks out over the slope below it.
+    public const double SITE_RISE = 3.6;
 
     public static Vector2 find_toms_rock(TerrainField natural)
     {
@@ -47,7 +50,7 @@ public static class PlacesProbe
         candidates.Sort((a, b) => a.h != b.h ? b.h.CompareTo(a.h) : a.p.X != b.p.X ? a.p.X.CompareTo(b.p.X) : a.p.Y.CompareTo(b.p.Y));
         foreach (var (h, p) in candidates)
         {
-            if (pond_view(natural, p, h + PlacesLayout.ROCK_RISE + PlacesLayout.SEATED_EYE) >= MIN_POND_VIEW) return p;
+            if (pond_view(natural, p, h + SITE_RISE + PlacesLayout.SEATED_EYE) >= MIN_POND_VIEW) return p;
         }
         return Vector2.Inf;
     }
@@ -81,5 +84,48 @@ public static class PlacesProbe
             if (field.height(q.X, q.Y) > line) return false;
         }
         return true;
+    }
+
+    /// Fraction of sight lines from `eye` to points spread over the pond's water
+    /// that pass both the land and the trees. A tree blocks a line where it passes
+    /// its trunk, or inside its crown: a column from the tree's lowest branches to
+    /// its top, as wide as its longest limbs reach.
+    public static double lookout_view(TerrainField field, IEnumerable<ScenePlan.TreeEntry> trees, Vector3 eye)
+    {
+        Vector2 from = new(eye.X, eye.Z);
+        var near = new List<ScenePlan.TreeEntry>();
+        foreach (ScenePlan.TreeEntry t in trees)
+        {
+            if (t.position.DistanceTo(TerrainField.POND_CENTRE) < from.DistanceTo(TerrainField.POND_CENTRE) + 2.0) near.Add(t);
+        }
+        int seen = 0, total = 0;
+        for (int i = 0; i < 24; i++)
+        {
+            double a = i / 24.0 * Math.Tau;
+            for (double r = 0.2; r < 0.85; r += 0.3)
+            {
+                Vector2 target = TerrainField.POND_CENTRE + new Vector2((float)Math.Cos(a), (float)Math.Sin(a)) * (float)(TerrainField.pond_radius_at(a) * r);
+                total++;
+                if (!sight_clear(field, from, eye.Y, target, TerrainField.WATER_LEVEL)) continue;
+                bool clear = true;
+                double length = from.DistanceTo(target);
+                foreach (ScenePlan.TreeEntry t in near)
+                {
+                    Vector2 c = PlacesLayout.closest_on_segment(t.position, from, target);
+                    double off = c.DistanceTo(t.position);
+                    TreeSpecies species = TreeSpecies.by_kind(t.kind);
+                    double h = species.height.Y * t.scale;
+                    double crown = species.branch_length.Y * h * 0.85;
+                    if (off > Math.Max(crown, 0.6)) continue;
+                    double line = Mathf.Lerp(eye.Y, (float)TerrainField.WATER_LEVEL, (float)(from.DistanceTo(c) / length));
+                    double above = line - field.height(t.position.X, t.position.Y);
+                    bool trunk = off < 0.6 * t.scale && above < h;
+                    bool leaves = above > species.branch_start * h && above < h;
+                    if (trunk || leaves) { clear = false; break; }
+                }
+                if (clear) seen++;
+            }
+        }
+        return (double)seen / total;
     }
 }

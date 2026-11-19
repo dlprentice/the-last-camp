@@ -533,6 +533,11 @@ public partial class TerrainField
 
         double trail = 1.0 - smoothstep(0.32 + wobble, 1.22 + wobble, walking_distance(p));
         trail = maxf(trail, camp_wear(p) * (0.85 + wobble));
+        if (places_enabled)
+        {
+            // Thin stony soil between the outcrop's ledges.
+            trail = maxf(trail, PlacesLayout.outcrop_cover(p) * (0.6 + wobble * 0.5));
+        }
         double mud = 1.0 - smoothstep(0.05, 0.55, h - WATER_LEVEL);
         double litter = clampf(cover * 1.2 + steep * 0.8 + wobble * 0.6, 0.0, 1.0);
         double grass = clampf((1.0 - litter) * (1.0 - steep), 0.0, 1.0);
@@ -616,6 +621,7 @@ public partial class TerrainField
         // twice left wide bald bands. Plant from habitat instead: shorter woodland
         // grass continues under trees, with only the walked route and pads bare.
         double habitat = lerpf(0.98, 0.48, woodland_cover(x, z));
-        return habitat * dry_land * trail_edge * pad_edge * (1.0 - smoothstep(0.48, 0.95, s));
+        double outcrop = places_enabled ? 1.0 - PlacesLayout.outcrop_cover(new Vector2((float)x, (float)z)) * 0.95 : 1.0;
+        return habitat * dry_land * trail_edge * pad_edge * outcrop * (1.0 - smoothstep(0.48, 0.95, s));
     }
 }

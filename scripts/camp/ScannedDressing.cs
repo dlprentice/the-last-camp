@@ -597,7 +597,7 @@ public partial class ScannedDressing : Node3D
             attempts += 1;
             Vector2 p = _woodland_point(24.0, 64.0);
             double cover = _field.canopy.sample(p.X, p.Y);
-            if (cover < 0.15 || cover > 0.8 || !_allowed(p, 2.2, 0.2))
+            if (cover < 0.15 || cover > 0.8 || !_allowed(p, 2.2, 0.2) || (_field.places_enabled && PlacesLayout.in_lookout_view(p, 0.0)))
             {
                 continue;
             }

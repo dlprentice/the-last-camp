@@ -10,7 +10,8 @@ namespace LastCamp;
 /// on. On the log is Tom's first notch, the start of his route.
 public partial class OldFireRing : Node3D
 {
-    public const int STONES = 10;
+    public const int STONES = 12;
+    public const int CHARCOAL = 9;
     public const double LOG_LENGTH_PAD = 0.0;
     public const double LOG_SINK = 0.025;
     /// Where on the log Tom cut his first notch, from its south-west end.
@@ -34,30 +35,59 @@ public partial class OldFireRing : Node3D
     public struct Stone
     {
         public Transform3D pose;
+        public GraniteSlab.Shape shape;
+        /// Largest dimension across, metres.
         public double size;
     }
 
-    /// The ring's stones: sunk deep, as fifty summers of soil leave them.
+    /// The ring's stones, two fists to a loaf in size, each half sunk where it
+    /// was set fifty summers ago; one long gone, one knocked out of line.
     public static List<Stone> stones(TerrainField field)
     {
         var rng = new RandomNumberGenerator { Seed = 1974 };
         var list = new List<Stone>();
         for (int i = 0; i < STONES; i++)
         {
-            double a = i / (double)STONES * Math.Tau + rng.RandfRange(-0.12f, 0.12f);
-            double size = rng.RandfRange(0.17f, 0.27f);
-            double r = PlacesLayout.OLD_RING_RADIUS + rng.RandfRange(-0.06f, 0.06f);
-            if (i == 6) continue;                 // long gone
-            if (i == 3) r += 0.55;                // kicked out of line
+            double a = i / (double)STONES * Math.Tau + rng.RandfRange(-0.1f, 0.1f);
+            double across = rng.RandfRange(0.18f, 0.32f);
+            Vector3 size = new((float)across, (float)(across * rng.RandfRange(0.55f, 0.75f)), (float)(across * rng.RandfRange(0.7f, 0.95f)));
+            double r = PlacesLayout.OLD_RING_RADIUS + rng.RandfRange(-0.05f, 0.05f);
+            double yaw = a + Math.PI * 0.5 + rng.RandfRange(-0.4f, 0.4f);
+            double roundness = rng.RandfRange(0.38f, 0.55f);
+            if (i == 7) continue;                 // long gone
+            if (i == 3) r += 0.5;                 // kicked out of line
             Vector2 at = PlacesLayout.OLD_RING + new Vector2((float)Math.Cos(a), (float)Math.Sin(a)) * (float)r;
-            double low = double.PositiveInfinity;
+            double ground = double.PositiveInfinity;
             for (int k = 0; k < 8; k++)
             {
                 double b = k / 8.0 * Math.Tau;
-                low = Math.Min(low, field.height(at.X + Math.Cos(b) * size, at.Y + Math.Sin(b) * size));
+                ground = Math.Min(ground, field.height(at.X + Math.Cos(b) * across * 0.45, at.Y + Math.Sin(b) * across * 0.45));
             }
-            Basis basis = new Basis(Vector3.Up, rng.Randf() * (float)Math.Tau).Scaled(new Vector3((float)size, (float)(size * 0.72), (float)(size * 1.12)));
-            list.Add(new Stone { pose = new Transform3D(basis, new Vector3(at.X, (float)(low - size * 0.22), at.Y)), size = size });
+            // Half sunk: the stone's middle sits a little below the lowest ground under it.
+            Basis basis = new(Vector3.Up, (float)yaw);
+            list.Add(new Stone
+            {
+                pose = new Transform3D(basis, new Vector3(at.X, (float)(ground - size.Y * 0.08), at.Y)),
+                shape = new GraniteSlab.Shape { size = size, roundness = roundness, rough = 0.22, seed = 7400 + i },
+                size = across,
+            });
+        }
+        return list;
+    }
+
+    /// Old charcoal in the ring's middle: a few lumps, mostly grown over.
+    public static List<Transform3D> charcoal(TerrainField field)
+    {
+        var rng = new RandomNumberGenerator { Seed = 1975 };
+        var list = new List<Transform3D>();
+        for (int i = 0; i < CHARCOAL; i++)
+        {
+            double a = rng.Randf() * Math.Tau;
+            double r = Math.Sqrt(rng.Randf()) * PlacesLayout.OLD_RING_RADIUS * 0.6;
+            Vector2 at = PlacesLayout.OLD_RING + new Vector2((float)Math.Cos(a), (float)Math.Sin(a)) * (float)r;
+            float size = rng.RandfRange(0.025f, 0.06f);
+            Basis basis = new Basis(new Vector3(rng.Randf(), 1.0f, rng.Randf()).Normalized(), rng.Randf() * (float)Math.Tau).Scaled(new Vector3(size, size * 0.6f, size * 0.8f));
+            list.Add(new Transform3D(basis, new Vector3(at.X, (float)(field.height(at.X, at.Y) - size * 0.25), at.Y)));
         }
         return list;
     }
@@ -91,29 +121,33 @@ public partial class OldFireRing : Node3D
 
     public void build()
     {
-        Material moss_stone = PropMaterials.triplanar("rock", new Color(0.78f, 0.78f, 0.72f), 0.6, 0.78);
+        Material granite = GraniteSlab.material();
         int i = 0;
         foreach (Stone s in stones(field))
         {
-            var mi = new MeshInstance3D
+            ArrayMesh stone = GraniteSlab.build(s.shape, s.pose, field.height);
+            AddChild(new MeshInstance3D
             {
-                Name = $"RingStone_{i}", Mesh = PropMeshes.rock(7400 + i * 13, 1.0), MaterialOverride = moss_stone, Transform = s.pose,
+                Name = $"RingStone_{i}", Mesh = stone, MaterialOverride = granite, Transform = s.pose,
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.On, GIMode = GeometryInstance3D.GIModeEnum.Static,
-            };
-            AddChild(mi);
-            var hull = (ConvexPolygonShape3D)((ArrayMesh)mi.Mesh).CreateConvexShape(true, true);
-            Vector3[] points = hull.Points;
-            for (int k = 0; k < points.Length; k++) points[k] = s.pose.Basis * points[k];
+            });
             var body = new StaticBody3D { Name = $"RingStoneBody_{i}", CollisionLayer = 1, CollisionMask = 0, Position = s.pose.Origin };
             body.SetMeta("surface", (StringName)"rock");
-            body.AddChild(new CollisionShape3D { Shape = new ConvexPolygonShape3D { Points = points } });
+            body.AddChild(new CollisionShape3D { Shape = GraniteSlab.hull(stone, s.pose.Basis) });
             AddChild(body);
             i++;
+        }
+        var coal = FieldKit.solid(new Color(0.035f, 0.032f, 0.03f), 0.95);
+        ArrayMesh lump = PropMeshes.rock(7600, 1.0);
+        int c = 0;
+        foreach (Transform3D coal_pose in charcoal(field))
+        {
+            AddChild(new MeshInstance3D { Name = $"Charcoal_{c++}", Mesh = lump, MaterialOverride = coal, Transform = coal_pose, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
         }
 
         ArrayMesh mesh = log_mesh();
         Transform3D pose = log_pose(field, mesh);
-        ShaderMaterial bark = PropMaterials.bark("bark_oak", 0.62);
+        ShaderMaterial bark = PropMaterials.bark("bark_oak", 0.42);
         ShaderMaterial grain = PropMaterials.wood(new Color(0.62f, 0.58f, 0.52f), 0.9, 0.0, 1.1);
         mesh.SurfaceSetMaterial(0, bark);
         mesh.SurfaceSetMaterial(1, grain);
