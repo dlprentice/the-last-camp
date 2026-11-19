@@ -251,9 +251,18 @@ public partial class GrassPlanter
             }
             // Exact clearance at a narrow walking route cannot be reconstructed from
             // the one-metre suitability grid alone.
-            if ((p.X > -19.0 && p.X < 12.0 && p.Y > -8.0 && p.Y < 73.0) || (field.places_enabled && TerrainField.PLACE_TRAIL_BOUNDS.HasPoint(p)))
+            double trodden = 0.0;
+            if ((p.X > -19.0 && p.X < 14.0 && p.Y > -10.0 && p.Y < 73.0) || (field.places_enabled && TerrainField.PLACE_TRAIL_BOUNDS.HasPoint(p)))
             {
                 if (field.walking_distance(p) < 0.52 || TerrainField.camp_wear(p) > 0.94)
+                {
+                    continue;
+                }
+                trodden = field.camp_trample(p);
+                // Trodden turf keeps fewer stems; the survivors are short and lie
+                // flat. Untrodden ground draws no extra numbers, so the open sward
+                // keeps its established layout.
+                if (trodden > 0.0 && rng.Randf() < trodden * 0.45)
                 {
                     continue;
                 }
@@ -278,6 +287,9 @@ public partial class GrassPlanter
             double height = field.meadow_height(p.X, p.Y) * 0.82 * rng.RandfRange(0.45f, 1.13f);
             height *= lerpf(0.78, 1.06, smoothstep(-0.40, 0.40, growth)) * lerpf(1.0, 0.74, cover);
             height *= lerpf(1.0, 0.80, mature);
+            // Bruised stems near the fire and the paths pale toward straw.
+            height *= lerpf(1.0, 0.34, trodden);
+            mature = maxf(mature, trodden * 0.62);
             double yaw = rng.Randf() * TAU;
             double lean_angle = yaw + rng.RandfRange(-0.6f, 0.6f);
             Color tint = _blade_tint(mature, cover, rng.Randf());
@@ -304,7 +316,7 @@ public partial class GrassPlanter
             floats[(int)(o + 16)] = rng.Randf();
             floats[(int)(o + 17)] = (float)(cos(lean_angle) * 0.5 + 0.5);
             floats[(int)(o + 18)] = (float)(sin(lean_angle) * 0.5 + 0.5);
-            floats[(int)(o + 19)] = rng.RandfRange(0.15f, 0.6f);
+            floats[(int)(o + 19)] = (float)lerpf(rng.RandfRange(0.15f, 0.6f), 1.0, trodden);
             count += 1;
             min_pos = new Vector3((float)minf(min_pos.X, p.X), (float)minf(min_pos.Y, y), (float)minf(min_pos.Z, p.Y));
             max_pos = new Vector3((float)maxf(max_pos.X, p.X), (float)maxf(max_pos.Y, y + height), (float)maxf(max_pos.Z, p.Y));

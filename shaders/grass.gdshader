@@ -17,8 +17,8 @@ global uniform vec3 player_position;
 global uniform float scene_wetness;
 
 uniform vec3 root_color : source_color = vec3(0.065, 0.14, 0.045);
-uniform vec3 tip_color : source_color = vec3(0.22, 0.39, 0.16);
-uniform vec3 dry_tip_color : source_color = vec3(0.49, 0.47, 0.32);
+uniform vec3 tip_color : source_color = vec3(0.29, 0.46, 0.18);
+uniform vec3 dry_tip_color : source_color = vec3(0.58, 0.54, 0.34);
 uniform float fade_start = 55.0;
 uniform float fade_end = 80.0;
 uniform float trample_radius = 0.9;
@@ -123,7 +123,7 @@ void vertex() {
 	// its silhouette. Ground bias returns smoothly to the established far value.
 	vec3 side_t = normalize(cross(vec3(0.0, 1.0, 0.0), blade_n) + vec3(1e-4));
 	v_world_normal = normalize(blade_n + side_t * (UV.x - 0.5) * 0.4);
-	v_ground_blend = mix(0.28, 0.6, smoothstep(3.0, 18.0, cam_dist));
+	v_ground_blend = mix(0.36, 0.6, smoothstep(3.0, 18.0, cam_dist));
 
 	// Grass instances contain rotation and independent axis scales, without
 	// shear. Project the wind displacement onto those axes instead of taking
@@ -149,7 +149,9 @@ void fragment() {
 	float old_leaf = clamp(stand_age * 0.58 + leaf_age, 0.0, 0.76);
 	vec3 tip = mix(tip_color, dry_tip_color, old_leaf);
 	vec3 root = mix(root_color, dry_tip_color * 0.28, old_leaf * 0.65);
-	vec3 albedo = mix(root, tip, smoothstep(0.0, 0.85, v_height)) * v_tint;
+	// Dark roots, bright tips: the last third of a blade carries the light.
+	vec3 albedo = mix(root, tip, smoothstep(0.0, 0.9, v_height)) * v_tint;
+	albedo *= 1.0 + 0.22 * smoothstep(0.62, 1.0, v_height);
 	albedo *= 0.88 + 0.24 * v_blade;
 	albedo *= 0.94 + 0.12 * abs(v_side - 0.5) * 2.0;
 
@@ -173,5 +175,5 @@ void fragment() {
 	NORMAL = view_normal_from_world(VIEW_MATRIX, n);
 	// Forward+ applies ALBEDO to BACKLIGHT itself. Keep transmission restrained
 	// while allowing low sunlight to pass through the finer green blade tips.
-	BACKLIGHT = vec3(1.0, 0.98, 0.88) * (v_blade < -0.5 ? 0.008 : 0.07 + 0.15 * v_height);
+	BACKLIGHT = vec3(1.0, 0.98, 0.88) * (v_blade < -0.5 ? 0.008 : 0.06 + 0.22 * v_height * v_height);
 }
