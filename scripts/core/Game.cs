@@ -335,6 +335,8 @@ public partial class Game : Node
     public Game()
     {
         Instance = this;
+        // The first autoload: pin scripts before anything creates or frees a RefCounted game type.
+        ScriptPins.Pin();
     }
 
     public override void _ExitTree()
