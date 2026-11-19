@@ -257,10 +257,10 @@ void fragment() {
 	// Standing water only where the ground dips (baked per vertex), on level
 	// earth and, shallower, in the turf. The noise only roughens the margin.
 	float margin = texture(noise_tex, world_pos.xz * 0.9).g * 0.018;
-	float basin = smoothstep(0.012 + margin, 0.045 + margin, v_dip);
+	float basin = smoothstep(0.02 + margin, 0.06 + margin, v_dip);
 	float pooled = smoothstep(0.35, 0.95, scene_wetness) * basin
-		* smoothstep(0.94, 0.995, n.y) * clamp(w.z + w.w * 0.9 + w.x * 0.35 + w.y * 0.2, 0.0, 1.0);
-	rough = mix(rough, 0.40, wet * 0.85);
+		* smoothstep(0.94, 0.995, n.y) * clamp(w.z + w.w * 0.9, 0.0, 1.0);
+	rough = mix(rough, 0.50, wet * 0.85);
 	rough = mix(rough, 0.11, pooled);
 	nrm_ts.xy *= 1.0 - pooled * 0.85;
 	nrm_ts = normalize(nrm_ts);
@@ -285,7 +285,7 @@ void fragment() {
 
 	ALBEDO = albedo;
 	ROUGHNESS = rough;
-	SPECULAR = mix(0.25, 0.5, wet);
+	SPECULAR = mix(0.25, 0.40, wet);
 	CLEARCOAT = pooled * 0.7;
 	CLEARCOAT_ROUGHNESS = 0.12;
 	AO = mix(1.0, ao, ao_strength);

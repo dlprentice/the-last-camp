@@ -111,8 +111,9 @@ public partial class Understory : Node3D
             grass_material.Shader = Content.Load<Shader>("res://shaders/grass.gdshader");
             apply_quality(Quality.Instance.current);
         }
-        // Thin blades: a close-up blade wider than a finger reads as a strap.
-        ArrayMesh blade = GrassPlanter.clump_mesh(7, 5, 0.0135);
+        // Thin blades, loosely spread: a close-up blade wider than a finger reads
+        // as a strap, and a tight bunch of them as a planted plug.
+        ArrayMesh blade = GrassPlanter.clump_mesh(7, 5, 0.0135, 77, 2.2);
         _upload_grass(GrassPlanter.merge_chunks(planter.chunks, 16), blade, grass_material, "Grass");
         if (distant_grass_material == null)
         {

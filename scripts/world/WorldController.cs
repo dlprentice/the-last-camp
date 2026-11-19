@@ -431,7 +431,7 @@ public partial class WorldController : Node3D
         sun.Visible = G.op(">", sun_light["energy"], 0.001).AsBool();
         moon.GlobalTransform = new Transform3D(Basis.LookingAt(-moon_dir, _stable_up(moon_dir)), Vector3.Zero);
         // Storm cloud still passes a little moon: the rain shots kept only the dock lantern at 0.18.
-        moon.LightEnergy = G.op("*", G.op("*", moon_light["energy"], lerpf(2.0, 1.1, deep_night)), lerpf(1.0, 0.32, overcast)).AsSingle();
+        moon.LightEnergy = G.op("*", G.op("*", moon_light["energy"], lerpf(1.7, 0.8, deep_night)), lerpf(1.0, 0.32, overcast)).AsSingle();
         moon.Visible = G.op(">", moon_light["energy"], 0.001).AsBool();
 
         sky_material.SetShaderParameter(NativeArgs.Name("sun_direction"), sun_dir);

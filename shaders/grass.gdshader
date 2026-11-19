@@ -16,7 +16,7 @@ global uniform float wind_strength;
 global uniform vec3 player_position;
 global uniform float scene_wetness;
 
-uniform vec3 root_color : source_color = vec3(0.065, 0.14, 0.045);
+uniform vec3 root_color : source_color = vec3(0.075, 0.15, 0.05);
 uniform vec3 tip_color : source_color = vec3(0.29, 0.46, 0.18);
 uniform vec3 dry_tip_color : source_color = vec3(0.58, 0.54, 0.34);
 uniform float fade_start = 55.0;
@@ -123,7 +123,7 @@ void vertex() {
 	// its silhouette. Ground bias returns smoothly to the established far value.
 	vec3 side_t = normalize(cross(vec3(0.0, 1.0, 0.0), blade_n) + vec3(1e-4));
 	v_world_normal = normalize(blade_n + side_t * (UV.x - 0.5) * 0.4);
-	v_ground_blend = mix(0.36, 0.6, smoothstep(3.0, 18.0, cam_dist));
+	v_ground_blend = mix(0.46, 0.6, smoothstep(3.0, 18.0, cam_dist));
 
 	// Grass instances contain rotation and independent axis scales, without
 	// shear. Project the wind displacement onto those axes instead of taking
@@ -170,10 +170,10 @@ void fragment() {
 	SPECULAR = 0.18 + sheen * 0.15 + film * 0.08;
 	CLEARCOAT = film * 0.10;
 	CLEARCOAT_ROUGHNESS = 0.22;
-	AO = mix(0.48, 1.0, smoothstep(0.0, 0.75, v_height));
+	AO = mix(0.56, 1.0, smoothstep(0.0, 0.75, v_height));
 	AO_LIGHT_AFFECT = 0.28;
 	NORMAL = view_normal_from_world(VIEW_MATRIX, n);
 	// Forward+ applies ALBEDO to BACKLIGHT itself. Keep transmission restrained
 	// while allowing low sunlight to pass through the finer green blade tips.
-	BACKLIGHT = vec3(1.0, 0.98, 0.88) * (v_blade < -0.5 ? 0.008 : 0.06 + 0.22 * v_height * v_height);
+	BACKLIGHT = vec3(1.0, 0.98, 0.88) * (v_blade < -0.5 ? 0.008 : 0.07 + 0.34 * v_height * v_height);
 }

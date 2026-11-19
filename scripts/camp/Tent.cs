@@ -363,6 +363,7 @@ public partial class Tent : Node3D
     {
         /// Sod cloth: the strip of canvas that continues past each ground line and
         /// lies flat on the earth, sealing the tent. Without it the walls float.
+        /// It carries no height (COLOR.r = 0), so the shader dirties it fully.
         FastNoiseLite noise = new FastNoiseLite();
         noise.Seed = 913;
         noise.Frequency = 2.0f;
@@ -382,8 +383,8 @@ public partial class Tent : Node3D
                 double x_out = side * (WIDTH * 0.5 + reach + ripple * 0.03);
                 Vector2 uv_in = new Vector2((float)(z / CANVAS_TILE), (float)(WIDTH * 0.62 / CANVAS_TILE));
                 Vector2 uv_out = new Vector2((float)(z / CANVAS_TILE), (float)((WIDTH * 0.62 + reach) / CANVAS_TILE));
-                inner.Add((int)mb.add_vertex(new Vector3((float)x_in, 0.004f, (float)z), Vector3.Up, uv_in, new Color(0.18f, 0.0f, 0.0f, 1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
-                outer.Add((int)mb.add_vertex(new Vector3((float)x_out, (float)(0.006 + absf(ripple) * 0.01), (float)z), Vector3.Up, uv_out, new Color(0.22f, 0.0f, 0.0f, 1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
+                inner.Add((int)mb.add_vertex(new Vector3((float)x_in, 0.004f, (float)z), Vector3.Up, uv_in, new Color(0.0f, 0.0f, 0.0f, 1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
+                outer.Add((int)mb.add_vertex(new Vector3((float)x_out, (float)(0.006 + absf(ripple) * 0.01), (float)z), Vector3.Up, uv_out, new Color(0.0f, 0.0f, 0.0f, 1.0f), new Vector4(0.0f, 0.0f, 1.0f, 1.0f)));
             }
             for (long i3 = 0; i3 < segments; i3++)
             {
@@ -399,8 +400,8 @@ public partial class Tent : Node3D
             double u2 = (double)i4 / (double)segments;
             double x = (u2 - 0.5) * (WIDTH - 0.06);
             double ripple2 = noise.GetNoise2D((float)(x * 3.0), 21.0f);
-            b_in.Add((int)mb.add_vertex(new Vector3((float)x, 0.004f, (float)back_z), Vector3.Up, new Vector2((float)(x / CANVAS_TILE), 1.8f), new Color(0.18f, 0.0f, 0.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
-            b_out.Add((int)mb.add_vertex(new Vector3((float)x, (float)(0.006 + absf(ripple2) * 0.01), (float)(back_z + reach + ripple2 * 0.03)), Vector3.Up, new Vector2((float)(x / CANVAS_TILE), (float)(1.8 + reach / CANVAS_TILE)), new Color(0.22f, 0.0f, 0.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
+            b_in.Add((int)mb.add_vertex(new Vector3((float)x, 0.004f, (float)back_z), Vector3.Up, new Vector2((float)(x / CANVAS_TILE), 1.8f), new Color(0.0f, 0.0f, 0.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
+            b_out.Add((int)mb.add_vertex(new Vector3((float)x, (float)(0.006 + absf(ripple2) * 0.01), (float)(back_z + reach + ripple2 * 0.03)), Vector3.Up, new Vector2((float)(x / CANVAS_TILE), (float)(1.8 + reach / CANVAS_TILE)), new Color(0.0f, 0.0f, 0.0f, 1.0f), new Vector4(1.0f, 0.0f, 0.0f, 1.0f)));
         }
         for (long i5 = 0; i5 < segments; i5++)
         {

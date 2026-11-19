@@ -529,7 +529,7 @@ public partial class TerrainField
         double around = 0.0;
         if (p.DistanceSquaredTo(FIRE) < 196.0)
         {
-            around = 1.0 - smoothstep(3.4, 7.0, p.DistanceTo(FIRE));
+            around = 1.0 - smoothstep(2.9, 5.8, p.DistanceTo(FIRE));
             around = maxf(around, 1.0 - smoothstep(1.4, 3.6, p.DistanceTo(TENT_MOUTH)));
             around = maxf(around, (1.0 - smoothstep(2.6, 4.4, p.DistanceTo(TENT))) * 0.7);
             around = maxf(around, 1.0 - smoothstep(1.6, 3.4, p.DistanceTo(TABLE)));

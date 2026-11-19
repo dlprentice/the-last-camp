@@ -78,12 +78,12 @@ void fragment() {
 	float mildew = smoothstep(0.62, 0.78, texture(noise_tex, world_pos.xz * 9.0 + world_pos.y * 6.0).r) * low;
 	albedo = mix(albedo, albedo * vec3(0.55, 0.5, 0.42), low * ground_darkening);
 	// Earth splashed up the hem: an uneven tide line a hand high, speckled above.
-	float hem_h = world_pos.y - (MODEL_MATRIX[3].y);
-	float tide = 0.08 + 0.05 * texture(noise_tex, world_pos.xz * 1.3 + vec2(world_pos.y)).g;
+	float hem_h = v_height * 1.6;
+	float tide = 0.13 + 0.08 * texture(noise_tex, world_pos.xz * 1.3 + vec2(world_pos.y)).g;
 	float splash = 1.0 - smoothstep(tide * 0.6, tide, hem_h);
 	float speckle = smoothstep(0.66, 0.80, texture(noise_tex, world_pos.xz * 14.0 + vec2(hem_h * 11.0)).r)
 		* (1.0 - smoothstep(tide, tide * 2.6, hem_h));
-	albedo = mix(albedo, vec3(0.20, 0.15, 0.10), clamp(splash * 0.62 + speckle * 0.45, 0.0, 0.75));
+	albedo = mix(albedo, vec3(0.075, 0.055, 0.035), clamp(splash * 0.78 + speckle * 0.5, 0.0, 0.85));
 	albedo = mix(albedo, albedo * vec3(0.42, 0.40, 0.34), mildew * 0.6);
 	float fire_d = length(world_pos - fire_position);
 	float warmth = exp(-fire_d * 0.35) * fire_intensity * 0.3;
@@ -97,7 +97,7 @@ void fragment() {
 	// but must retain a fibrous response instead of reflecting the lantern
 	// as two polished white patches across the ceiling.
 	float exterior = FRONT_FACING ? 1.0 : 0.0;
-	float film = smoothstep(0.35, 0.95, scene_wetness) * (0.30 + runoff * 0.70) * exterior;
+	float film = smoothstep(0.35, 0.95, scene_wetness) * (0.30 + runoff * 0.70) * exterior * (1.0 - splash * 0.7);
 	ALBEDO = albedo * (1.0 - soaked * 0.32);
 	ROUGHNESS = mix(mix(orm.g, 0.98, 0.3), mix(0.84, 0.39, exterior), soaked) + seam * 0.05;
 	SPECULAR = mix(0.25, mix(0.20, 0.38, exterior), soaked);

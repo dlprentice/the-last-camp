@@ -262,7 +262,7 @@ public partial class GrassPlanter
                 // Trodden turf keeps fewer stems; the survivors are short and lie
                 // flat. Untrodden ground draws no extra numbers, so the open sward
                 // keeps its established layout.
-                if (trodden > 0.0 && rng.Randf() < trodden * 0.45)
+                if (trodden > 0.0 && rng.Randf() < trodden * 0.35)
                 {
                     continue;
                 }
@@ -288,7 +288,7 @@ public partial class GrassPlanter
             height *= lerpf(0.78, 1.06, smoothstep(-0.40, 0.40, growth)) * lerpf(1.0, 0.74, cover);
             height *= lerpf(1.0, 0.80, mature);
             // Bruised stems near the fire and the paths pale toward straw.
-            height *= lerpf(1.0, 0.34, trodden);
+            height *= lerpf(1.0, 0.45, trodden);
             mature = maxf(mature, trodden * 0.62);
             double yaw = rng.Randf() * TAU;
             double lean_angle = yaw + rng.RandfRange(-0.6f, 0.6f);
@@ -572,7 +572,8 @@ public partial class GrassPlanter
             for (long i = 0, i_end = segments + 1; i < i_end; i++)
             {
                 double v = (double)i / (double)(segments + 1);
-                double taper = 1.0 - v * 0.8;
+                // Most of the narrowing happens early, so blades end in a fine point.
+                double taper = 1.0 - pow(v, 0.7) * 0.86;
                 Vector3 p = offset + new Vector3(0.0f, (float)(v * height), 0.0f) + curve * (float)(v * v * height);
                 // The width direction crossed with the curved centre-line tangent.
                 // Taper adds a parallel width component, which cancels in the cross.

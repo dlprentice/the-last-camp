@@ -32,8 +32,8 @@ public partial class Firepit : Node3D
     public static readonly Color LIGHT_COLOR = new Color(1.0f, 0.53f, 0.2f);
     public const double BASE_ENERGY = 1.5;
     public const double BASE_RANGE = 12.0;
-    public const double FILL_ENERGY = 0.34;
-    public const double NIGHT_GAIN = 1.3;
+    public const double FILL_ENERGY = 0.48;
+    public const double NIGHT_GAIN = 1.7;
     public const double DAY_GAIN = 2.6;
     public const double DAY_RANGE = 0.34;
     public const double FILL_RANGE = 22.0;
