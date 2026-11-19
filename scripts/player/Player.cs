@@ -258,7 +258,7 @@ public partial class Player : CharacterBody3D
         }
         if (Game.Instance.audio != null)
         {
-            Game.Instance.audio.play_interact("lantern_toggle");
+            Game.Instance.audio.play_interact(lantern_on ? Sounds.LanternOn : Sounds.LanternOff);
         }
     }
 
@@ -607,7 +607,7 @@ public partial class Player : CharacterBody3D
             return;
         }
         held_item = "stone";
-        Game.Instance.audio?.play_interact("pickup");
+        Game.Instance.audio?.play_interact(Sounds.StonePickup);
         Game.Instance.hud?.notify("Aim low over the water. Hold the left mouse button, then release.");
     }
 
@@ -623,6 +623,7 @@ public partial class Player : CharacterBody3D
         {
             held_item = "";
             _heldStone.Visible = false;
+            Game.Instance.audio?.play_interact(Sounds.StoneThrow);
         }
         else Game.Instance.hud?.notify("Let the first stone settle before throwing another.");
         stone_charge = 0;

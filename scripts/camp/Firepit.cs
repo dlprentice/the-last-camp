@@ -109,7 +109,7 @@ public partial class Firepit : Node3D
             Game.Instance.hud?.notify("Fire tended — the new log catches.");
             if (Game.Instance.audio != null)
             {
-                Game.Instance.audio.play_interact("log_added");
+                Game.Instance.audio.play_interact(Sounds.LogIntoFire);
             }
             return;
         }

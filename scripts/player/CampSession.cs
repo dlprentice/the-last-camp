@@ -133,7 +133,11 @@ public partial class CampSession : Node
         Player player = Game.Instance.player;
         Firepit fire = Game.Instance.camp.campsite.firepit;
         bool inTent = player != null && CampWeather.tent_shelter(Game.Instance.camp.campsite.tent.ToLocal(player.GlobalPosition + Vector3.Up * 0.5f));
-        if (inTent && !_inTent) Story.Raise(StoryEvents.TentEntered);
+        if (inTent && !_inTent)
+        {
+            Game.Instance.audio?.play_interact(Sounds.TentEnter);
+            Story.Raise(StoryEvents.TentEntered);
+        }
         _inTent = inTent;
         if (player != null)
         {

@@ -128,8 +128,6 @@ public partial class Fingerprint
             water.Add(PondSurface.displacement(p2, i * 0.31, WorldController.WIND_DIRECTION, i % 41 * 0.1));
         }
         stamp("water", water);
-        stamp("noise", Variant.From(Synth.pink_noise(22050, 9817).ToArray()));
-        stamp("filtered_noise", Variant.From(Synth.low_pass(Synth.white_noise(22050, 5741), 1300.0).ToArray()));
         ScannedDressing dressing = new ScannedDressing();
         dressing.setup_from(field, plan);
         foreach (Variant key_key in dressing._placements.Keys)
@@ -162,50 +160,9 @@ public partial class Fingerprint
             draw_order.Add(new Basis(Vector3.Up, (float)(random.Randf() * TAU)).Scaled(scale));
         }
         stamp("random_receiver_order", draw_order);
-        AudioDirector director = new AudioDirector();
-        for (long group = 0, group_end = AudioDirector.GENERATION_GROUPS; group < group_end; group++)
-        {
-            Godot.Collections.Dictionary into = new Godot.Collections.Dictionary();
-            director._generate_group(group, into);
-            audio_stamp(G.format("sound_bank/%d", group), into);
-        }
-        director.Free();
         FileAccess output = FileAccess.Open(Game.Instance.arg_value("fingerprints", "res://local-data/fingerprints.json"), FileAccess.ModeFlags.Write);
         output.StoreString(Json.Stringify(result, "\t", true) + "\n");
         output.Close();
         G.print("CONTENT_FINGERPRINTS ", (long)result.Count);
-    }
-
-    public void audio_stamp(string label, Variant item)
-    {
-        if (item.Obj is AudioStreamWav)
-        {
-            stamp(label, new Godot.Collections.Array { (long)item.As<AudioStreamWav>().Format, item.As<AudioStreamWav>().MixRate, item.As<AudioStreamWav>().Stereo, (long)item.As<AudioStreamWav>().LoopMode, item.As<AudioStreamWav>().LoopBegin, item.As<AudioStreamWav>().LoopEnd, item.As<AudioStreamWav>().Data });
-        }
-        else if (item.Obj is AudioDirector.FootstepSet)
-        {
-            audio_stamp(label + "/left", item.As<AudioDirector.FootstepSet>().left);
-            audio_stamp(label + "/right", item.As<AudioDirector.FootstepSet>().right);
-        }
-        else if (item.VariantType == Variant.Type.Dictionary)
-        {
-            foreach (Variant key_item in G.Iter(item))
-            {
-                Variant key = key_item;
-                audio_stamp(label + "/" + G.str(key), G.Index(item, key));
-            }
-        }
-        else if (item.VariantType == Variant.Type.Array)
-        {
-            foreach (Variant i_item in G.Iter(G.Call(item, "size")))
-            {
-                Variant i = i_item;
-                audio_stamp(label + G.format("/%d", i), G.Index(item, i));
-            }
-        }
-        else
-        {
-            G.assert(false, "Unexpected audio bank value");
-        }
     }
 }

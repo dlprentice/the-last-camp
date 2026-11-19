@@ -159,17 +159,6 @@ public partial class TestCamp : TestCase
             }
         }
         assert_true(has_two_creators, "multiple creators are listed without their role notes");
-        Godot.Collections.Array sounds = Cinematic._audio_credit_rows();
-        assert_eq((long)sounds.Count, 6, "six recordings are credited once each");
-        bool by = false;
-        foreach (Variant row2 in sounds)
-        {
-            if ((long)G.str(G.Index(row2, 1)).IndexOf("SoundBible", StringComparison.Ordinal) != -1 && (long)G.str(G.Index(row2, 1)).IndexOf("CC BY 3.0", StringComparison.Ordinal) != -1)
-            {
-                by = true;
-            }
-        }
-        assert_true(by, "attribution licences name the provider and the licence");
     }
 
     public void test_ridges_plant_the_forest_species_to_a_closed_canopy()

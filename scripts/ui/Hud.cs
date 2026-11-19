@@ -207,6 +207,7 @@ public partial class Hud : CanvasLayer
             _toggle_pause();
             _journal.Visible = opening;
             if (opening) _menu.Visible = false;
+            Game.Instance.audio?.play_interact(opening ? Sounds.JournalOpen : Sounds.JournalClose);
             GetViewport().SetInputAsHandled();
         }
         else if (@event.IsActionPressed("quality_menu"))
