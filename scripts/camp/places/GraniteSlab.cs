@@ -30,6 +30,8 @@ public static class GraniteSlab
         /// Optional: lifts the underside within this inset by `hollow` metres (the loose step).
         public double hollow;
         public double hollow_inset;
+        /// How high moss climbs from the soil line (default 0.22 m).
+        public double moss_band;
     }
 
     static double spow(double v, double e) => Math.Sign(v) * Math.Pow(Math.Abs(v), e);
@@ -101,7 +103,7 @@ public static class GraniteSlab
                 Vector3 w = place * pts[k];
                 double above = w.Y - ground(w.X, w.Z);
                 float soil = (float)(1.0 - smoothstep(-0.01, 0.06, above));
-                float moss = (float)(1.0 - smoothstep(0.0, 0.22, above)) * (float)(0.5 + 0.5 * Math.Max(0.0, n.Y));
+                float moss = (float)(1.0 - smoothstep(0.0, s.moss_band > 0.0 ? s.moss_band : 0.22, above)) * (float)(0.5 + 0.5 * Math.Max(0.0, n.Y));
                 index[k] = mb.add_vertex(pts[k], n, new Vector2(i / (float)SEGMENTS, j / (float)RINGS), new Color(soil, moss, 0, 1), new Vector4(1, 0, 0, 1));
             }
         }

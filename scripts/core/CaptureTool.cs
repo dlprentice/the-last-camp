@@ -364,12 +364,12 @@ public partial class CaptureTool : Node
         add("place_old_ring", PlacesLayout.OLD_RING - ring_dir * 3.4f, 1.65, PlacesLayout.OLD_RING, 0.0, 10.0, 48.0);
         // The flight from the end of Tom's route, looking up it as he would arrive.
         Vector2 route_end = PlacesLayout.TOMS_ROUTE[^2] + (PlacesLayout.TOMS_ROUTE[^2] - PlacesLayout.TOMS_ROUTE[^1]).Normalized() * 1.2f;
-        add("place_steps", route_end, 1.75, PlacesLayout.polar(9.0, 10.0), 0.4, 18.6, 58.0);
+        add("place_steps", route_end, 1.75, PlacesLayout.polar(12.0, 75.0), 0.6, 18.6, 58.0);
         // The bench's view at the seated eye: over the slope to the pond and the sunset.
         Vector2 bench = PlacesLayout.BENCH;
         Vector3 eye = new(bench.X, (float)(field.height(bench.X, bench.Y) + PlacesLayout.SEATED_EYE), bench.Y);
-        Vector2 out_to = bench + PlacesLayout.bearing(PlacesLayout.LOOKOUT_BEARING_DEG) * 80.0f;
-        add_absolute("place_lookout", eye, new Vector3(out_to.X, (float)(TerrainField.WATER_LEVEL + 3.0), out_to.Y), 19.9, 62.0);
+        Vector2 out_to = bench + PlacesLayout.bearing(PlacesLayout.LOOKOUT_BEARING_DEG + 3.0) * 90.0f;
+        add_absolute("place_lookout", eye, new Vector3(out_to.X, (float)(TerrainField.WATER_LEVEL + 4.5), out_to.Y), 19.9, 50.0);
         add("place_loose_step", PlacesLayout.LOOSE_STEP + PlacesLayout.RIGHT * 1.05f + face * 0.75f, 1.2, PlacesLayout.LOOSE_STEP, 0.02, 18.4, 45.0);
         Places places = Game.Instance.camp.places;
         if (places?.ring != null)

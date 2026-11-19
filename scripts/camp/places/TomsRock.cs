@@ -245,10 +245,10 @@ public partial class TomsRock : Node3D
         var rng = new RandomNumberGenerator { Seed = 1971 };
         var list = new List<Ledge>();
         int index = 0;
-        for (double r = LEDGE_INNER; r <= LEDGE_OUTER; r += 1.75)
+        for (double r = LEDGE_INNER; r <= LEDGE_OUTER; r += 1.5)
         {
             double circumference = Math.Tau * r;
-            int count = Math.Max(3, (int)(circumference / 3.1));
+            int count = Math.Max(3, (int)(circumference / 3.4));
             double offset = rng.Randf() * 360.0;
             for (int i = 0; i < count; i++)
             {
@@ -256,9 +256,9 @@ public partial class TomsRock : Node3D
                 double rr = r + rng.RandfRange(-0.5f, 0.5f);
                 Vector2 at = PlacesLayout.polar(rr, bearing);
                 double scale = Mathf.Lerp(1.0f, 0.7f, (float)((rr - LEDGE_INNER) / (LEDGE_OUTER - LEDGE_INNER)));
-                Vector3 size = new(rng.RandfRange(2.0f, 3.6f) * (float)scale, rng.RandfRange(0.7f, 1.3f) * (float)scale, rng.RandfRange(1.4f, 2.4f) * (float)scale);
+                Vector3 size = new(rng.RandfRange(2.8f, 5.0f) * (float)scale, rng.RandfRange(1.1f, 1.9f) * (float)scale, rng.RandfRange(2.0f, 3.4f) * (float)scale);
                 long seed = 900 + index++;
-                double roundness = rng.RandfRange(0.22f, 0.36f);
+                double roundness = rng.RandfRange(0.38f, 0.55f);
                 double yaw_jitter = rng.RandfRange(-0.35f, 0.35f);
                 // Long axis along the contour; up leans halfway to the slope's normal.
                 Vector2 radial = (at - PlacesLayout.TOMS_ROCK).Normalized();
@@ -272,7 +272,7 @@ public partial class TomsRock : Node3D
                 for (int k = 0; k < 16; k++)
                 {
                     double a = k / 16.0 * Math.Tau;
-                    Vector3 local = new((float)(Math.Cos(a) * size.X * 0.45), -size.Y * 0.2f, (float)(Math.Sin(a) * size.Z * 0.45));
+                    Vector3 local = new((float)(Math.Cos(a) * size.X * 0.45), size.Y * 0.1f, (float)(Math.Sin(a) * size.Z * 0.45));
                     Vector3 w = basis * local;
                     origin_y = Math.Min(origin_y, field.height(at.X + w.X, at.Y + w.Z) - w.Y);
                 }
