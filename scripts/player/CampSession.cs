@@ -63,11 +63,85 @@ public partial class CampSession : Node
             prompt_text = "Rest", on_interact = Callable.From<Player>(Rest) };
         _bed.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(0.72f, 0.40f, 0.55f) } });
         Game.Instance.camp.campsite.tent.AddChild(_bed);
+        Reading = new ReadingSheet { Name = "Reading" };
+        AddChild(Reading);
+        WireStoryProps();
         ApplyStoryToWorld();
         // Main hands control to the player right after this node is added, and the
         // first hand-over snaps to the terrain; the saved position goes on after it.
         Callable.From(RestorePosition).CallDeferred();
     }
+
+    /// The sheet the story's texts are read on.
+    public ReadingSheet Reading { get; private set; } = null!;
+    public Interactable PierSeat { get; private set; } = null!;
+    public Interactable? BenchSeat { get; private set; }
+    public Interactable? StepLift { get; private set; }
+
+    /// Connects the world's story props to the story, and adds the seats and the
+    /// step's lift: plain colliders on the interaction layer, nothing visible.
+    private void WireStoryProps()
+    {
+        Campsite site = Game.Instance.camp.campsite;
+        site.kitchen.letter_body.on_interact = Callable.From<Player>(p => ReadLetter(p));
+        site.tent.tin_body.on_interact = Callable.From<Player>(p => OpenTin(p));
+        site.tent.strike_body.on_interact = Callable.From<Player>(p => StrikeTent(p));
+        // Restoring a saved story puts back what was already done.
+        if (Story.Facts.Contains(StoryEvents.LetterRead)) site.kitchen.take_letter();
+        if (Story.Facts.Contains(StoryEvents.TinOpened)) site.tent.open_tin();
+
+        Dock dock = site.dock;
+        PierSeat = new Interactable { Name = "PierEndSeat", CollisionLayer = 1u << 1, CollisionMask = 0,
+            Position = new Vector3(0, 0.18f, (float)(-dock.total_length() + 0.25)), prompt_text = "Sit",
+            on_interact = Callable.From<Player>(SitAtPierEnd) };
+        PierSeat.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(0.9f, 0.3f, 0.4f) } });
+        dock.AddChild(PierSeat);
+
+        Places? places = Game.Instance.camp.places;
+        if (places?.rock == null) return;
+        places.Arrived += ReachPlace;
+        places.LooseStepPressed += OnLooseStep;
+        TomsRock rock = places.rock;
+        Node3D bench = rock.bench_body.GetParent<Node3D>();
+        BenchSeat = new Interactable { Name = "BenchSeat", CollisionLayer = 1u << 1, CollisionMask = 0,
+            Position = new Vector3(0, (float)PlacesLayout.BENCH_SEAT_HEIGHT + 0.08f, 0), prompt_text = "Sit",
+            on_interact = Callable.From<Player>(SitAtLookout) };
+        BenchSeat.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(TomsRock.BENCH_SEAT.X, 0.16f, TomsRock.BENCH_SEAT.Z) } });
+        bench.AddChild(BenchSeat);
+        StepLift = new Interactable { Name = "LooseStepLift", CollisionLayer = 0, CollisionMask = 0, Transform = rock.loose_rest, prompt_text = "Lift",
+            on_interact = Callable.From<Player>(p => LiftStep(p)) };
+        StepLift.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = TomsRock.LOOSE_SIZE + new Vector3(0.06f, 0.08f, 0.06f) } });
+        rock.AddChild(StepLift);
+        if (Story.Facts.Contains(StoryEvents.StepLifted)) { places.LiftStep(); if (places.Tin != null) places.Tin.Visible = false; }
+    }
+
+    /// The loose step knocks hollow when it takes the player's weight.
+    private void OnLooseStep() => Game.Instance.audio?.footstep("hollow", false);
+
+    private void OnRingNotch(Player player)
+    {
+        Places? places = Game.Instance.camp.places;
+        if (places?.ring == null || !NotchCounts(Story)) { _notchInView = false; return; }
+        bool inView = NotchInView(player.camera.GlobalPosition, -player.camera.GlobalBasis.Z, places.ring.notch_world, places.ring.notch_face);
+        if (inView && !_notchInView) FindBlaze();
+        _notchInView = inView;
+    }
+
+    /// Looking at the notch: closer than `NotchFindDistance`, near the centre of
+    /// view, from the side its cut faces.
+    public static bool NotchInView(Vector3 eye, Vector3 forward, Vector3 notch, Vector3 face)
+    {
+        Vector3 to = notch - eye;
+        float d = to.Length();
+        return d < NotchFindDistance && d > 0.05f
+            && Mathf.RadToDeg(forward.AngleTo(to)) < NotchFindConeDeg
+            && face.Dot(-to / d) > 0.1f;
+    }
+
+    private bool _notchInView;
+    /// Tom's notch is found by looking at it from closer than this, near the centre of view.
+    public const float NotchFindDistance = 2.0f;
+    public const float NotchFindConeDeg = 25.0f;
 
     private void RestorePosition()
     {
@@ -131,8 +205,23 @@ public partial class CampSession : Node
         _bed.prompt_text = BedPrompt();
 
         Player player = Game.Instance.player;
-        Firepit fire = Game.Instance.camp.campsite.firepit;
-        bool inTent = player != null && CampWeather.tent_shelter(Game.Instance.camp.campsite.tent.ToLocal(player.GlobalPosition + Vector3.Up * 0.5f));
+        Campsite site = Game.Instance.camp.campsite;
+        Firepit fire = site.firepit;
+        site.tent.offer_tin(Story.TinAvailable && !site.tent.struck);
+        site.tent.offer_strike(Epilogue);
+        if (StepLift != null) StepLift.CollisionLayer = LiftOffered ? 1u << 1 : 0;
+        if (player != null)
+        {
+            OnRingNotch(player);
+            Vector2 feet = new(player.GlobalPosition.X, player.GlobalPosition.Z);
+            if (Epilogue && Story.BandDone && feet.DistanceTo(WalkOutPoint) < WalkOutRadius) WalkOut(player);
+            if (_shelterRest && !player.resting) _shelterRest = false;
+        }
+        // Resting in the tent through the rain is sheltering; once the storm has
+        // passed and the night's asks are done, it is turning in.
+        bool restingInTent = _shelterRest && player != null && player.GlobalPosition.DistanceTo(_bed.GlobalPosition) < 3.6f;
+        if (restingInTent && Story.Sheltered && Story.CanEndBy(StoryEvents.TurnedIn) && !_ending) _ = EndBand(StoryEvents.TurnedIn, player);
+        bool inTent = player != null && (restingInTent || CampWeather.tent_shelter(site.tent.ToLocal(player.GlobalPosition + Vector3.Up * 0.5f)));
         if (inTent && !_inTent)
         {
             Game.Instance.audio?.play_interact(Sounds.TentEnter);
@@ -169,8 +258,11 @@ public partial class CampSession : Node
         }
     }
 
+    private bool _shelterRest;
+
     private string BedPrompt()
     {
+        if (Story.Band.Storm && !Story.Finished && !Story.Sheltered) return "Rest";
         if (Story.EndActFor(StoryEvents.TurnedIn) != null) return "Turn in for the night";
         if (Story.EndActFor(StoryEvents.RestBedroll) != null) return Story.Band.Id == "evening" && Story.Chapter.Id == StoryScript.Arrival ? "Rest until dusk" : "Rest";
         return "Rest at camp";
@@ -190,7 +282,13 @@ public partial class CampSession : Node
     {
         Story.Raise(StoryEvents.LogCarried);
         if (Story.Chapter.Id == StoryScript.Arrival && Story.Band.Id == "night") LightFire();
-        if (Story.Band.Storm && Game.Instance.world.weather.rain > 0.3) Story.Raise(StoryEvents.FireFedInRain);
+        // Once sheltered the rain is clearing; a log still counts, so the storm can
+        // always be finished.
+        if (Story.Band.Storm && (Game.Instance.world.weather.rain > 0.3 || Story.Sheltered))
+        {
+            Story.Raise(StoryEvents.FireFedInRain);
+            Game.Instance.audio?.fire_hiss();
+        }
     }
 
     public void LightFire()
@@ -221,34 +319,229 @@ public partial class CampSession : Node
     /// is the hook for anything that shelters the player directly.
     public void ShelterFromStorm() => Story.Raise(StoryEvents.StormSheltered);
 
-    // ---- Hooks for places and props that are not built yet ----------------------
-    // Each raises its event; nothing in the world calls them until the thing exists.
+    // ---- The story's places and props --------------------------------------------
+    // Each is a real interaction in the world: the props carry the meshes and the
+    // colliders, the session decides when each offers itself and what it raises.
 
-    public void ReadLetter() { Sound(Sounds.LetterUnfold); Story.AddItem("june_letter"); Story.Raise(StoryEvents.LetterRead); }
+    /// June's letter on the camp table: the sheet comes up to read and she begins.
+    public async void ReadLetter(Player? player)
+    {
+        if (Reading.IsOpen) return;
+        Sound(Sounds.LetterUnfold);
+        Game.Instance.camp?.campsite?.kitchen?.take_letter();
+        Story.AddItem("june_letter");
+        Story.Raise(StoryEvents.LetterRead);
+        await Reading.Read(StoryTexts.JuneLetter, player);
+    }
+
     public void ReachPlace(string place) => Story.Raise("place:" + place);
     public void ReachTrailhead() => ReachPlace("trailhead");
-    public void SitAtPierEnd(Player player) => _ = Sit(StoryEvents.SatPier, player);
-    /// Whether Tom's tin can be opened yet: only after the old fire ring. The tin's
-    /// interaction should offer itself only while this is true.
-    public bool TinAvailable => Story.TinAvailable;
-    /// The tin's lid, then a page of Tom's tally book.
-    public bool OpenTin()
+
+    /// Sitting at the end of the pier. On the first evening, once its objectives
+    /// are done, it is the sunset sequence into the night; otherwise just a sit.
+    public void SitAtPierEnd(Player player)
     {
-        if (!Story.TinAvailable) return false;
+        SeatPlayer(player, -Game.Instance.camp.campsite.dock.GlobalBasis.Z);
+        if (Story.Chapter.Id == StoryScript.Arrival && Story.Band.Id == "evening")
+        {
+            _ = Sit(StoryEvents.SatPier, player);
+            if (!Story.BandDone) Game.Instance.hud?.notify("A few things left first. J opens your journal.");
+        }
+    }
+
+    /// Whether Tom's tin can be opened yet: only after the old fire ring. The tin's
+    /// interaction offers itself only while this is true.
+    public bool TinAvailable => Story.TinAvailable;
+
+    /// The tin's lid, then the pages of Tom's tally book. Refused (false, nothing
+    /// raised) before the old ring. Once open it can be read again.
+    public bool OpenTin(Player? player = null)
+    {
+        if (!Story.TinAvailable || Reading.IsOpen) return false;
+        Tent tent = Game.Instance.camp.campsite.tent;
+        if (tent.tin_open)
+        {
+            Sound(Sounds.PageTurn);
+            _ = Reading.Read(StoryTexts.TallyBook, player);
+            return true;
+        }
         Sound(Sounds.TinOpen);
-        SoundLater(Sounds.PageTurn, 1.4);
+        tent.open_tin();
         Story.AddItem("tally_book");
         Story.Raise(StoryEvents.TinOpened);
+        _ = ReadAfter(StoryTexts.TallyBook, player, 0.8, Sounds.PageTurn);
         return true;
     }
-    public void FindBlaze() => Story.Raise(StoryEvents.BlazeFound);
-    public void SitAtLookout(Player player) => _ = Sit(StoryEvents.SatLookout, player);
-    /// The stone set aside, then the small tin pulled from the soil under it.
-    public void LiftStep(Player player) { Sound(Sounds.StepLift); SoundLater(Sounds.TinLift, 1.8); Story.AddItem("tom_letter"); Story.Raise(StoryEvents.StepLifted); _ = EndBand(StoryEvents.StepLifted, player); }
-    /// The pegs come out, then the canvas falls.
-    public void StrikeTent() { Sound(Sounds.TentPeg); SoundLater(Sounds.TentFall, 1.2); Story.Raise(StoryEvents.TentStruck); }
-    public void RakeAsh() { Sound(Sounds.AshRake); Story.Raise(StoryEvents.AshRaked); }
-    public void ScatterStones() { Sound(Sounds.RingStone); Story.Raise(StoryEvents.StonesScattered); }
+
+    private async Task ReadAfter(string[] pages, Player? player, double seconds, string sound)
+    {
+        player?.suspend();
+        await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
+        if (!IsInsideTree()) return;
+        Sound(sound);
+        await Reading.Read(pages, player);
+    }
+
+    /// Tom's first notch, seen up close: counts only once the tally book has
+    /// shown what it is. Before the tin is open it raises nothing at all.
+    public bool FindBlaze()
+    {
+        if (!NotchCounts(Story)) return false;
+        Story.Raise(StoryEvents.BlazeFound);
+        return true;
+    }
+
+    /// Sitting on Tom's bench. On the climb's evening it is the lookout: June
+    /// speaks again and the sun goes down; any other time it is just a sit.
+    public void SitAtLookout(Player player)
+    {
+        SeatPlayer(player, new Vector3(PlacesLayout.FACE.X, 0, PlacesLayout.FACE.Y));
+        Game.Instance.camp.places?.SitOnBench();
+        Objective? lookout = Story.Band.Objectives.FirstOrDefault(o => o.Event == StoryEvents.SatLookout);
+        if (lookout != null && !Story.IsDone(lookout)) _ = Sit(StoryEvents.SatLookout, player);
+        else Sound(Sounds.SitDown);
+    }
+
+    /// The loose step offers "Lift" only after the player has stood on it, and only
+    /// when lifting it is the evening's last act (the notch and the bench done).
+    public bool LiftOffered
+    {
+        get
+        {
+            Places? places = Game.Instance.camp?.places;
+            return places != null && !_lifting && LiftAllowed(Story, places.loose_step_stood_on, places.StepIsLifted);
+        }
+    }
+
+    /// The loose step's rule: never before the player has stood on it, never once
+    /// lifted, and only on the climb's evening with the notch and the bench done.
+    public static bool LiftAllowed(StoryState story, bool stoodOn, bool lifted)
+    {
+        if (!stoodOn || lifted) return false;
+        if (story.Finished || story.Chapter.Id != StoryScript.Marks || story.Band.Id != "evening") return false;
+        return story.Required(story.Band).Where(o => o.Event != StoryEvents.StepLifted).All(story.IsDone);
+    }
+
+    /// Tom's notch means something only once his tally book has been read.
+    public static bool NotchCounts(StoryState story) => story.Facts.Contains(StoryEvents.TinOpened);
+
+    private bool _lifting;
+
+    /// The stone set aside, then the small tin pulled from the soil under it and
+    /// Tom's letter read. Refused (false) while the step does not offer itself.
+    public bool LiftStep(Player player)
+    {
+        if (!LiftOffered) return false;
+        _ = LiftAndRead(player);
+        return true;
+    }
+
+    private async Task LiftAndRead(Player player)
+    {
+        _lifting = true;
+        Places places = Game.Instance.camp.places;
+        player.suspend();
+        Sound(Sounds.StepLift);
+        places.LiftStep();
+        await ToSignal(GetTree().CreateTimer(TomsRock.LIFT_SECONDS + 0.2), SceneTreeTimer.SignalName.Timeout);
+        if (!IsInsideTree()) return;
+        Sound(Sounds.TinLift);
+        if (places.Tin != null) places.Tin.Visible = false;
+        await ToSignal(GetTree().CreateTimer(0.6), SceneTreeTimer.SignalName.Timeout);
+        if (!IsInsideTree()) return;
+        await Reading.Read(StoryTexts.TomLetter, player);
+        Story.AddItem("tom_letter");
+        Story.Raise(StoryEvents.StepLifted);
+        _lifting = false;
+        await EndBand(StoryEvents.StepLifted, player);
+    }
+
+    /// The last morning's acts, offered only in the epilogue.
+    private bool Epilogue => !Story.Finished && Story.Chapter.Id == StoryScript.Epilogue;
+
+    /// The pegs come out, then the canvas falls and the tent is packed away.
+    public bool StrikeTent(Player? player = null)
+    {
+        Tent tent = Game.Instance.camp.campsite.tent;
+        if (!Epilogue || tent.struck) return false;
+        Sound(Sounds.TentPeg);
+        _ = StrikeAndPack(tent);
+        return true;
+    }
+
+    private async Task StrikeAndPack(Tent tent)
+    {
+        await tent.strike(pegs_out: () => Sound(Sounds.TentFall));
+        Story.Raise(StoryEvents.TentStruck);
+    }
+
+    /// What the camp fire offers on the last morning: rake the ash, then move the
+    /// ring's stones. Null when it offers nothing of its own.
+    public string? FireAct()
+    {
+        if (!Epilogue) return null;
+        Firepit fire = Game.Instance.camp.campsite.firepit;
+        if (!fire.ash_raked) return "Rake";
+        if (!fire.stones_scattered) return "Move";
+        return null;
+    }
+
+    /// Runs the fire's act; false when there is none (the fire's own interaction runs).
+    public bool DoFireAct(Player player)
+    {
+        string? act = FireAct();
+        if (act == "Rake") return RakeAsh();
+        if (act == "Move") return ScatterStones();
+        return false;
+    }
+
+    /// Rakes out the ash: still warm if the fire survived the storm, cold and wet if not.
+    public bool RakeAsh()
+    {
+        Firepit fire = Game.Instance.camp.campsite.firepit;
+        if (!Epilogue || fire.ash_raked) return false;
+        Sound(Sounds.AshRake);
+        fire.rake_ash(Story.StormOutcome != "went_out");
+        Story.Raise(StoryEvents.AshRaked);
+        return true;
+    }
+
+    /// Stones moved by one "Move": the ring is scattered in three.
+    public const int StonesPerMove = 5;
+
+    /// Lifts the next few ring stones out and sets them down beyond the ring.
+    /// Refused before the ash is raked.
+    public bool ScatterStones()
+    {
+        Firepit fire = Game.Instance.camp.campsite.firepit;
+        if (!Epilogue || !fire.ash_raked || fire.stones_scattered) return false;
+        int moved = fire.scatter_stones(StonesPerMove);
+        for (int i = 0; i < moved; i++)
+            SoundLater(Sounds.RingStone, i * Firepit.STONE_STAGGER + Firepit.STONE_SECONDS * 0.9);
+        if (fire.stones_scattered) Story.Raise(StoryEvents.StonesScattered);
+        return moved > 0;
+    }
+
+    /// Where the walk out counts: a few metres past the trailhead post, away from camp.
+    public static Vector2 WalkOutPoint
+    {
+        get
+        {
+            Vector2 post = PlacesLayout.TRAILHEAD_POST;
+            Vector2 away = (TerrainField.TRAIL[0] - TerrainField.TRAIL[1]).Normalized();
+            return post + away * 4.0f;
+        }
+    }
+    public const float WalkOutRadius = 2.5f;
+
+    /// Puts the player in a seated pose looking along `facing`.
+    private static void SeatPlayer(Player player, Vector3 facing)
+    {
+        player.resting = true;
+        player.Velocity = Vector3.Zero;
+        if (facing.LengthSquared() > 1e-4) player.yaw = Math.Atan2(-facing.X, -facing.Z);
+        player.pitch = -0.08;
+    }
 
     private static void Sound(string id) => Game.Instance.audio?.play_interact(id);
 
@@ -257,7 +550,33 @@ public partial class CampSession : Node
         if (!IsInsideTree()) return;
         GetTree().CreateTimer(seconds).Timeout += () => Sound(id);
     }
-    public void WalkOut(Player player) => _ = EndBand(StoryEvents.WalkedOut, player);
+    /// Walking out past the trailhead post ends the story once the last morning's
+    /// acts are done; then the closing sequence, and the postcard after it.
+    public async void WalkOut(Player player)
+    {
+        if (!await EndBand(StoryEvents.WalkedOut, player)) return;
+        await RunEnding();
+    }
+
+    public bool EndingRunning { get; private set; }
+
+    /// The HUD's closing sequence (the shot, the credits); `credits_finished` when it ends.
+    private async Task RunEnding()
+    {
+        if (EndingRunning || Story.Facts.Contains(StoryEvents.CreditsFinished)) return;
+        EndingRunning = true;
+        bool fireKept = Story.StormOutcome != "went_out";
+        GD.Print($"STORY_ENDING fire_kept={fireKept}");
+        if (Game.Instance.hud is IEndingScreen ending) await ending.ShowEnding(fireKept);
+        else await ToSignal(GetTree().CreateTimer(EndingFallbackSeconds), SceneTreeTimer.SignalName.Timeout);
+        if (!IsInsideTree()) return;
+        FinishCredits();
+        EndingRunning = false;
+    }
+
+    /// While the HUD has no closing sequence yet, the credits are a short pause.
+    public const double EndingFallbackSeconds = 3.0;
+
     public void FinishCredits() => Story.Raise(StoryEvents.CreditsFinished);
 
     /// Sitting: an objective where the band asks for it, the sunset sequence
@@ -299,6 +618,17 @@ public partial class CampSession : Node
     public async void Rest(Player player)
     {
         if (Resting) return;
+        // In the storm, resting at the bedroll is sheltering: the player crawls in
+        // out of the rain and stays until it passes (moving gets them up again).
+        if (Story.Band.Storm && !Story.Finished && (!Story.Sheltered || !Story.BandDone))
+        {
+            player.resting = true;
+            player.Velocity = Vector3.Zero;
+            _shelterRest = true;
+            Game.Instance.hud?.notify(Story.Sheltered ? "A few things left first. J opens your journal." : "In out of the rain. Move to get up.");
+            if (Story.Sheltered) { player.resting = false; _shelterRest = false; }
+            return;
+        }
         string act = Story.EndActFor(StoryEvents.TurnedIn) != null ? StoryEvents.TurnedIn : StoryEvents.RestBedroll;
         if (Story.EndActFor(act) == null)
         {
@@ -440,6 +770,12 @@ public partial class CampSession : Node
     public override void _ExitTree()
     {
         Story.LineTriggered -= OnLine;
+        Places? places = Game.Instance?.camp?.places;
+        if (places != null)
+        {
+            places.Arrived -= ReachPlace;
+            places.LooseStepPressed -= OnLooseStep;
+        }
         if (Game.Instance?.session == this) Game.Instance.session = null;
     }
 }

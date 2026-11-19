@@ -958,6 +958,27 @@ public partial class AudioDirector : Node
         }
     }
 
+    /// One hiss now: a log going onto the fire in the rain. Played only while
+    /// it rains on a burning fire, like the scheduled ones.
+    public void fire_hiss()
+    {
+        if (!_is_setup || !IsInsideTree() || _rain < 0.25 || _fire_intensity < 0.05)
+        {
+            return;
+        }
+        int variant = pick_variant(Sounds.FireHiss);
+        AudioStream stream = bank.Stream(Sounds.FireHiss, variant);
+        if (stream == null)
+        {
+            return;
+        }
+        _fire_hiss.Stream = stream;
+        _fire_hiss.PitchScale = _rng.RandfRange(0.95f, 1.05f);
+        _fire_hiss.VolumeDb = (float)play_db(Sounds.FireHiss, variant, linear_to_db(maxf(_rain, 0.3)));
+        _fire_hiss.Play();
+        _hiss_timer.reset(_rng.RandfRange(3.0f, 6.0f));
+    }
+
     /// Rain hissing on the coals while the fire burns in the rain.
     public void _schedule_hiss(double delta)
     {

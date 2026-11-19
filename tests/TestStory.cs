@@ -331,7 +331,9 @@ public partial class TestStory : TestCase
         assert_true(s.BandDone, "ring then tin completes the morning");
         var game = new StoryState();
         game.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 0);
-        assert_true(game.TinAvailable, "while the old ring is not built, nothing gates the tin");
+        assert_false(game.TinAvailable, "with the old ring built, the game's tin waits for it too");
+        game.Raise(StoryEvents.TinOpened);
+        assert_false(game.Facts.Contains(StoryEvents.TinOpened), "and refuses to open before it");
     }
 
     public void test_rest_ends_a_band_only_while_its_real_act_is_unbuilt()
@@ -342,7 +344,8 @@ public partial class TestStory : TestCase
         finished.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 1);
         assert_true(finished.EndActFor(StoryEvents.RestBedroll) == null, "once the step exists, rest does not end the climb");
         var game = new StoryState();
-        assert_true(game.EndActFor(StoryEvents.RestBedroll) != null, "while the pier seat is unbuilt, rest is the way on");
+        assert_true(game.EndActFor(StoryEvents.RestBedroll) == null && game.EndActFor(StoryEvents.SatPier) != null,
+            "with the pier seat built, the game's evening ends at the pier, not in bed");
     }
 
     public void test_sunset_sit_moves_the_clock_forward_and_holds_there()
@@ -457,17 +460,20 @@ public partial class TestStory : TestCase
         assert_eq(s.ProgressOf(s.Band.Objectives[0]), 0, "an event from the evening does not complete the night");
     }
 
-    public void test_unbuilt_places_do_not_hold_the_game()
+    public void test_every_story_event_is_built_in_the_world()
     {
         var s = new StoryState();
-        assert_eq(string.Join(",", s.Required(s.Band).Select(o => o.Id)), "logs,skips", "the letter waits for its table");
-        assert_true(s.EndActFor(StoryEvents.SatPier) == null && s.EndActFor(StoryEvents.RestBedroll) != null, "rest ends the evening until the pier seat exists");
-        assert_true(s.Advance(StoryEvents.RestBedroll) == null, "but not before the evening's objectives");
+        assert_eq(string.Join(",", s.Required(s.Band).Select(o => o.Id)), "letter,logs,skips", "the letter on the table is asked for");
+        assert_true(s.EndActFor(StoryEvents.SatPier) != null && s.EndActFor(StoryEvents.RestBedroll) == null, "the evening ends at the pier");
+        assert_true(s.Advance(StoryEvents.SatPier) == null, "but not before the evening's objectives");
         foreach ((Chapter chapter, Band band) in StoryScript.AllBands())
         {
-            if (chapter.Id == StoryScript.Epilogue) continue;
             assert_true(band.EndActs.Any(a => StoryEvents.IsBuilt(a.Event)), $"{chapter.Id}/{band.Id} can end in today's world");
+            foreach (Objective objective in band.Objectives)
+                assert_true(StoryEvents.IsBuilt(objective.Event), $"{chapter.Id}/{band.Id}/{objective.Id} is raised by something in the world");
         }
+        foreach (LineTrigger line in StoryScript.Lines)
+            assert_true(StoryEvents.IsBuilt(line.Event), $"{line.Id}'s trigger is raised by something in the world");
     }
 
     public void test_storm_outcomes()
