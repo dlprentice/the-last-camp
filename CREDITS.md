@@ -14,17 +14,19 @@ alterations in these canonical tables:
 | --- | --- | --- |
 | Nine PBR material sets | [Texture sources](textures/SOURCES.md) | CC0 1.0 |
 | 35 photoscanned models | [Model sources](models/SOURCES.md) | CC0 1.0 |
-| Six recording sources | [Sound sources](audio/SOURCES.md) | CC0 1.0 and CC BY 3.0 |
+| All game audio, generated with ElevenLabs | [Sound sources](audio/SOURCES.md) | Licensed; not redistributed in the repository |
 | Adapted shader hashes and engine | [Third-party notices](THIRD_PARTY_NOTICES.md) | MIT and engine component licenses |
 
-Water Splash by Mike Koenig, and Water Churning and Thunder HD by Mark
-DiAngelo, are from SoundBible under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
-They were edited, filtered and mixed for this project; the sound-source table
-links each original. Rain is by Ylmir, fireplace by PagDev, and Trees in Wind
-by naturenotesuk, under CC0 1.0.
+## Audio
 
-The remaining generated geometry, textures and synthesized environmental
-sounds are project work. The source includes three credited root-ball models
+The game's audio, its ambience, footsteps, wildlife, weather, action sounds and
+June's voice, is generated with ElevenLabs and licensed for this game. It is not
+covered by the MIT license and is not redistributed in this repository; builds
+carry it. Each sound is listed by id in
+[`audio/generated/manifest.json`](audio/generated/manifest.json) and June's lines in
+[`audio/generated/voice.json`](audio/generated/voice.json).
+
+The remaining generated geometry and textures are project work. The source includes three credited root-ball models
 that are retained as optional assets but not placed in the scene.
 
 For a video upload, retain the end credits and link this page so the source
