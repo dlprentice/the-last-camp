@@ -139,6 +139,15 @@ public partial class VoicePlayer : Node
         _subtitle.Visible = false;
         _layer.AddChild(_subtitle);
         Attach(Game.Instance?.session);
+        // The tree's frame signal runs while the game is paused too, so the
+        // subtitle hides behind the pause menu and returns on resume, and the
+        // subtitles setting applies at once to a line already showing.
+        GetTree().ProcessFrame += RefreshSubtitle;
+    }
+
+    private void RefreshSubtitle()
+    {
+        if (_subtitle != null && Current != null) _subtitle.Visible = SubtitleShown;
     }
 
     /// Listens to a session's story lines. Called again lazily if the session starts later.
@@ -169,12 +178,14 @@ public partial class VoicePlayer : Node
 
     public bool Speaking => Current != null;
 
+    /// Subtitles show when they are on, not held by the postcard, and the game is
+    /// not paused behind the pause menu, the journal or settings.
+    private bool SubtitleShown => GameSettings.Current.Subtitles && !SubtitlesHeld && !(IsInsideTree() && GetTree().Paused);
+
     public override void _Process(double delta)
     {
         if (_session == null) Attach(Game.Instance?.session);
         Step(delta);
-        // The subtitles setting applies at once, also to a line already showing.
-        if (_subtitle != null && Current != null) _subtitle.Visible = GameSettings.Current.Subtitles && !SubtitlesHeld;
     }
 
     /// Advances the line playback by `delta` seconds (the tree's pause stops it).
@@ -216,7 +227,7 @@ public partial class VoicePlayer : Node
         if (_subtitle != null)
         {
             _subtitle.Text = Current.Text;
-            _subtitle.Visible = GameSettings.Current.Subtitles && !SubtitlesHeld;
+            _subtitle.Visible = SubtitleShown;
         }
     }
 
@@ -237,6 +248,7 @@ public partial class VoicePlayer : Node
 
     public override void _ExitTree()
     {
+        GetTree().ProcessFrame -= RefreshSubtitle;
         if (_session != null) _session.LinePlayed -= OnLine;
         _session = null;
         Game.Instance?.audio?.set_voice_ducking(false);

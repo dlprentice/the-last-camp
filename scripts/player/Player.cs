@@ -262,6 +262,26 @@ public partial class Player : CharacterBody3D
         }
     }
 
+    /// "Return to camp": stands the player by the fire, facing it, wherever they
+    /// were. Nothing else changes (held items, the story and the clock stay).
+    public void return_to_camp()
+    {
+        Firepit fire = Game.Instance?.camp?.campsite?.firepit;
+        if (fire == null) return;
+        Vector3 centre = fire.GlobalPosition;
+        // The open side of the ring, where the route feeds the fire from.
+        Vector3 spot = new Vector3(1.7f, 0.0f, 1.8f);
+        spot.Y = (float)(Game.Instance.camp.height_at(spot.X, spot.Z) + 0.1);
+        GlobalPosition = spot;
+        Velocity = Vector3.Zero;
+        resting = false;
+        charging_stone = false;
+        stone_charge = 0;
+        Vector3 to_fire = centre - spot;
+        yaw = Math.Atan2(-to_fire.X, -to_fire.Z);
+        pitch = -0.2;
+    }
+
     public void suspend()
     {
         enabled = false;

@@ -12,8 +12,8 @@ namespace LastCamp;
 public partial class JournalBook : Control
 {
     public static readonly Vector2 PageSize = new(760, 860);
-    private const float ContentWidth = 760 - 88;
-    private const float ContentHeight = 860 - 72 - 64;
+    public const float ContentWidth = 760 - 88;
+    public const float ContentHeight = 860 - 72 - 64;
     private const int BlockGap = 14;
 
     private VBoxContainer _leftBody = null!, _rightBody = null!;
@@ -143,10 +143,15 @@ public partial class JournalBook : Control
         _ => (UiTheme.Serif, UiTheme.BODY, UiTheme.INK),
     };
 
-    private static float Measure(JournalBlock block)
+    /// A block's height on the page with its gap: the wrapped text, plus the kit's
+    /// Label line spacing between its lines, which the font's own measure leaves out.
+    public static float Measure(JournalBlock block)
     {
         (Font font, int size, _) = Face(block.Face);
-        return font.GetMultilineStringSize(block.Text, HorizontalAlignment.Left, ContentWidth, size).Y + BlockGap + 4;
+        float text = font.GetMultilineStringSize(block.Text, HorizontalAlignment.Left, ContentWidth, size).Y;
+        int lines = Math.Max(1, (int)Math.Round(text / font.GetHeight(size)));
+        int spacing = UiTheme.Kit.GetConstant("line_spacing", "Label");
+        return text + (lines - 1) * spacing + BlockGap + 4;
     }
 
     private static Control Render(JournalBlock block)

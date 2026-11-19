@@ -87,14 +87,7 @@ public sealed class GameSettings
     /// and the hands read their settings when they draw.
     public void Apply()
     {
-        if (Quality.Instance is Quality quality)
-        {
-            bool auto = Preset == "auto";
-            QualityPreset.Tier tier = Quality.tier_from_name(auto ? "high" : Preset);
-            bool wasExplicit = quality.@explicit;
-            quality.@explicit = !auto;
-            if (quality.current.tier != tier && (!auto || wasExplicit)) quality.apply(tier);
-        }
+        if (Quality.Instance is Quality quality) ApplyPreset(quality, Game.Instance?.user_args ?? new Godot.Collections.Dictionary());
         AudioDirector.UserAmbienceDb = VolumeDb(Ambience);
         AudioDirector.UserEffectsDb = VolumeDb(Effects);
         AudioDirector.UserVoiceDb = VolumeDb(Voice);
@@ -108,6 +101,25 @@ public sealed class GameSettings
             int master = AudioServer.GetBusIndex(AudioDirector.BUS_MASTER);
             if (master >= 0) AudioServer.SetBusVolumeDb(master, (float)VolumeDb(Master));
         }
+    }
+
+    /// True when the command line chose the preset (`--quality=...`): it then
+    /// wins over the saved one for the whole session, and auto-tune stays off.
+    public static bool PresetFromCommandLine(Godot.Collections.Dictionary args) => args.ContainsKey("quality");
+
+    /// Applies the saved preset, unless the command line chose one.
+    public void ApplyPreset(Quality quality, Godot.Collections.Dictionary args)
+    {
+        if (PresetFromCommandLine(args))
+        {
+            quality.@explicit = true;
+            return;
+        }
+        bool auto = Preset == "auto";
+        QualityPreset.Tier tier = Quality.tier_from_name(auto ? "high" : Preset);
+        bool wasExplicit = quality.@explicit;
+        quality.@explicit = !auto;
+        if (quality.current.tier != tier && (!auto || wasExplicit)) quality.apply(tier);
     }
 
     public string PresetName => Preset switch

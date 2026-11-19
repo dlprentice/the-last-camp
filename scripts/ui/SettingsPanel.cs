@@ -72,6 +72,7 @@ public partial class SettingsPanel : PanelContainer
 
     public void Close()
     {
+        if (_dirty) Save();
         Visible = false;
         Closed?.Invoke();
     }
@@ -101,10 +102,29 @@ public partial class SettingsPanel : PanelContainer
         return row;
     }
 
+    private bool _dirty;
+
     private void Commit()
     {
         GameSettings.Current.Commit(SavePath);
+        _dirty = false;
     }
+
+    /// A slider's value applies at once; the file is written when it is let go
+    /// or when the panel closes.
+    private void ApplyLive()
+    {
+        GameSettings.Current.Apply();
+        _dirty = true;
+    }
+
+    private void Save()
+    {
+        GameSettings.Current.Save(SavePath);
+        _dirty = false;
+    }
+
+    public bool Dirty => _dirty;
 
     /// A row whose value is a button: pressing it moves to the next value.
     private KitButton Cycle(VBoxContainer box, string name, Func<string> value, Action next)
@@ -139,8 +159,9 @@ public partial class SettingsPanel : PanelContainer
         {
             set(v);
             shown.Text = show(v);
-            Commit();
+            ApplyLive();
         };
+        slider.DragEnded += changed => { if (changed) Save(); };
         slider.FocusEntered += () => { if (!KitButton.Quiet) Game.Instance?.audio?.play_interact(Sounds.UiMove); };
         slider.MouseEntered += () => slider.GrabFocus();
         row.AddChild(slider);

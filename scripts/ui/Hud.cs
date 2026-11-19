@@ -11,7 +11,7 @@ using LastCamp.Story;
 namespace LastCamp;
 
 /// The play screen, almost empty (docs/direction.md): an interaction dot with one
-/// verb, short notices and the chapter cards. Behind Esc, the pause menu and its
+/// verb, and the chapter cards. Behind Esc, the pause menu and its
 /// settings; behind J, the journal. Also the photo-mode line, the cinematic
 /// letterbox, the rest fade and the developer quality and frame panels.
 public partial class Hud : CanvasLayer
@@ -19,8 +19,6 @@ public partial class Hud : CanvasLayer
     public Control _root;
     public InteractionDot _dot;
     public Label _verb;
-    private Label _notice;
-    private double _noticeTime;
     private JournalBook _journal;
     private bool _journalFromPause;
     public bool JournalVisible => _journal.Visible;
@@ -74,10 +72,6 @@ public partial class Hud : CanvasLayer
         _place(_verb, new Vector2(0.5f, 0.5f), new Vector2(-200, 22), new Vector2(200, 56));
         _root.AddChild(_verb);
 
-        _notice = UiTheme.label("", UiTheme.BODY, UiTheme.PAPER, HorizontalAlignment.Center, shadow: true);
-        _place(_notice, new Vector2(0.5f, 0.72f), new Vector2(-560, -24), new Vector2(560, 16));
-        _notice.Visible = false;
-        _root.AddChild(_notice);
 
         _photo_label = UiTheme.label("Photo mode    WASD, Space and C fly    wheel changes speed    F12 saves    P leaves",
             UiTheme.SMALL, UiTheme.PAPER, HorizontalAlignment.Center, shadow: true);
@@ -169,6 +163,7 @@ public partial class Hud : CanvasLayer
         _resume = _menu_button("Resume", () => { if (Game.Instance.mode == Game.Mode.PAUSED) _toggle_pause(); });
         _menu_button("Journal", () => _open_journal(fromPause: true));
         _menu_button("Settings", _open_settings);
+        _menu_button("Return to camp", ReturnToCamp);
         _menu_button("Save and quit to title", () =>
         {
             Game.Instance.session?.Save();
@@ -203,6 +198,22 @@ public partial class Hud : CanvasLayer
     {
         _menuButtons.GetParent<Control>().Visible = false;
         _settings.Open();
+    }
+
+    /// "Return to camp": through black to standing by the fire, facing it. The
+    /// story is not touched; this is only the way back from anywhere.
+    public async void ReturnToCamp()
+    {
+        Player player = Game.Instance.player;
+        if (player == null || Game.Instance.session?.Resting == true) return;
+        if (Game.Instance.mode == Game.Mode.PAUSED) _toggle_pause();
+        player.suspend();
+        await FadeRest(true);
+        if (!IsInsideTree() || !GodotObject.IsInstanceValid(player)) return;
+        player.return_to_camp();
+        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+        await FadeRest(false);
+        if (Game.Instance.mode == Game.Mode.PLAY && GodotObject.IsInstanceValid(player)) player.begin();
     }
 
     public async Task FadeRest(bool dark)
@@ -351,9 +362,6 @@ public partial class Hud : CanvasLayer
         CampSession session = Game.Instance.session;
         if (!ReferenceEquals(session, _attached)) _attach(session);
         if (!playing && Game.Instance.mode != Game.Mode.PAUSED) _journal.Visible = false;
-        if (playing) _noticeTime = Math.Max(0, _noticeTime - delta);
-        _notice.Visible = playing && _noticeTime > 0;
-        _notice.Modulate = new Color(1, 1, 1, (float)Math.Min(1, _noticeTime / 0.4));
         Player player = Game.Instance.player;
         string verb = VerbFor(player, player?.focus(), playing);
         _verb.Text = verb;
@@ -445,8 +453,9 @@ public partial class Hud : CanvasLayer
 
     public void notify(string message)
     {
-        _notice.Text = message;
-        _noticeTime = 5;
+        // The play screen carries no hint or status text (docs/direction.md); teaching
+        // lives in the journal's list. Notices are kept for the log only.
+        GD.Print($"NOTICE {message}");
     }
 
     public void _update_letterbox(double delta)

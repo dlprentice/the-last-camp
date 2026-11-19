@@ -212,6 +212,59 @@ public partial class TestHud : TestCase
         voice.Free();
     }
 
+    public void test_command_line_preset_wins_over_settings()
+    {
+        var args = Game.parse_user_args(new List<string> { "--quality=medium" });
+        assert_true(GameSettings.PresetFromCommandLine(args), "--quality is a command-line preset");
+        assert_false(GameSettings.PresetFromCommandLine(Game.parse_user_args(new List<string>())), "a plain launch has none");
+        Quality quality = Quality.Instance;
+        QualityPreset.Tier tier = quality.current.tier;
+        bool wasExplicit = quality.@explicit;
+        var saved = new GameSettings { Preset = tier == QualityPreset.Tier.ULTRA ? "low" : "ultra" };
+        saved.ApplyPreset(quality, args);
+        assert_eq((long)quality.current.tier, (long)tier, "the saved preset does not replace the command line's");
+        assert_true(quality.@explicit, "auto-tune stays off when the command line gives a preset");
+        new GameSettings { Preset = "auto" }.ApplyPreset(quality, args);
+        assert_true(quality.@explicit, "an automatic saved preset does not turn auto-tune back on");
+        quality.@explicit = wasExplicit;
+    }
+
+    public void test_longest_texts_fit_a_page()
+    {
+        GameSettings saved = GameSettings.Current;
+        VoiceScript voice = VoiceScript.Load();
+        string longest = StoryScript.Lines.Where(l => l.Kind == LineKind.Entry)
+            .Select(l => JournalContent.LineText(voice, l.Id, l.Id == "e7" ? "went_out" : ""))
+            .OrderByDescending(t => t.Length).First();
+        assert_gt(longest.Length, 200, "the voice script's entries are loaded");
+        foreach (bool plain in new[] { false, true })
+        {
+            GameSettings.Current = new GameSettings { PlainText = plain };
+            string how = plain ? "in plain text" : "in the hands";
+            float letter = JournalBook.Measure(new JournalBlock(JournalFace.Tom, JournalContent.TomLetter));
+            assert_lt(letter, JournalBook.ContentHeight, $"Tom's letter fits one page {how} ({letter:0} px)");
+            float entry = JournalBook.Measure(new JournalBlock(JournalFace.June, longest));
+            assert_lt(entry, JournalBook.ContentHeight, $"the longest entry fits one page in June's hand {how} ({entry:0} px)");
+            foreach (string page in JournalContent.TallyPages)
+                assert_lt(JournalBook.Measure(new JournalBlock(JournalFace.Tom, page)), JournalBook.ContentHeight, $"each tally page fits {how}");
+        }
+        GameSettings.Current = saved;
+        float one = JournalBook.Measure(new JournalBlock(JournalFace.Print, "One line."));
+        float two = JournalBook.Measure(new JournalBlock(JournalFace.Print, "One line.\nTwo lines."));
+        assert_gt(two - one, UiTheme.Serif.GetHeight(UiTheme.BODY) + 1, "the measure counts the kit's line spacing between lines");
+    }
+
+    public void test_play_shows_no_notice_text()
+    {
+        SceneTree tree = Engine.GetMainLoop() as SceneTree;
+        Hud hud = new Hud();
+        tree.Root.AddChild(hud);
+        hud.notify("J opens your camp journal.");
+        assert_false(Controls(hud).OfType<Label>().Any(l => l.Text.Contains("journal")), "a notice puts no text on the play screen");
+        assert_true(Controls(hud).OfType<KitButton>().Any(b => b.Text == "Return to camp"), "the pause menu offers Return to camp");
+        hud.Free();
+    }
+
     public void test_kit_is_paper_and_ink()
     {
         assert_eq(UiTheme.PAPER.ToHtml(false), "efe7d6", "paper");
