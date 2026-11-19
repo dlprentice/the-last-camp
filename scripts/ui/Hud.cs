@@ -227,7 +227,8 @@ public partial class Hud : CanvasLayer
             InputEventKey key = ((InputEventKey)@event);
             if (key.Keycode == Key.Q)
             {
-                Game.Instance.quit_cleanly();
+                if (Game.Instance.session != null) Game.Instance.session.SaveAndQuit();
+                else Game.Instance.quit_cleanly();
             }
         }
     }
@@ -259,7 +260,7 @@ public partial class Hud : CanvasLayer
         _journalHint.Visible = playing && session != null && !_stats_visible;
         if (session != null)
         {
-            _journalHint.Text = $"J  Camp journal   {session.Completed}/4";
+            _journalHint.Text = $"J  Camp journal   {session.Completed}/{session.Total}";
             if (_journal.Visible) _journalText.Text = session.Journal();
         }
         if (!playing && Game.Instance.mode != Game.Mode.PAUSED) _journal.Visible = false;
