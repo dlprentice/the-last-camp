@@ -43,41 +43,41 @@ Tom's through-line runs through the two places this cut keeps:
 ### Chapter 1: Arrival (evening and night)
 
 - [ ] You walk in from the trailhead post at 18:45 and read June's letter on the camp
-  table. Entry 1, "The Letter", plays.
+  table. Entry 1 plays.
 - [ ] You carry three logs to the ring and skip a stone three times. Three skips plays
-  entry 3, "Nine Skips".
+  entry 2.
 - [ ] You sit at the end of the pier; the sun goes down over about 90 s.
-- [ ] After the first star, you light the fire (entry 2, "First Fire") and your
+- [ ] After the first star, you light the fire (entry 3) and your
   lantern, then turn in at the tent.
 
 ### Chapter 2: The Marks (day 2 and the storm night)
 
 - [ ] Morning: you open Tom's tin in the tent and read his tally book on screen.
-- [ ] You follow the footpath to the old fire ring. Entry 5, "The First Ring", plays,
+- [ ] You follow the footpath to the old fire ring. Entry 4 plays,
   and you find Tom's first blaze.
 - [ ] Evening: you follow Tom's blazes and steps to Tom's Rock, sit on his bench for the
-  sunset (entry 9, "Tom's Rock"), lift the loose step and read his letter. Nothing
+  sunset (entry 5), lift the loose step and read his letter. Nothing
   marks the step: it sits a little wrong and sounds hollow underfoot, and only then
   offers the interaction.
 - [ ] You walk down by lantern. The wind turns and the storm comes in: you feed the fire
-  twice in the rain and shelter in the tent until it passes (entry 7, "The Storm of
-  '96"). Keeping the fire alive is a goal, not a requirement; if it goes out, the next
+  twice in the rain and shelter in the tent until it passes (entry 6). Keeping the fire alive is a goal, not a requirement; if it goes out, the next
   morning and one line of June's postcard are different.
 
 ### Epilogue: Leave No Trace (dawn)
 
-- [ ] You rake out the ash (still warm if the fire survived the storm, cold and wet if
-  not) and scatter the ring stones, strike the tent, and walk out
-  past the trailhead post.
+- [ ] You strike the tent, then rake out the ash (still warm if the fire survived the
+  storm, cold and wet if not) and scatter the ring stones. June's last note plays, and
+  no other voice is heard until the credits. You walk out past the trailhead post.
 - [ ] A closing camera shot over the clearing, the credits (every credited asset), and
-  June's postcard (entry 10), her answer to Tom's letter, which fits either storm
+  June's postcard (entry 7), her answer to Tom's letter, which fits either storm
   outcome, then the title. There is no fail screen anywhere.
 
 ### Throughout
 
 - [ ] First-person hands hold the log, the stone, the lantern, the tin and the letter.
   No item floats.
-- [ ] June is voiced: seven entries and about a dozen margin notes, all subtitled. Without
+- [ ] June is voiced: seven entries and nine margin notes, all subtitled, as written in
+  [the script](script.md). June falls silent once Tom's tin is open, until the lookout. Without
   the licensed voice files (a public clone), the game plays with subtitles only.
 - [ ] You can never get stuck. Fall recovery works, and the pause menu has "Return to
   camp".
