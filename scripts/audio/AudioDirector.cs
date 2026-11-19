@@ -168,8 +168,19 @@ public partial class AudioDirector : Node
         public SmoothedValue amp;
         public double trim_db;
 
+        /// Smallest level change written to the player. Every VolumeDb write makes
+        /// the AudioServer swap the playback's bus details, which the audio thread
+        /// reads while it mixes; the engine frees a swapped-out copy two main-loop
+        /// frames later. Writing a bed's level every frame (thousands a second in
+        /// an uncapped headless run) let a copy be freed while the mixer still read
+        /// it. Steady beds now write nothing.
+        public const double LEVEL_STEP_DB = 0.05;
+        public double written_db = double.NaN;
+
         public void set_level(double db)
         {
+            if (!double.IsNaN(written_db) && Math.Abs(db - written_db) < LEVEL_STEP_DB && !(db <= SILENT_DB && written_db > SILENT_DB)) return;
+            written_db = db;
             if (player is AudioStreamPlayer flat) flat.VolumeDb = (float)db;
             else if (player is AudioStreamPlayer3D spatial) spatial.VolumeDb = (float)db;
         }
