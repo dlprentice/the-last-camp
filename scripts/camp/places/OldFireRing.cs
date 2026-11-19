@@ -106,7 +106,9 @@ public partial class OldFireRing : Node3D
             for (int k = 0; k < points.Length; k++) points[k] = s.pose.Basis * points[k];
             var body = new StaticBody3D { Name = $"RingStoneBody_{i}", CollisionLayer = 1, CollisionMask = 0, Position = s.pose.Origin };
             body.SetMeta("surface", (StringName)"rock");
-            body.AddChild(new CollisionShape3D { Shape = new ConvexPolygonShape3D { Points = points } });
+            var shape_109 = new ConvexPolygonShape3D { Points = points };
+            body.AddChild(new CollisionShape3D { Shape = shape_109 });
+            GC.KeepAlive(shape_109);
             AddChild(body);
             i++;
         }
@@ -122,7 +124,9 @@ public partial class OldFireRing : Node3D
         var log_body = new StaticBody3D { Name = "FallenLogBody", CollisionLayer = 1, CollisionMask = 0, Transform = pose };
         log_body.SetMeta("surface", (StringName)"wood");
         double length = PlacesLayout.OLD_LOG_A.DistanceTo(PlacesLayout.OLD_LOG_B);
-        log_body.AddChild(new CollisionShape3D { Shape = new CylinderShape3D { Radius = (float)PlacesLayout.OLD_LOG_RADIUS, Height = (float)length }, Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f) });
+        var shape_125 = new CylinderShape3D { Radius = (float)PlacesLayout.OLD_LOG_RADIUS, Height = (float)length };
+        log_body.AddChild(new CollisionShape3D { Shape = shape_125, Rotation = new Vector3(0, 0, Mathf.Pi * 0.5f) });
+        GC.KeepAlive(shape_125);
         AddChild(log_body);
         _build_notch(mesh, pose, bark);
     }

@@ -70,8 +70,10 @@ public partial class WoodlandCollision : Node3D
                     else
                     {
                         body = new StaticBody3D { CollisionMask = 0 };
-                        body.SetMeta("surface", "wood");
-                        body.AddChild(new CollisionShape3D { Shape = new CylinderShape3D() });
+                        body.SetMeta(NativeArgs.Name("surface"), "wood");
+                        var shape_74 = new CylinderShape3D();
+                        body.AddChild(new CollisionShape3D { Shape = shape_74 });
+                        GC.KeepAlive(shape_74);
                         AddChild(body);
                     }
                     var collider = body.GetChild<CollisionShape3D>(0);

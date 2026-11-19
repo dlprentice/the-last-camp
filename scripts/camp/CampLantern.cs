@@ -112,7 +112,7 @@ public partial class CampLantern : Node3D
         _time += delta;
         // The same air moves the canopy, linen, smoke and hanging lanterns,
         // including an unlit lantern before sunset.
-        if (housing != null && G.truthy(housing.GetMeta("swings", false)))
+        if (housing != null && G.truthy(housing.GetMeta(NativeArgs.Name("swings"), false)))
         {
             double wind = Game.Instance.world != null ? Game.Instance.world.wind_strength() : 0.4;
             Vector3 _t1 = housing.Rotation;
@@ -130,7 +130,7 @@ public partial class CampLantern : Node3D
         light.LightEnergy = (float)(LIGHT_ENERGY * flicker);
         if (_flame_mat != null)
         {
-            _flame_mat.SetShaderParameter("heat", 1.7 * flicker);
+            _flame_mat.SetShaderParameter(NativeArgs.Name("heat"), 1.7 * flicker);
         }
     }
 

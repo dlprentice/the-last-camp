@@ -182,9 +182,9 @@ public partial class JournalBook : Control
     public override void _UnhandledInput(InputEvent @event)
     {
         if (!Visible) return;
-        if (@event.IsActionPressed("ui_left") || @event.IsActionPressed("move_left")) { Turn(-1); GetViewport().SetInputAsHandled(); }
-        else if (@event.IsActionPressed("ui_right") || @event.IsActionPressed("move_right")) { Turn(1); GetViewport().SetInputAsHandled(); }
-        else if (@event.IsActionPressed("pause") || @event.IsActionPressed("ui_cancel"))
+        if (@event.IsActionPressed(NativeArgs.Name("ui_left")) || @event.IsActionPressed(NativeArgs.Name("move_left"))) { Turn(-1); GetViewport().SetInputAsHandled(); }
+        else if (@event.IsActionPressed(NativeArgs.Name("ui_right")) || @event.IsActionPressed(NativeArgs.Name("move_right"))) { Turn(1); GetViewport().SetInputAsHandled(); }
+        else if (@event.IsActionPressed(NativeArgs.Name("pause")) || @event.IsActionPressed(NativeArgs.Name("ui_cancel")))
         {
             CloseRequested?.Invoke();
             GetViewport().SetInputAsHandled();

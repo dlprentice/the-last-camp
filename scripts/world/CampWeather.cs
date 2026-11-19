@@ -189,9 +189,9 @@ public partial class CampWeather : Node3D
             if (site.tent != null && site.dock != null)
             {
                 ShaderMaterial mat = _rain_mesh.MaterialOverride as ShaderMaterial;
-                mat.SetShaderParameter("tent_inverse", site.tent.GlobalTransform.AffineInverse());
-                mat.SetShaderParameter("dock_inverse", site.dock.GlobalTransform.AffineInverse());
-                mat.SetShaderParameter("dock_length", site.dock.total_length());
+                mat.SetShaderParameter(NativeArgs.Name("tent_inverse"), site.tent.GlobalTransform.AffineInverse());
+                mat.SetShaderParameter(NativeArgs.Name("dock_inverse"), site.dock.GlobalTransform.AffineInverse());
+                mat.SetShaderParameter(NativeArgs.Name("dock_length"), site.dock.total_length());
                 _impacts = new RainImpacts();
                 AddChild(_impacts);
                 _impacts.build(Game.Instance.camp);
@@ -205,7 +205,7 @@ public partial class CampWeather : Node3D
         if (camera != null && _rain_mesh.Visible)
         {
             _rain_mesh.GlobalPosition = new Vector3(camera.GlobalPosition.X, 0, camera.GlobalPosition.Z);
-            ((ShaderMaterial)_rain_mesh.MaterialOverride).SetShaderParameter("rain_clock", _clock);
+            ((ShaderMaterial)_rain_mesh.MaterialOverride).SetShaderParameter(NativeArgs.Name("rain_clock"), _clock);
         }
         if (Game.Instance.audio != null && Game.Instance.audio.is_ready())
         {

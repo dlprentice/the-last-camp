@@ -198,7 +198,12 @@ public static partial class G
     public static double randfn(double mean, double deviation) => GD.Randfn(mean, deviation);
     public static void randomize() => GD.Randomize();
     public static void seed(long value) => GD.Seed(unchecked((ulong)value));
-    public static long hash(Variant value) => (uint)GD.Hash(value);
+    public static long hash(Variant value)
+    {
+        long result = (uint)GD.Hash(value);
+        GC.KeepAlive(value);
+        return result;
+    }
     /// <summary>str(): the engine's own stringify of each value (Variant.ToString calls it), concatenated.</summary>
     public static string str(params Variant[] values)
     {
@@ -230,9 +235,19 @@ public static partial class G
     }
     public static void print_stack() => GD.Print(System.Environment.StackTrace);
     public static long @typeof(Variant value) => (long)value.VariantType;
-    public static string var_to_str(Variant value) => GD.VarToStr(value);
+    public static string var_to_str(Variant value)
+    {
+        string result = GD.VarToStr(value);
+        GC.KeepAlive(value);
+        return result;
+    }
     public static Variant str_to_var(string text) => GD.StrToVar(text);
-    public static List<byte> var_to_bytes(Variant value) => new(GD.VarToBytes(value));
+    public static List<byte> var_to_bytes(Variant value)
+    {
+        byte[] result = GD.VarToBytes(value);
+        GC.KeepAlive(value);
+        return new(result);
+    }
     public static Variant bytes_to_var(List<byte> bytes) => GD.BytesToVar(bytes.ToArray());
     public static string error_string(long error) => Eval("error_string(a)", error).AsString();
     public static string type_string(long type) => Eval("type_string(a)", type).AsString();

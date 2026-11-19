@@ -139,10 +139,14 @@ public partial class Player : CharacterBody3D
         _heldLog.SetSurfaceOverrideMaterial(0, PropMaterials.bark("bark_oak", 0.65));
         _heldLog.SetSurfaceOverrideMaterial(1, PropMaterials.wood(new Color(0.95f, 0.85f, 0.66f), 0.15, 0, 1));
         hand_socket.AddChild(_heldLog);
+        var stone_mesh = PropMeshes.rock(8342, 1);
+        var stone_material = new StandardMaterial3D { AlbedoColor = new Color(0.20f, 0.23f, 0.22f), Roughness = 0.8f };
         _heldStone = new MeshInstance3D {
-            Name = "CarriedStone", Mesh = PropMeshes.rock(8342, 1),
-            MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.20f, 0.23f, 0.22f), Roughness = 0.8f }, Scale = new Vector3(0.055f, 0.018f, 0.042f),
+            Name = "CarriedStone", Mesh = stone_mesh,
+            MaterialOverride = stone_material, Scale = new Vector3(0.055f, 0.018f, 0.042f),
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
+        GC.KeepAlive(stone_mesh);
+        GC.KeepAlive(stone_material);
         hand_socket.AddChild(_heldStone);
         FloorMaxAngle = (float)deg_to_rad(52.0);
         FloorSnapLength = 0.4f;
@@ -292,7 +296,7 @@ public partial class Player : CharacterBody3D
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event.IsActionPressed("photo_mode"))
+        if (@event.IsActionPressed(NativeArgs.Name("photo_mode")))
         {
             if (Game.Instance.mode == Game.Mode.PHOTO && photo != null)
             {
@@ -329,14 +333,14 @@ public partial class Player : CharacterBody3D
             yaw -= motion.Relative.X * sensitivity;
             pitch = clampf(pitch - motion.Relative.Y * sensitivity * (look.InvertY ? -1.0 : 1.0), -MAX_PITCH, MAX_PITCH);
         }
-        else if (@event.IsActionPressed("interact"))
+        else if (@event.IsActionPressed(NativeArgs.Name("interact")))
         {
             if (_focus != null && _focus.HasMethod("interact"))
             {
-                _focus.Call("interact", this);
+                _focus.Call(NativeArgs.Name("interact"), this);
             }
         }
-        else if (@event.IsActionPressed("toggle_lantern"))
+        else if (@event.IsActionPressed(NativeArgs.Name("toggle_lantern")))
         {
             toggle_lantern();
         }
@@ -354,10 +358,10 @@ public partial class Player : CharacterBody3D
         Vector2 input = Vector2.Zero;
         if (enabled && Game.Instance.mode == Game.Mode.PLAY)
         {
-            input = Input.GetVector("move_left", "move_right", "move_forward", "move_back");
+            input = Input.GetVector(NativeArgs.Name("move_left"), NativeArgs.Name("move_right"), NativeArgs.Name("move_forward"), NativeArgs.Name("move_back"));
             if (input.LengthSquared() > 0.01) resting = false;
-            crouching = resting || Input.IsActionPressed("crouch");
-            running = Input.IsActionPressed("sprint") && !crouching && input.Length() > 0.1;
+            crouching = resting || Input.IsActionPressed(NativeArgs.Name("crouch"));
+            running = Input.IsActionPressed(NativeArgs.Name("sprint")) && !crouching && input.Length() > 0.1;
             if (charging_stone) stone_charge = Math.Min(1, stone_charge + delta / 1.15);
         }
         else
@@ -579,9 +583,9 @@ public partial class Player : CharacterBody3D
         if (IsOnFloor())
         {
             GodotObject collider_node = GetSlideCollisionCount() > 0 ? GetLastSlideCollision().GetCollider() : null;
-            if (collider_node != null && collider_node.HasMeta("surface"))
+            if (collider_node != null && collider_node.HasMeta(NativeArgs.Name("surface")))
             {
-                return collider_node.GetMeta("surface").AsStringName();
+                return collider_node.GetMeta(NativeArgs.Name("surface")).AsStringName();
             }
         }
         Color mask = Game.Instance.camp.field.material_mask(GlobalPosition.X, GlobalPosition.Z);

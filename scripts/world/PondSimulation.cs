@@ -413,8 +413,12 @@ public partial class PondSimulation : RefCounted
                 _fail();
                 return;
             }
-            pipeline = _own(rd.ComputePipelineCreate(shader));
-            probe_pipeline = _own(rd.ComputePipelineCreate(probe_shader));
+            // Pass a held empty for the default specialization constants and keep every
+            // collection and RD object argument alive until its call returns (godot#125198).
+            var no_constants = new Godot.Collections.Array<RDPipelineSpecializationConstant>();
+            pipeline = _own(rd.ComputePipelineCreate(shader, no_constants));
+            probe_pipeline = _own(rd.ComputePipelineCreate(probe_shader, no_constants));
+            GC.KeepAlive(no_constants);
             RDTextureFormat format = new RDTextureFormat();
             format.Format = RenderingDevice.DataFormat.R32G32B32A32Sfloat;
             format.TextureType = RenderingDevice.TextureType.Type2D;
@@ -429,10 +433,15 @@ public partial class PondSimulation : RefCounted
                 _fail();
                 return;
             }
+            var view = new RDTextureView();
+            var initial_data = new Godot.Collections.Array<byte[]> { initial.ToArray() };
             for (long i = 0; i < 3; i++)
             {
-                textures.Add(_own(rd.TextureCreate(format, new RDTextureView(), new Godot.Collections.Array<byte[]> { initial.ToArray() })));
+                textures.Add(_own(rd.TextureCreate(format, view, initial_data)));
             }
+            GC.KeepAlive(format);
+            GC.KeepAlive(view);
+            GC.KeepAlive(initial_data);
             interactions = _own(rd.StorageBufferCreate((uint)((PondSimulation.MAX_IMPULSES + PondSimulation.MAX_WAKES * 2) * 16)));
             probe_input = _own(rd.StorageBufferCreate((uint)(PondSimulation.MAX_PROBES * 8)));
             probe_output = _own(rd.StorageBufferCreate((uint)(PondSimulation.MAX_PROBES * 4)));
@@ -443,8 +452,12 @@ public partial class PondSimulation : RefCounted
             }
             for (long i2 = 0; i2 < 2; i2++)
             {
-                sets.Add(_own(rd.UniformSetCreate(new Godot.Collections.Array<RDUniform> { _uniform(0, (long)RenderingDevice.UniformType.Image, textures[(int)i2]), _uniform(1, (long)RenderingDevice.UniformType.Image, textures[(int)(1 - i2)]), _uniform(2, (long)RenderingDevice.UniformType.StorageBuffer, interactions) }, shader, 0)));
-                probe_sets.Add(_own(rd.UniformSetCreate(new Godot.Collections.Array<RDUniform> { _uniform(0, (long)RenderingDevice.UniformType.Image, textures[(int)i2]), _uniform(1, (long)RenderingDevice.UniformType.StorageBuffer, probe_input), _uniform(2, (long)RenderingDevice.UniformType.StorageBuffer, probe_output) }, probe_shader, 0)));
+                var uniforms = new Godot.Collections.Array<RDUniform> { _uniform(0, (long)RenderingDevice.UniformType.Image, textures[(int)i2]), _uniform(1, (long)RenderingDevice.UniformType.Image, textures[(int)(1 - i2)]), _uniform(2, (long)RenderingDevice.UniformType.StorageBuffer, interactions) };
+                sets.Add(_own(rd.UniformSetCreate(uniforms, shader, 0)));
+                GC.KeepAlive(uniforms);
+                var probe_uniforms = new Godot.Collections.Array<RDUniform> { _uniform(0, (long)RenderingDevice.UniformType.Image, textures[(int)i2]), _uniform(1, (long)RenderingDevice.UniformType.StorageBuffer, probe_input), _uniform(2, (long)RenderingDevice.UniformType.StorageBuffer, probe_output) };
+                probe_sets.Add(_own(rd.UniformSetCreate(probe_uniforms, probe_shader, 0)));
+                GC.KeepAlive(probe_uniforms);
             }
             if (G.any(sets, (Rid value2) => !value2.IsValid) || G.any(probe_sets, (Rid value3) => !value3.IsValid))
             {

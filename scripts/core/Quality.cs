@@ -87,23 +87,23 @@ public partial class Quality : Node
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event.IsActionPressed("quality_1") || @event.IsActionPressed("quality_2") || @event.IsActionPressed("quality_3") || @event.IsActionPressed("quality_4"))
+        if (@event.IsActionPressed(NativeArgs.Name("quality_1")) || @event.IsActionPressed(NativeArgs.Name("quality_2")) || @event.IsActionPressed(NativeArgs.Name("quality_3")) || @event.IsActionPressed(NativeArgs.Name("quality_4")))
         {
             @explicit = true;
         }
-        if (@event.IsActionPressed("quality_1"))
+        if (@event.IsActionPressed(NativeArgs.Name("quality_1")))
         {
             apply(QualityPreset.Tier.LOW);
         }
-        else if (@event.IsActionPressed("quality_2"))
+        else if (@event.IsActionPressed(NativeArgs.Name("quality_2")))
         {
             apply(QualityPreset.Tier.MEDIUM);
         }
-        else if (@event.IsActionPressed("quality_3"))
+        else if (@event.IsActionPressed(NativeArgs.Name("quality_3")))
         {
             apply(QualityPreset.Tier.HIGH);
         }
-        else if (@event.IsActionPressed("quality_4"))
+        else if (@event.IsActionPressed(NativeArgs.Name("quality_4")))
         {
             apply(QualityPreset.Tier.ULTRA);
         }

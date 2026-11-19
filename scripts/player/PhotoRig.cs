@@ -151,8 +151,8 @@ public partial class PhotoRig : Node3D
         }
         double look_blend = 1.0 - exp(-delta * 22.0);
         camera.Rotation = new Vector3((float)lerpf(camera.Rotation.X, pitch, look_blend), (float)lerp_angle(camera.Rotation.Y, yaw, look_blend), 0);
-        Vector3 wish = new Vector3(Input.GetAxis("move_left", "move_right"), Input.GetAxis("crouch", "fly_up"), Input.GetAxis("move_forward", "move_back"));
-        double sprint = Input.IsActionPressed("sprint") ? 2.1 : 1.0;
+        Vector3 wish = new Vector3(Input.GetAxis(NativeArgs.Name("move_left"), NativeArgs.Name("move_right")), Input.GetAxis(NativeArgs.Name("crouch"), NativeArgs.Name("fly_up")), Input.GetAxis(NativeArgs.Name("move_forward"), NativeArgs.Name("move_back")));
+        double sprint = Input.IsActionPressed(NativeArgs.Name("sprint")) ? 2.1 : 1.0;
         Vector3 target = move_direction(camera.Basis, wish) * (float)speed * (float)sprint;
         // Exact integration of first-order velocity response for constant input:
         // smooth starts/stops without travel changing with capture frame rate.
@@ -187,8 +187,9 @@ public partial class PhotoRig : Node3D
         _focus_timer = fmod(_focus_timer, FOCUS_INTERVAL);
         Vector3 origin = camera.GlobalPosition;
         Vector3 direction = -camera.GlobalBasis.Z;
-        PhysicsRayQueryParameters3D query = PhysicsRayQueryParameters3D.Create(origin, origin + direction * 120.0f, 1);
+        using PhysicsRayQueryParameters3D query = PhysicsRayQueryParameters3D.Create(origin, origin + direction * 120.0f, 1, NativeArgs.NoRids);
         Godot.Collections.Dictionary hit = GetWorld3D().DirectSpaceState.IntersectRay(query);
+        GC.KeepAlive(query);
         double distance = !(hit.Count == 0) ? origin.DistanceTo(hit["position"].AsVector3()) : 80.0;
         // Water has no collider. Focus its visible surface rather than the distant
         // pond bed when the centre ray crosses open water before a solid object.

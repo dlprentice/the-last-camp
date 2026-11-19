@@ -104,7 +104,7 @@ public partial class IntroDolly : Node3D
             return;
         }
         elapsed += delta;
-        if (elapsed > SKIP_GRACE && Input.IsActionJustPressed("skip_intro"))
+        if (elapsed > SKIP_GRACE && Input.IsActionJustPressed(NativeArgs.Name("skip_intro")))
         {
             finish();
             return;

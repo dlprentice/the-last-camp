@@ -122,7 +122,9 @@ public partial class Places : Node3D
         var area = new Area3D { Name = $"Arrive_{id}", CollisionLayer = 0, CollisionMask = PLAYER_LAYER, Monitorable = false };
         double ground = field.height(at.X, at.Y);
         area.Position = new Vector3(at.X, (float)ground, at.Y);
-        area.AddChild(new CollisionShape3D { Shape = new CylinderShape3D { Radius = (float)radius, Height = 4.0f } });
+        var shape_125 = new CylinderShape3D { Radius = (float)radius, Height = 4.0f };
+        area.AddChild(new CollisionShape3D { Shape = shape_125 });
+        GC.KeepAlive(shape_125);
         area.BodyEntered += body =>
         {
             if (body is Player) Arrived?.Invoke(id);

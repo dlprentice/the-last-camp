@@ -143,12 +143,12 @@ public partial class Firepit : Node3D
             else
             {
                 Image mid = layers[(int)((long)layers.Count / 2)].As<Image>();
-                G.print(G.format("FLAME_NOISE layers=%d size=%s format=%d samples=%s %s %s intensity=%.2f height=%s density=%s", new Godot.Collections.Array { (long)layers.Count, mid.GetSize(), (long)mid.GetFormat(), mid.GetPixel(8, 8), mid.GetPixel(32, 32), mid.GetPixel(50, 20), intensity, _flame_mat.GetShaderParameter("height"), _flame_mat.GetShaderParameter("density") }));
+                G.print(G.format("FLAME_NOISE layers=%d size=%s format=%d samples=%s %s %s intensity=%.2f height=%s density=%s", new Godot.Collections.Array { (long)layers.Count, mid.GetSize(), (long)mid.GetFormat(), mid.GetPixel(8, 8), mid.GetPixel(32, 32), mid.GetPixel(50, 20), intensity, _flame_mat.GetShaderParameter(NativeArgs.Name("height")), _flame_mat.GetShaderParameter(NativeArgs.Name("density")) }));
             }
         }
         if (Game.Instance.has_flag("fire-debug") && _flame_mat != null)
         {
-            _flame_mat.SetShaderParameter("debug_mode", G.to_int(Game.Instance.arg_value("fire-debug", "1")));
+            _flame_mat.SetShaderParameter(NativeArgs.Name("debug_mode"), G.to_int(Game.Instance.arg_value("fire-debug", "1")));
         }
         if (intensity > MIN_INTENSITY)
         {
@@ -189,10 +189,10 @@ public partial class Firepit : Node3D
         if (flame_volume != null)
         {
             flame_volume.Visible = live > 0.02;
-            _flame_mat.SetShaderParameter("flare", roar);
+            _flame_mat.SetShaderParameter(NativeArgs.Name("flare"), roar);
             // Even a freshly fed fire keeps its upper envelope below the pot.
-            _flame_mat.SetShaderParameter("height", flame_height(roar));
-            _flame_mat.SetShaderParameter("density", 2.0 + 1.0 * live);
+            _flame_mat.SetShaderParameter(NativeArgs.Name("height"), flame_height(roar));
+            _flame_mat.SetShaderParameter(NativeArgs.Name("density"), 2.0 + 1.0 * live);
         }
         if (sparks != null)
         {
@@ -202,7 +202,7 @@ public partial class Firepit : Node3D
         if (smoke != null)
         {
             smoke.AmountRatio = (float)clampf(0.3 + (1.2 - live) * 0.35 + roar * 0.2, 0.15, 1.0);
-            ((ShaderMaterial)smoke.MaterialOverride).SetShaderParameter("density", lerpf(0.46, 0.30, live));
+            ((ShaderMaterial)smoke.MaterialOverride).SetShaderParameter(NativeArgs.Name("density"), lerpf(0.46, 0.30, live));
         }
         if (haze != null)
         {
@@ -218,10 +218,10 @@ public partial class Firepit : Node3D
             light.Visible = intensity > 0.02;
             fill_light.Visible = intensity > 0.02;
         }
-        RenderingServer.GlobalShaderParameterSet("fire_intensity", intensity);
+        RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("fire_intensity"), intensity);
         if (IsInsideTree())
         {
-            RenderingServer.GlobalShaderParameterSet("fire_position", GlobalPosition + new Vector3(0.0f, 0.4f, 0.0f));
+            RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("fire_position"), GlobalPosition + new Vector3(0.0f, 0.4f, 0.0f));
         }
     }
 

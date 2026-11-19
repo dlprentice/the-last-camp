@@ -467,15 +467,15 @@ public partial class Pond : Node3D
             return;
         }
         surface_time += delta;
-        RenderingServer.GlobalShaderParameterSet("pond_time", surface_time);
+        RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("pond_time"), surface_time);
         if (simulation == null || simulation_paused)
         {
             return;
         }
         if (!_simulation_bound && simulation.is_ready())
         {
-            RenderingServer.GlobalShaderParameterSet("pond_interaction_tex", simulation.get_texture());
-            RenderingServer.GlobalShaderParameterSet("pond_interaction_enabled", true);
+            RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("pond_interaction_tex"), simulation.get_texture());
+            RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("pond_interaction_enabled"), true);
             _simulation_bound = true;
         }
         List<Vector2> probes = _canoe.probe_positions();
@@ -549,8 +549,8 @@ public partial class Pond : Node3D
         {
             return;
         }
-        material.SetShaderParameter("ripple_clock", _ripple_clock);
-        underside_material.SetShaderParameter("ripple_clock", _ripple_clock);
+        material.SetShaderParameter(NativeArgs.Name("ripple_clock"), _ripple_clock);
+        underside_material.SetShaderParameter(NativeArgs.Name("ripple_clock"), _ripple_clock);
         _update_skip(delta);
         _sync_environment();
         Camera3D camera = GetViewport().GetCamera3D();
@@ -570,9 +570,9 @@ public partial class Pond : Node3D
             _update_viewport_size();
             _mirror_camera(camera, underwater_camera);
             Projection projection = underwater_camera.GetCameraProjection();
-            underwater_filter_material.SetShaderParameter("ray_forward", -underwater_camera.GlobalBasis.Z);
-            underwater_filter_material.SetShaderParameter("ray_right", underwater_camera.GlobalBasis.X / projection.X.X);
-            underwater_filter_material.SetShaderParameter("ray_up", underwater_camera.GlobalBasis.Y / projection.Y.Y);
+            underwater_filter_material.SetShaderParameter(NativeArgs.Name("ray_forward"), -underwater_camera.GlobalBasis.Z);
+            underwater_filter_material.SetShaderParameter(NativeArgs.Name("ray_right"), underwater_camera.GlobalBasis.X / projection.X.X);
+            underwater_filter_material.SetShaderParameter(NativeArgs.Name("ray_up"), underwater_camera.GlobalBasis.Y / projection.Y.Y);
             transmission_camera.GlobalTransform = camera.GlobalTransform;
             transmission_camera.Fov = camera.Fov;
             transmission_camera.KeepAspect = camera.KeepAspect;
@@ -625,8 +625,8 @@ public partial class Pond : Node3D
         _ripples[(int)_ripple_cursor] = new Vector4(at.X, at.Z, (float)_ripple_clock, (float)strength);
         _ripple_cursor = (_ripple_cursor + 1) % RIPPLE_COUNT;
         Variant ripples = Variant.From(_ripples.ToArray());
-        material.SetShaderParameter("ripples", ripples);
-        underside_material.SetShaderParameter("ripples", ripples);
+        material.SetShaderParameter(NativeArgs.Name("ripples"), ripples);
+        underside_material.SetShaderParameter(NativeArgs.Name("ripples"), ripples);
         GC.KeepAlive(ripples);
     }
 

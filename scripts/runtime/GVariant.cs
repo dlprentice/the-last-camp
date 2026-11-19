@@ -298,17 +298,6 @@ public static partial class G
 
     public static bool is_instance_of(Variant value, System.Type type) => value.Obj != null && type.IsInstanceOfType(value.Obj);
 
-    // -- callables as C# delegates (an empty Callable becomes null, as the C# APIs expect for "none")
-    public static Func<TResult>? Func<[MustBeVariant] TResult>(Callable c) => c.Target == null && c.Delegate == null ? null : () => c.Call().As<TResult>();
-    public static Func<T1, TResult>? Func<[MustBeVariant] T1, [MustBeVariant] TResult>(Callable c) =>
-        c.Target == null && c.Delegate == null ? null : (a) => { Variant va = Variant.From(a); Variant r = c.Call(va); GC.KeepAlive(va); return r.As<TResult>(); };
-    public static Func<T1, T2, TResult>? Func<[MustBeVariant] T1, [MustBeVariant] T2, [MustBeVariant] TResult>(Callable c) =>
-        c.Target == null && c.Delegate == null ? null : (a, b) => { Variant va = Variant.From(a), vb = Variant.From(b); Variant r = c.Call(va, vb); GC.KeepAlive(va); GC.KeepAlive(vb); return r.As<TResult>(); };
-    public static Action? Action(Callable c) => c.Target == null && c.Delegate == null ? null : () => c.Call();
-    public static Action<T1>? Action<[MustBeVariant] T1>(Callable c) => c.Target == null && c.Delegate == null ? null : (a) => { Variant va = Variant.From(a); c.Call(va); GC.KeepAlive(va); };
-    public static Action<T1, T2>? Action<[MustBeVariant] T1, [MustBeVariant] T2>(Callable c) =>
-        c.Target == null && c.Delegate == null ? null : (a, b) => { Variant va = Variant.From(a), vb = Variant.From(b); c.Call(va, vb); GC.KeepAlive(va); GC.KeepAlive(vb); };
-
     // -- callables
     public static Variant callv(Callable callable, Godot.Collections.Array args)
     {

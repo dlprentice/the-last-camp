@@ -247,7 +247,9 @@ public partial class TomsRock : Node3D
             for (int k = 0; k < points.Length; k++) points[k] = pose.Basis * points[k];
             var body = new StaticBody3D { Name = $"GraniteBody_{i}", CollisionLayer = 1, CollisionMask = 0, Position = pose.Origin };
             body.SetMeta("surface", (StringName)"rock");
-            body.AddChild(new CollisionShape3D { Shape = new ConvexPolygonShape3D { Points = points } });
+            var shape_250 = new ConvexPolygonShape3D { Points = points };
+            body.AddChild(new CollisionShape3D { Shape = shape_250 });
+            GC.KeepAlive(shape_250);
             AddChild(body);
             i++;
         }
@@ -268,7 +270,9 @@ public partial class TomsRock : Node3D
             mesh.GIMode = GeometryInstance3D.GIModeEnum.Static;
             var body = new StaticBody3D { Name = $"StepBody_{i + 1}", CollisionLayer = 1, CollisionMask = 0 };
             body.SetMeta("surface", (StringName)"rock");
-            body.AddChild(new CollisionShape3D { Shape = new ConvexPolygonShape3D { Points = step_collision(field, s) } });
+            var shape_271 = new ConvexPolygonShape3D { Points = step_collision(field, s) };
+            body.AddChild(new CollisionShape3D { Shape = shape_271 });
+            GC.KeepAlive(shape_271);
             holder.AddChild(body);
         }
     }
@@ -329,9 +333,15 @@ public partial class TomsRock : Node3D
         }
         bench_body = new StaticBody3D { Name = "BenchBody", CollisionLayer = 1, CollisionMask = 0 };
         bench_body.SetMeta("surface", (StringName)"rock");
-        bench_body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = BENCH_SEAT }, Position = new Vector3(0, seat_bottom + BENCH_SEAT.Y * 0.5f, 0) });
+        var shape_332 = new BoxShape3D { Size = BENCH_SEAT };
+        bench_body.AddChild(new CollisionShape3D { Shape = shape_332, Position = new Vector3(0, seat_bottom + BENCH_SEAT.Y * 0.5f, 0) });
+        GC.KeepAlive(shape_332);
         foreach (float x in new[] { -(float)BENCH_SUPPORT_X, (float)BENCH_SUPPORT_X })
-            bench_body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(BENCH_SUPPORT.X, seat_bottom, BENCH_SUPPORT.Z) }, Position = new Vector3(x, seat_bottom * 0.5f, 0.02f) });
+        {
+            var shape_334 = new BoxShape3D { Size = new Vector3(BENCH_SUPPORT.X, seat_bottom, BENCH_SUPPORT.Z) };
+            bench_body.AddChild(new CollisionShape3D { Shape = shape_334, Position = new Vector3(x, seat_bottom * 0.5f, 0.02f) });
+            GC.KeepAlive(shape_334);
+        }
         bench.AddChild(bench_body);
     }
 
@@ -359,7 +369,9 @@ public partial class TomsRock : Node3D
         part(new Vector3(rim_x, rim_h, s.Z - 2 * rim_z), new Vector3(-s.X * 0.5f + rim_x * 0.5f, rim_y, 0), "RimLeft");
         loose_body = new StaticBody3D { Name = "LooseStepBody", CollisionLayer = 1, CollisionMask = 0 };
         loose_body.SetMeta("surface", (StringName)"rock");
-        loose_body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = s } });
+        var shape_362 = new BoxShape3D { Size = s };
+        loose_body.AddChild(new CollisionShape3D { Shape = shape_362 });
+        GC.KeepAlive(shape_362);
         loose_step.AddChild(loose_body);
 
         tin = new Node3D { Name = "TomsTin", Transform = tin_pose(field) };

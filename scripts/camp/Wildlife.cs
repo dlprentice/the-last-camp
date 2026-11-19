@@ -110,8 +110,8 @@ public partial class Wildlife : Node3D
             Tent tent = Game.Instance.camp.campsite.tent;
             if (tent != null)
             {
-                ((ShaderMaterial)motes.MaterialOverride).SetShaderParameter("tent_inverse", tent.GlobalTransform.AffineInverse());
-                ((ShaderMaterial)fireflies.MaterialOverride).SetShaderParameter("tent_inverse", tent.GlobalTransform.AffineInverse());
+                ((ShaderMaterial)motes.MaterialOverride).SetShaderParameter(NativeArgs.Name("tent_inverse"), tent.GlobalTransform.AffineInverse());
+                ((ShaderMaterial)fireflies.MaterialOverride).SetShaderParameter(NativeArgs.Name("tent_inverse"), tent.GlobalTransform.AffineInverse());
                 _shelter_ready = true;
             }
         }
@@ -542,7 +542,7 @@ public partial class Wildlife : Node3D
         _update_day_insects(active, wind);
         if (!(_fish.Count == 0))
         {
-            (_fish[0].MaterialOverride as ShaderMaterial).SetShaderParameter("swim_clock", _fish_clock);
+            (_fish[0].MaterialOverride as ShaderMaterial).SetShaderParameter(NativeArgs.Name("swim_clock"), _fish_clock);
         }
         for (long i3 = 0, i_end3 = (long)_fish.Count; i3 < i_end3; i3++)
         {

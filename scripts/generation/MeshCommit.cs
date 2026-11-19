@@ -36,7 +36,8 @@ public static class MeshCommit
             int after = mesh.GetSurfaceCount();
             if (after == before + 1)
                 return before;
-            Short("ArrayMesh.AddSurfaceFromArrays", before, after, attempt);
+            if (!Retry("ArrayMesh.AddSurfaceFromArrays", before, after, attempt))
+                return after - 1;
         }
     }
 
@@ -49,10 +50,12 @@ public static class MeshCommit
         {
             importer.AddSurface(primitive, arrays, NoBlendShapes, NoLods, material, name, flags);
             GC.KeepAlive(arrays);
+            GC.KeepAlive(material);
             int after = importer.GetSurfaceCount();
             if (after == before + 1)
                 return before;
-            Short("ImporterMesh.AddSurface", before, after, attempt);
+            if (!Retry("ImporterMesh.AddSurface", before, after, attempt))
+                return after - 1;
         }
     }
 
@@ -63,15 +66,18 @@ public static class MeshCommit
         GC.KeepAlive(NoBoneTransforms);
     }
 
-    /// Reports a commit that did not add exactly one surface. Returns to retry once (outside
-    /// tests); throws when strict, when the retry also came up short or when surfaces were added.
-    private static void Short(string call, int before, int after, int attempt)
+    /// Reports a commit that did not add exactly one surface. Tests (Strict) throw at once.
+    /// In play a lost surface is retried once; anything else is reported and play carries on.
+    private static bool Retry(string call, int before, int after, int attempt)
     {
         string message = $"{call} added {after - before} surfaces (expected 1, had {before}); attempt {attempt + 1}";
         GD.PushError(message);
-        if (Strict || attempt > 0 || after != before)
+        if (Strict)
             throw new InvalidOperationException(message);
+        if (attempt > 0 || after != before)
+            return false;
         GD.Print("MESH_COMMIT_RETRY ", call);
+        return true;
     }
 
     private static T ReadOnly<T>(T collection) where T : class

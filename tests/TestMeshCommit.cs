@@ -5,11 +5,11 @@ using Godot;
 
 namespace LastCamp.Tests;
 
-/// Since Godot 4.8 beta2 a collection argument can be finalized during the native call that
-/// reads it (godotengine/godot#125198), which silently drops a mesh surface. Every surface
-/// commit goes through MeshCommit; this builds the game's main kinds of mesh again and again
-/// while another thread allocates and forces collections, and checks every surface arrived
-/// whole.
+/// Smoke test for MeshCommit, not a regression test for godotengine/godot#125198. It rebuilds
+/// the game's main kinds of mesh under forced GC pressure and checks every surface arrives
+/// whole, with MeshCommit in strict mode. It does NOT reproduce the bug: with the keep-alives
+/// and empties reverted it still passes, because the engine loses a surface only a few times
+/// in 200,000 calls (and those runs usually end in a crash), far beyond a suite-sized test.
 public partial class TestMeshCommit : TestCase
 {
     private const int Rounds = 40;
@@ -75,7 +75,7 @@ public partial class TestMeshCommit : TestCase
         return mesh;
     }
 
-    public void test_every_surface_survives_gc_pressure()
+    public void test_smoke_surfaces_survive_gc_pressure()
     {
         bool strict = MeshCommit.Strict;
         MeshCommit.Strict = true;

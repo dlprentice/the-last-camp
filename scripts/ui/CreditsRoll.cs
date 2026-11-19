@@ -200,7 +200,7 @@ public partial class CreditsRoll : Control
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("ui_accept") || @event.IsActionPressed("pause"))
+        if (@event.IsActionPressed(NativeArgs.Name("ui_cancel")) || @event.IsActionPressed(NativeArgs.Name("ui_accept")) || @event.IsActionPressed(NativeArgs.Name("pause")))
         {
             Game.Instance?.audio?.play_interact(Sounds.UiSelect);
             End();

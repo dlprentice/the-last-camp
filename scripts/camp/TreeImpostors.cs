@@ -91,6 +91,9 @@ public partial class TreeImpostors : Node3D
             Baked first = baked[keys[0]];
             result.Color = (ShaderMaterial)first.material.Duplicate();
             result.Shadow = (ShaderMaterial)first.shadow_material.Duplicate();
+            // Held Variants: a temporary converted from a C# array can be finalized during
+            // the native call (godot#125198).
+            Variant quad_geometry = sizes, surface_response = response;
             foreach (ShaderMaterial material in new[] { result.Color, result.Shadow })
             {
                 material.Shader = Content.Load<Shader>("res://shaders/tree_impostor_multimesh.gdshader");
@@ -102,9 +105,13 @@ public partial class TreeImpostors : Node3D
                 material.SetShaderParameter("normal_atlas", default(Variant));
                 material.SetShaderParameter("albedo_layers", albedo);
                 material.SetShaderParameter("normal_layers", normals);
-                material.SetShaderParameter("quad_geometry", sizes);
-                material.SetShaderParameter("surface_response", response);
+                material.SetShaderParameter("quad_geometry", quad_geometry);
+                material.SetShaderParameter("surface_response", surface_response);
             }
+            GC.KeepAlive(quad_geometry);
+            GC.KeepAlive(surface_response);
+            GC.KeepAlive(albedo);
+            GC.KeepAlive(normals);
         }
         finally
         {

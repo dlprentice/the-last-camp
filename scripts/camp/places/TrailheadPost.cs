@@ -217,8 +217,12 @@ public partial class TrailheadPost : Node3D
 
         body = new StaticBody3D { Name = "PostBody", CollisionLayer = 1, CollisionMask = 0 };
         body.SetMeta("surface", (StringName)"wood");
-        body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3((float)WIDTH, (float)ABOVE_GROUND, (float)WIDTH) }, Position = new Vector3(0, (float)ABOVE_GROUND * 0.5f, 0) });
-        body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(0.13f, 0.25f, 0.22f) }, Position = box.Position });
+        var shape_220 = new BoxShape3D { Size = new Vector3((float)WIDTH, (float)ABOVE_GROUND, (float)WIDTH) };
+        body.AddChild(new CollisionShape3D { Shape = shape_220, Position = new Vector3(0, (float)ABOVE_GROUND * 0.5f, 0) });
+        GC.KeepAlive(shape_220);
+        var shape_221 = new BoxShape3D { Size = new Vector3(0.13f, 0.25f, 0.22f) };
+        body.AddChild(new CollisionShape3D { Shape = shape_221, Position = box.Position });
+        GC.KeepAlive(shape_221);
         AddChild(body);
     }
 

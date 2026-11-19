@@ -79,7 +79,7 @@ public partial class SettingsPanel : PanelContainer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (Visible && (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("pause")))
+        if (Visible && (@event.IsActionPressed(NativeArgs.Name("ui_cancel")) || @event.IsActionPressed(NativeArgs.Name("pause"))))
         {
             Game.Instance?.audio?.play_interact(Sounds.UiSelect);
             Close();

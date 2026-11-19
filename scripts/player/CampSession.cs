@@ -61,7 +61,9 @@ public partial class CampSession : Node
         _bed = new Interactable { Name = "BedrollRest", CollisionLayer = 2, CollisionMask = 0,
             Position = new Vector3(-0.30f, 0.35f, -1.45f),
             prompt_text = "Rest", on_interact = Callable.From<Player>(Rest) };
-        _bed.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(0.72f, 0.40f, 0.55f) } });
+        var shape_64 = new BoxShape3D { Size = new Vector3(0.72f, 0.40f, 0.55f) };
+        _bed.AddChild(new CollisionShape3D { Shape = shape_64 });
+        GC.KeepAlive(shape_64);
         Game.Instance.camp.campsite.tent.AddChild(_bed);
         ApplyStoryToWorld();
         // Main hands control to the player right after this node is added, and the

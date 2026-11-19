@@ -307,7 +307,7 @@ public partial class HabitatDiversity : Node3D
         _clock += delta;
         if (material != null)
         {
-            material.SetShaderParameter("habitat_clock", _clock);
+            material.SetShaderParameter(NativeArgs.Name("habitat_clock"), _clock);
         }
     }
 

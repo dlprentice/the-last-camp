@@ -82,7 +82,9 @@ public partial class TerrainFieldDirector : Node
         _rain_thread = null;
         if (GodotObject.IsInstanceValid(_rain_material) && image != null && !image.IsEmpty())
         {
-            _rain_material.SetShaderParameter("ground_height", ImageTexture.CreateFromImage(image));
+            ImageTexture ground_height = ImageTexture.CreateFromImage(image);
+            _rain_material.SetShaderParameter(NativeArgs.Name("ground_height"), ground_height);
+            GC.KeepAlive(ground_height);
         }
         SetProcess(false);
     }

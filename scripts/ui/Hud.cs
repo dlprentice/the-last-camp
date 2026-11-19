@@ -238,25 +238,25 @@ public partial class Hud : CanvasLayer
     public override void _UnhandledInput(InputEvent @event)
     {
         if (Game.Instance.session?.Resting == true || _ending != null) return;
-        if (@event.IsActionPressed("camp_journal") && Game.Instance.session != null
+        if (@event.IsActionPressed(NativeArgs.Name("camp_journal")) && Game.Instance.session != null
             && (Game.Instance.mode == Game.Mode.PLAY || _journal.Visible))
         {
             if (_journal.Visible) _close_journal(false);
             else _open_journal(fromPause: false);
             GetViewport().SetInputAsHandled();
         }
-        else if (@event.IsActionPressed("quality_menu"))
+        else if (@event.IsActionPressed(NativeArgs.Name("quality_menu")))
         {
             _quality_panel.Visible = !_quality_panel.Visible;
             Game.Instance.audio?.play_interact(Sounds.UiMove);
         }
-        else if (@event.IsActionPressed("toggle_stats"))
+        else if (@event.IsActionPressed(NativeArgs.Name("toggle_stats")))
         {
             _stats_visible = !_stats_visible;
             _stats_panel.Visible = _stats_visible;
             Game.Instance.audio?.play_interact(Sounds.UiMove);
         }
-        else if (@event.IsActionPressed("pause"))
+        else if (@event.IsActionPressed(NativeArgs.Name("pause")))
         {
             bool opening = Game.Instance.mode == Game.Mode.PLAY;
             _toggle_pause();
@@ -352,7 +352,7 @@ public partial class Hud : CanvasLayer
     {
         if (!playing || player == null) return "";
         if (player.held_item == "stone") return player.charging_stone ? "Release" : "Throw";
-        if (focus != null && focus.HasMethod("prompt")) return Verb(G.str(focus.Call("prompt")));
+        if (focus != null && focus.HasMethod(NativeArgs.Name("prompt"))) return Verb(G.str(focus.Call(NativeArgs.Name("prompt"))));
         return "";
     }
 

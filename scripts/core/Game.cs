@@ -141,7 +141,7 @@ public partial class Game : Node
     {
         if (node is AudioStreamPlayer || node is AudioStreamPlayer3D || node is AudioStreamPlayer2D)
         {
-            node.Call("stop");
+            node.Call(NativeArgs.Name("stop"));
         }
         foreach (Node child in node.GetChildren())
         {
@@ -192,15 +192,15 @@ public partial class Game : Node
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event.IsActionPressed("toggle_fullscreen"))
+        if (@event.IsActionPressed(NativeArgs.Name("toggle_fullscreen")))
         {
             toggle_fullscreen();
         }
-        else if (@event.IsActionPressed("screenshot"))
+        else if (@event.IsActionPressed(NativeArgs.Name("screenshot")))
         {
             save_screenshot();
         }
-        else if (@event.IsActionPressed("toggle_hud"))
+        else if (@event.IsActionPressed(NativeArgs.Name("toggle_hud")))
         {
             hud_visible = !hud_visible;
         }

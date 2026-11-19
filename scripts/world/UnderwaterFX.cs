@@ -62,8 +62,8 @@ public partial class UnderwaterFX : Node3D
         }
         _shown = amount;
         Visible = amount > 0.001;
-        _shaft_material.SetShaderParameter("visibility", amount);
-        _silt_material.SetShaderParameter("visibility", amount);
+        _shaft_material.SetShaderParameter(NativeArgs.Name("visibility"), amount);
+        _silt_material.SetShaderParameter(NativeArgs.Name("visibility"), amount);
     }
 
     public void apply_quality(QualityPreset p)

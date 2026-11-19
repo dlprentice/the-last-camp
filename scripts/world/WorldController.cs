@@ -138,7 +138,7 @@ public partial class WorldController : Node3D
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event.IsActionPressed("toggle_time_cycle"))
+        if (@event.IsActionPressed(NativeArgs.Name("toggle_time_cycle")))
         {
             cycle_running = !cycle_running;
         }
@@ -146,7 +146,7 @@ public partial class WorldController : Node3D
 
     public override void _Process(double delta)
     {
-        double scrub = (double)Input.GetActionStrength("time_forward") - Input.GetActionStrength("time_back");
+        double scrub = (double)Input.GetActionStrength(NativeArgs.Name("time_forward")) - Input.GetActionStrength(NativeArgs.Name("time_back"));
         if (Game.Instance.mode == Game.Mode.PLAY || Game.Instance.mode == Game.Mode.PHOTO)
         {
             if (scrub != 0.0)
@@ -160,16 +160,16 @@ public partial class WorldController : Node3D
         }
         _wind_time += delta;
         _gust = (0.7 + 0.3 * sin(_wind_time * 0.23) * sin(_wind_time * 0.071 + 1.3)) * wind_scale;
-        RenderingServer.GlobalShaderParameterSet("wind_strength", _gust);
+        RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("wind_strength"), _gust);
         double hour_step = absf(wrapf(hour - _cloud_hour, -12.0, 12.0));
         // Weather advances with a continuous time lapse; a cut to another hour
         // does not teleport the cloud texture. Vegetation keeps its real clock.
         _cloud_time += delta + (hour_step < 0.08 ? hour_step * 360.0 : 0.0);
         _cloud_hour = hour;
-        sky_material.SetShaderParameter("cloud_time", _cloud_time);
+        sky_material.SetShaderParameter(NativeArgs.Name("cloud_time"), _cloud_time);
         if (Game.Instance.player != null)
         {
-            RenderingServer.GlobalShaderParameterSet("player_position", Game.Instance.player.GlobalPosition);
+            RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("player_position"), Game.Instance.player.GlobalPosition);
         }
         _update_underwater(delta);
         _update_post();
@@ -431,14 +431,14 @@ public partial class WorldController : Node3D
         moon.LightEnergy = G.op("*", G.op("*", moon_light["energy"], lerpf(2.0, 1.1, deep_night)), lerpf(1.0, 0.32, overcast)).AsSingle();
         moon.Visible = G.op(">", moon_light["energy"], 0.001).AsBool();
 
-        sky_material.SetShaderParameter("sun_direction", sun_dir);
-        sky_material.SetShaderParameter("moon_direction", moon_dir);
-        sky_material.SetShaderParameter("haze", haze);
-        sky_material.SetShaderParameter("star_rotation", hour / 24.0 * TAU);
+        sky_material.SetShaderParameter(NativeArgs.Name("sun_direction"), sun_dir);
+        sky_material.SetShaderParameter(NativeArgs.Name("moon_direction"), moon_dir);
+        sky_material.SetShaderParameter(NativeArgs.Name("haze"), haze);
+        sky_material.SetShaderParameter(NativeArgs.Name("star_rotation"), hour / 24.0 * TAU);
         // Clouds break apart as the evening cools, revealing the star field.
-        sky_material.SetShaderParameter("cloud_coverage", weather != null ? weather.cloud_coverage(Atmosphere.daylight(hour)) : lerpf(0.18, 0.36, Atmosphere.daylight(hour)));
+        sky_material.SetShaderParameter(NativeArgs.Name("cloud_coverage"), weather != null ? weather.cloud_coverage(Atmosphere.daylight(hour)) : lerpf(0.18, 0.36, Atmosphere.daylight(hour)));
 
-        sky_material.SetShaderParameter("storm_amount", overcast);
+        sky_material.SetShaderParameter(NativeArgs.Name("storm_amount"), overcast);
         double daylight = Atmosphere.daylight(hour);
         _fog_color = Atmosphere.fog_color(sun_dir, haze);
         _apply_fog();
@@ -452,9 +452,9 @@ public partial class WorldController : Node3D
         Color sun_col = sun_light["color"].AsColor();
         double sun_energy = sun.LightEnergy;
         Vector3 sun_radiance = new Vector3(sun_col.R, sun_col.G, sun_col.B) * (float)sun_energy;
-        RenderingServer.GlobalShaderParameterSet("sun_direction", sun_dir);
-        RenderingServer.GlobalShaderParameterSet("sun_color", sun_radiance);
-        RenderingServer.GlobalShaderParameterSet("daylight", daylight);
+        RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("sun_direction"), sun_dir);
+        RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("sun_color"), sun_radiance);
+        RenderingServer.GlobalShaderParameterSet(NativeArgs.Name("daylight"), daylight);
         EmitSignal(SignalName.hour_changed, hour);
     }
 
@@ -695,7 +695,7 @@ public partial class WorldController : Node3D
         environment.FogLightEnergy = 1.0f;
         if (waterline_material != null)
         {
-            waterline_material.SetShaderParameter("density", (WATER_FOG_DENSITY - AIR_FOG_DENSITY) * (1.0 - u));
+            waterline_material.SetShaderParameter(NativeArgs.Name("density"), (WATER_FOG_DENSITY - AIR_FOG_DENSITY) * (1.0 - u));
         }
     }
 
@@ -749,7 +749,7 @@ public partial class WorldController : Node3D
         {
             double near_surface = 1.0 - smoothstep(TerrainField.WATER_LEVEL + 0.015, TerrainField.WATER_LEVEL + 0.15, xf.Origin.Y);
             double volume_density = WATER_VOLUME_DENSITY * (1.0 - underwater_blend) * near_surface;
-            water_volume_material.SetShaderParameter("density", volume_density);
+            water_volume_material.SetShaderParameter(NativeArgs.Name("density"), volume_density);
             water_volume.Visible = over_water && environment.VolumetricFogEnabled && volume_density > 0.00001;
         }
         post.set_param("underwater", over_water ? 1.0 : 0.0);
@@ -769,7 +769,7 @@ public partial class WorldController : Node3D
         waterline.Visible = over_water && lowest_y < TerrainField.WATER_LEVEL + WATER_WAVE_ENVELOPE + 0.002 && underwater_blend < 1.0;
         if (waterline.Visible)
         {
-            waterline_material.SetShaderParameter("strength", 1.0);
+            waterline_material.SetShaderParameter(NativeArgs.Name("strength"), 1.0);
         }
     }
 

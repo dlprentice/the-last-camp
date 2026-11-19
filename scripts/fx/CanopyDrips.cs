@@ -64,8 +64,8 @@ public partial class CanopyDrips : Node3D
         _strength = lerpf(_strength, target, 1.0 - exp(-delta * rate));
         if (_material != null)
         {
-            _material.SetShaderParameter("drip_clock", _clock);
-            _material.SetShaderParameter("drip_strength", _strength);
+            _material.SetShaderParameter(NativeArgs.Name("drip_clock"), _clock);
+            _material.SetShaderParameter(NativeArgs.Name("drip_strength"), _strength);
         }
         if (_mesh != null)
         {

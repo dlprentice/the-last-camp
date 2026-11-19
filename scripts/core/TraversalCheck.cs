@@ -179,8 +179,9 @@ public partial class TraversalCheck : Node
         foreach (Vector2 p in new[] { new Vector2(240, 60), new Vector2(-320, 80), new Vector2(80, 450), new Vector2(-120, -620) })
         {
             float h = (float)camp.field.surface_height(p.X, p.Y);
-            using var query = PhysicsRayQueryParameters3D.Create(new Vector3(p.X, h + 0.3f, p.Y), new Vector3(p.X, h - 0.3f, p.Y), 1);
+            using var query = PhysicsRayQueryParameters3D.Create(new Vector3(p.X, h + 0.3f, p.Y), new Vector3(p.X, h - 0.3f, p.Y), 1, NativeArgs.NoRids);
             var hit = _player.GetWorld3D().DirectSpaceState.IntersectRay(query);
+            GC.KeepAlive(query);
             supported &= hit.Count > 0 && Math.Abs(hit["position"].AsVector3().Y - h) < 0.025;
         }
         _check("outer woodland collision matches rendered hills beyond the former 210 m limit", supported);
@@ -191,8 +192,9 @@ public partial class TraversalCheck : Node
         collision.Refresh(tree.Origin);
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-        using var trunkRay = PhysicsRayQueryParameters3D.Create(tree.Origin + new Vector3(3, 1, 0), tree.Origin + new Vector3(-3, 1, 0), 1);
+        using var trunkRay = PhysicsRayQueryParameters3D.Create(tree.Origin + new Vector3(3, 1, 0), tree.Origin + new Vector3(-3, 1, 0), 1, NativeArgs.NoRids);
         var trunkHit = _player.GetWorld3D().DirectSpaceState.IntersectRay(trunkRay);
+        GC.KeepAlive(trunkRay);
         _check("ridge trunks receive pooled local collisions", trunkHit.Count > 0 &&
             trunkHit["collider"].AsGodotObject() is StaticBody3D body && body.GetParent() == collision);
         _check("ridge physics keeps a bounded local set instead of all trees", collision.ActiveBodies is > 0 and < 800);

@@ -147,7 +147,9 @@ public partial class Fingerprint
             RandomNumberGenerator rng = new RandomNumberGenerator();
             rng.Seed = unchecked((ulong)(98371));
             GrassPlanter.Chunk chunk = planter._plan_chunk(origin, rng);
-            stamp("grass_chunk/" + G.str(origin), new Godot.Collections.Array { chunk.count, chunk.aabb, Variant.From(chunk.buffer.ToArray()) });
+            var chunk_value = new Godot.Collections.Array { chunk.count, chunk.aabb, Variant.From(chunk.buffer.ToArray()) };
+            stamp("grass_chunk/" + G.str(origin), chunk_value);
+            GC.KeepAlive(chunk_value);
         }
         RandomNumberGenerator random = new RandomNumberGenerator();
         random.Seed = unchecked((ulong)(27182));
@@ -160,6 +162,7 @@ public partial class Fingerprint
             draw_order.Add(new Basis(Vector3.Up, (float)(random.Randf() * TAU)).Scaled(scale));
         }
         stamp("random_receiver_order", draw_order);
+        GC.KeepAlive(draw_order);
         FileAccess output = FileAccess.Open(Game.Instance.arg_value("fingerprints", "res://local-data/fingerprints.json"), FileAccess.ModeFlags.Write);
         output.StoreString(Json.Stringify(result, "\t", true) + "\n");
         output.Close();
