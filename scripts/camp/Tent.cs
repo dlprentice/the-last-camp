@@ -24,7 +24,7 @@ public partial class Tent : Node3D
     public const double LENGTH = 3.0;
     public const double HEIGHT = 1.6;
     public const double POLE_RADIUS = 0.028;
-    public const double SAG = 0.075;
+    public const double SAG = 0.105;
     /// Sewn panels along the ridge; the cloth bellies between the taut seams.
     public const double PANEL_WIDTH = 0.75;
     public const double CANVAS_TILE = 0.30;
@@ -260,6 +260,20 @@ public partial class Tent : Node3D
         sag += tension * (sin(u * 18.0 + v * 4.0) * 0.006 + sin(u * 27.0 - v * 3.0) * 0.003);
         double seam_phase = absf(fposmod((u - 0.5) * LENGTH / PANEL_WIDTH + 0.5, 1.0) - 0.5) * 2.0;
         sag += 0.016 * sin(v * PI) * smoothstep(0.0, 0.6, seam_phase);
+        // The guy lines pull the hem taut at their pegs (u = 0.2, 0.8) and at
+        // the poles; the cloth between hangs slack in a shallow scallop above
+        // the ground line, never lifting the hem itself.
+        double span = u < 0.2 ? u / 0.2 : (u < 0.8 ? (u - 0.2) / 0.6 : (u - 0.8) / 0.2);
+        double hem_band = smoothstep(0.45, 0.88, v) * (1.0 - smoothstep(0.93, 1.0, v));
+        sag += 0.032 * hem_band * sin(span * PI) * (u > 0.2 && u < 0.8 ? 1.0 : 0.6);
+        // Tension folds fan up from each peg into the slack cloth.
+        foreach (double peg in new[] { 0.2, 0.8 })
+        {
+            double du = u - peg;
+            double rise = 1.0 - v;
+            double fan = exp(-pow(du / (0.025 + rise * 0.16), 2.0)) * smoothstep(0.0, 0.25, rise) * (1.0 - smoothstep(0.35, 0.7, rise));
+            sag += fan * 0.010 * sin(du / (0.02 + rise * 0.05) * 3.0);
+        }
         return p - new Vector3((float)(side * 0.35), 1.0f, 0.0f).Normalized() * (float)sag;
     }
 
@@ -518,6 +532,12 @@ public partial class Tent : Node3D
         Vector3 ridge = new Vector3(0.0f, (float)(HEIGHT - 0.01), 0.0f);
         Vector3 hang = new Vector3(0.0f, (float)(HEIGHT - 0.22), 0.0f);
         lantern.build(false, Quality.Instance.current.lantern_shadows, false, hang);
+        // Light through the cloth: the omni alone lights the inner face, but
+        // canvas glows from within, brightest near the flame.
+        Vector3 flame = new Vector3(0.0f, (float)(HEIGHT - 0.32), (float)(-LENGTH * 0.5 + 0.45));
+        _canvas.SetShaderParameter("glow_position", IsInsideTree() ? ToGlobal(flame) : Transform * flame);
+        _canvas.SetShaderParameter("lantern_glow", lantern.lit ? 1.0 : 0.0);
+        lantern.toggled += on => _canvas.SetShaderParameter("lantern_glow", on ? 1.0 : 0.0);
         MeshBuilder mb = new MeshBuilder();
         PropMeshes.add_hang_link(mb, ridge, hang, 0.007);
         MeshInstance3D rope = new MeshInstance3D();
