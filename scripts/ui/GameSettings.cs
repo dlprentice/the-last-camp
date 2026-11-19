@@ -116,7 +116,7 @@ public sealed class GameSettings
             return;
         }
         bool auto = Preset == "auto";
-        QualityPreset.Tier tier = Quality.tier_from_name(auto ? "high" : Preset);
+        QualityPreset.Tier tier = Quality.tier_from_name(auto ? QualityPreset.DEFAULT_TIER_NAME : Preset);
         bool wasExplicit = quality.@explicit;
         quality.@explicit = !auto;
         if (quality.current.tier != tier && (!auto || wasExplicit)) quality.apply(tier);

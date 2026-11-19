@@ -27,8 +27,15 @@ public partial class QualityPreset : RefCounted
         ULTRA,
     }
 
+    /// The preset a fresh install and "Automatic" start from: the 60 fps one.
+    public const QualityPreset.Tier DEFAULT_TIER = QualityPreset.Tier.MEDIUM;
+    public const string DEFAULT_TIER_NAME = "medium";
+
     public QualityPreset.Tier tier;
     public string display_name = "";
+    /// Frame cap in ordinary play (0 = uncapped). A preset that cannot hold 60
+    /// on the reference laptop caps at an even 30 instead of wandering between.
+    public long max_fps = 0;
 
     // Resolution / anti-aliasing
     public double render_scale = 1.0;
@@ -80,6 +87,9 @@ public partial class QualityPreset : RefCounted
     public double grass_density = 0.9;
     public double grass_distance = 72.0;
     public double grass_lod_bias = 1.0;
+    /// Lowest share of near-grass clumps kept at range (beyond about 40-75 m);
+    /// survivors widen to keep the ground covered. See `Understory`.
+    public double grass_distance_floor = Understory.GrassDensityMinimum;
     public double foliage_distance = 1.0;
     public double particle_scale = 1.0;
     public double lod_bias = 1.0;
@@ -91,6 +101,16 @@ public partial class QualityPreset : RefCounted
     public bool ridge_far_band = true;
     public Viewport.AnisotropicFiltering anisotropy = Viewport.AnisotropicFiltering.Anisotropy16X;
     public long parallax_steps = 16;
+
+    /// A field-by-field copy (a Godot object must not be memberwise cloned: the
+    /// clone would share its native instance).
+    public QualityPreset copy()
+    {
+        QualityPreset p = new QualityPreset();
+        foreach (System.Reflection.FieldInfo field in typeof(QualityPreset).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            field.SetValue(p, field.GetValue(this));
+        return p;
+    }
 
     public static QualityPreset ultra()
     {
@@ -137,6 +157,9 @@ public partial class QualityPreset : RefCounted
         QualityPreset p = new QualityPreset();
         p.tier = QualityPreset.Tier.HIGH;
         p.display_name = "High";
+        // Full detail at an even, capped 30 fps: about 30 ms of main-view GPU
+        // time on the reference laptop cannot hold 60, so it does not try.
+        p.max_fps = 30;
         p.contact_shadows = true;
         // Measured on the RTX 4060 Laptop (2026-09-10): the frame is fragment-bound
         // in vegetation, so the atlas and internal resolution are the levers that
@@ -168,7 +191,7 @@ public partial class QualityPreset : RefCounted
         QualityPreset p = new QualityPreset();
         p.tier = QualityPreset.Tier.MEDIUM;
         p.display_name = "Medium";
-        p.render_scale = 0.67;
+        p.render_scale = 0.59;
         p.upscaler = Viewport.Scaling3DModeEnum.Fsr2;
         p.directional_shadow_size = 2048;
         p.directional_shadow_distance = 80.0;
@@ -181,20 +204,22 @@ public partial class QualityPreset : RefCounted
         p.sdfgi_cascades = 4;
         p.sdfgi_ray_count = RenderingServer.EnvironmentSdfgiRayCount.Count8;
         p.ssr = false;
-        p.fog_volume_size = 80;
-        p.fog_volume_depth = 80;
+        p.fog_volume_size = 64;
+        p.fog_volume_depth = 64;
         p.dof = false;
         p.sky_radiance = Sky.RadianceSizeEnum.Size128;
-        p.reflection_scale = 0.3;
+        p.reflection_scale = 0.25;
         p.reflection_half_rate = true;
         p.grass_density = 0.5;
-        p.grass_distance = 260.0;
+        p.grass_distance = 160.0;
         p.grass_lod_bias = 0.25;
+        p.grass_distance_floor = 0.045;
         p.foliage_distance = 0.8;
+        p.lod_bias = 0.75;
         p.ridge_detail = 0.5;
         p.particle_scale = 0.7;
         p.anisotropy = Viewport.AnisotropicFiltering.Anisotropy8X;
-        p.parallax_steps = 8;
+        p.parallax_steps = 4;
         return p;
     }
 
