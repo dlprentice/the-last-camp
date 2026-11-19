@@ -1,0 +1,332 @@
+[
+ {
+  "id": "bed_day_woods",
+  "seconds": 30,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Late summer mixed northern forest in the afternoon, gentle breeze in birch and maple leaves, distant songbirds now and then, calm and natural, no music, no voices"
+ },
+ {
+  "id": "bed_evening",
+  "seconds": 30,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Northern forest at sunset in late August, only a few birds left singing far away, the first crickets starting, very still air, natural field recording, no music"
+ },
+ {
+  "id": "bed_night",
+  "seconds": 30,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Quiet night beside a small forest pond in late summer, crickets and katydids, a soft frog now and then, very still, natural field recording, no music, no owls"
+ },
+ {
+  "id": "bed_wind_canopy",
+  "seconds": 30,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Steady wind moving through tall pine and oak treetops, rustling leaves and creaking branches, no birds, no rain, natural field recording"
+ },
+ {
+  "id": "bed_pond_lap",
+  "seconds": 20,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Small gentle waves lapping against wooden pier posts on a calm pond, close up, quiet, natural field recording"
+ },
+ {
+  "id": "bed_fire",
+  "seconds": 30,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Small campfire crackling steadily outdoors, wood popping softly, close up, warm and calm, no wind, no voices"
+ },
+ {
+  "id": "bed_rain",
+  "seconds": 30,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Steady rain falling on forest leaves and soft ground, medium intensity, no thunder, natural field recording"
+ },
+ {
+  "id": "bed_rain_canvas",
+  "seconds": 30,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Heavy rain drumming on a canvas tent heard from inside the tent, close and cosy, no thunder"
+ },
+ {
+  "id": "bed_storm_wind",
+  "seconds": 30,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Strong gusting wind roaring through a forest at night before a storm, trees swaying and creaking, no rain, no thunder"
+ },
+ {
+  "id": "bed_wading",
+  "seconds": 10,
+  "loop": true,
+  "takes": 3,
+  "prompt": "Legs wading slowly through shallow calm pond water, gentle sloshing, close up"
+ },
+ {
+  "id": "step_grass",
+  "seconds": 0.6,
+  "takes": 6,
+  "prompt": "A single footstep on dry summer grass, boot, close up, one step only"
+ },
+ {
+  "id": "step_dirt",
+  "seconds": 0.6,
+  "takes": 6,
+  "prompt": "A single footstep on a packed dirt forest path, boot, close up, one step only"
+ },
+ {
+  "id": "step_wood",
+  "seconds": 0.6,
+  "takes": 6,
+  "prompt": "A single footstep on weathered wooden pier planks, boot, slight hollow resonance, one step only"
+ },
+ {
+  "id": "step_rock",
+  "seconds": 0.6,
+  "takes": 6,
+  "prompt": "A single footstep on a flat granite stone, boot, close up, one step only"
+ },
+ {
+  "id": "step_water",
+  "seconds": 0.7,
+  "takes": 6,
+  "prompt": "A single footstep in ankle deep pond water, boot splash, close up, one step only"
+ },
+ {
+  "id": "step_hollow",
+  "seconds": 0.9,
+  "takes": 3,
+  "prompt": "A boot stepping on a loose flat stone slab that rocks and knocks hollow against rock underneath, one step"
+ },
+ {
+  "id": "birds_day",
+  "seconds": 3,
+  "loop": false,
+  "takes": 8,
+  "prompt": "A single songbird phrase in a northern forest, heard from about twenty metres away, natural, no other birds"
+ },
+ {
+  "id": "owl",
+  "seconds": 4,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A barred owl calling far off in a forest at night, natural, very distant, no other sounds"
+ },
+ {
+  "id": "loon",
+  "seconds": 5,
+  "loop": false,
+  "takes": 2,
+  "prompt": "A common loon's long wail across a calm lake at dusk, distant, natural"
+ },
+ {
+  "id": "thunder",
+  "seconds": 8,
+  "loop": false,
+  "takes": 4,
+  "prompt": "Thunder rolling over a forest at night, from distant rumble to a close crack, natural"
+ },
+ {
+  "id": "fire_hiss",
+  "seconds": 2,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Rain drops hitting hot campfire coals, short sizzle and hiss"
+ },
+ {
+  "id": "water_in",
+  "seconds": 1.2,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Stepping from a pebbly shore into knee deep pond water, splash"
+ },
+ {
+  "id": "water_out",
+  "seconds": 1.2,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Stepping out of knee deep pond water onto the shore, dripping"
+ },
+ {
+  "id": "log_pickup",
+  "seconds": 1,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Lifting a split firewood log off a woodpile, wood knocking on wood"
+ },
+ {
+  "id": "log_into_fire",
+  "seconds": 1.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A split log dropped onto a burning campfire, thump and a burst of crackling sparks"
+ },
+ {
+  "id": "stone_pickup",
+  "seconds": 0.7,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Picking up a small flat stone off a wooden plank"
+ },
+ {
+  "id": "stone_throw",
+  "seconds": 0.6,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A small stone thrown hard by hand, a short soft whoosh"
+ },
+ {
+  "id": "stone_skip",
+  "seconds": 0.6,
+  "loop": false,
+  "takes": 4,
+  "prompt": "A flat stone skipping once off still pond water, a light slap"
+ },
+ {
+  "id": "stone_sink",
+  "seconds": 0.8,
+  "loop": false,
+  "takes": 2,
+  "prompt": "A small stone plopping into a pond and sinking"
+ },
+ {
+  "id": "lantern_on",
+  "seconds": 1.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "An old brass oil lantern: the glass globe lifted, a match struck, the wick catching, the globe set down"
+ },
+ {
+  "id": "lantern_off",
+  "seconds": 1,
+  "loop": false,
+  "takes": 3,
+  "prompt": "An oil lantern's wick turned down and the flame going out, small metal click"
+ },
+ {
+  "id": "fire_light",
+  "seconds": 2.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A wooden match struck and kindling catching in a campfire, first crackles"
+ },
+ {
+  "id": "tent_enter",
+  "seconds": 1.2,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Brushing through a heavy canvas tent flap"
+ },
+ {
+  "id": "tin_open",
+  "seconds": 1.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "An old metal tackle tin's hinged lid creaking open, flat stones rattling inside"
+ },
+ {
+  "id": "page_turn",
+  "seconds": 0.8,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Turning one page of an old paper notebook, close up"
+ },
+ {
+  "id": "letter_unfold",
+  "seconds": 1.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Unfolding an old folded paper letter, close up"
+ },
+ {
+  "id": "step_lift",
+  "seconds": 2,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A heavy flat stone slab lifted, scraping on rock, then set down beside"
+ },
+ {
+  "id": "tin_lift",
+  "seconds": 2,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A small rusted tin box pulled from dry soil and its stiff lid prised open"
+ },
+ {
+  "id": "ash_rake",
+  "seconds": 1.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Raking ash and charcoal in a stone fire ring with a stick"
+ },
+ {
+  "id": "ring_stone",
+  "seconds": 1.2,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A heavy fire ring stone lifted and set down on soft earth"
+ },
+ {
+  "id": "tent_peg",
+  "seconds": 0.8,
+  "loop": false,
+  "takes": 3,
+  "prompt": "Pulling a metal tent peg out of firm ground"
+ },
+ {
+  "id": "tent_fall",
+  "seconds": 2.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A canvas tent collapsing softly as its wooden poles are pulled out"
+ },
+ {
+  "id": "sit_down",
+  "seconds": 1,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A person sitting down on a log, clothing rustle"
+ },
+ {
+  "id": "ui_move",
+  "seconds": 0.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A very soft paper tick, quiet"
+ },
+ {
+  "id": "ui_select",
+  "seconds": 0.5,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A pencil tapping once on paper, quiet"
+ },
+ {
+  "id": "journal_open",
+  "seconds": 1,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A cloth bound notebook opened, pages settling"
+ },
+ {
+  "id": "journal_close",
+  "seconds": 0.8,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A cloth bound notebook closed softly"
+ },
+ {
+  "id": "card_in",
+  "seconds": 2,
+  "loop": false,
+  "takes": 3,
+  "prompt": "A low soft breath of wind, very quiet, no other sound"
+ }
+]

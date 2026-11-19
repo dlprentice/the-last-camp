@@ -14,11 +14,11 @@ here alone and she never asked what he was doing.
 
 Tom's through-line runs through the two places this cut keeps:
 
-- **The tackle tin (day 2 morning).** In June's tent is Tom's tin. Under his flat
+- **The old fire ring (day 2 morning).** The first place June and Tom camped. On the
+  fallen log seat is a notch cut with a knife.
+- **The tackle tin.** In June's tent is Tom's tin. Under his flat
   skipping stones is his 2014 tally book: heron counts, then in the margins
-  "steps: 6 of 20", "steps: 14 of 20", and a route sketch from the old fire ring.
-- **The old fire ring.** The first place June and Tom camped. On the fallen log seat
-  is Tom's first notched blaze, the start of his route.
+  "steps: 6 of 20", "steps: 14 of 20", and a route sketch from the old fire ring. The notch was his first blaze.
 - **Tom's Rock.** His blazes lead up twenty stone steps he set himself to a stone
   bench facing the pond and the sunset. The twentieth step is loose; under it is a
   tin with his letter for their 40th anniversary, which he never gave her. You read
@@ -52,9 +52,10 @@ Tom's through-line runs through the two places this cut keeps:
 
 ### Chapter 2: The Marks (day 2 and the storm night)
 
-- [ ] Morning: you open Tom's tin in the tent and read his tally book on screen.
-- [ ] You follow the footpath to the old fire ring. Entry 4 plays,
-  and you find Tom's first blaze.
+- [ ] Morning: you follow the footpath to the old fire ring. Entry 4 plays. There is a
+  notch cut in the log seat, but nothing points at it.
+- [ ] Back at camp you open Tom's tin in the tent and read his tally book on screen: his
+  route starts at the old ring. From here until the lookout, June says nothing.
 - [ ] Evening: you follow Tom's blazes and steps to Tom's Rock, sit on his bench for the
   sunset (entry 5), lift the loose step and read his letter. Nothing
   marks the step: it sits a little wrong and sounds hollow underfoot, and only then
