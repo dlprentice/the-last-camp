@@ -68,7 +68,7 @@ public partial class OldFireRing : Node3D
             list.Add(new Stone
             {
                 pose = new Transform3D(basis, new Vector3(at.X, (float)(ground - size.Y * 0.08), at.Y)),
-                shape = new GraniteSlab.Shape { size = size, roundness = roundness, rough = 0.22, seed = 7400 + i },
+                shape = new GraniteSlab.Shape { size = size, roundness = roundness, rough = 0.22, seed = 7400 + i, moss_band = 0.04 },
                 size = across,
             });
         }

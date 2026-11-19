@@ -53,14 +53,17 @@ public static class PlacesLayout
     public const long STEP_COUNT = 20;
     public const double ARRIVE_TOMS_ROCK = 3.6;
 
-    /// The steps climb the outcrop's north-east flank in switchbacks and end on
-    /// the twentieth step, which they reach from the bench's right-hand side.
+    /// The steps wind up the outcrop: a long rising traverse round its east and
+    /// south flanks, one switchback, a shorter climb back round inside it, and the
+    /// last few onto the summit, ending on the twentieth step, which they reach from
+    /// the bench's right-hand side. The two legs stand well apart on the slope.
     /// Listed from the bottom step to the top. The ground along the line is cut
     /// level across it, as a dug-in step path would be.
     public static readonly Vector2[] STEP_LINE =
     {
-        polar(15.0, 30.0), polar(12.5, 350.0), polar(10.0, 30.0), polar(7.0, 345.0), polar(4.4, 40.0),
-        polar(2.4, 20.0), polar(1.05, 35.0), LOOSE_STEP,
+        polar(15.0, 30.0), polar(14.0, 58.0), polar(12.8, 86.0), polar(11.6, 114.0), polar(10.4, 142.0),
+        polar(9.4, 168.0), polar(7.2, 140.0), polar(6.0, 108.0), polar(4.8, 76.0), polar(3.3, 50.0),
+        polar(1.05, 35.0), LOOSE_STEP,
     };
     public const double STEP_CUT_INNER = 0.8;
     public const double STEP_CUT_OUTER = 2.4;
@@ -290,10 +293,10 @@ public static class PlacesLayout
     }
 
     public const double LOOKOUT_BEARING_DEG = 309.0;
-    public const double LOOKOUT_CORE_DEG = 24.0;
-    public const double LOOKOUT_EDGE_DEG = 36.0;
+    public const double LOOKOUT_CORE_DEG = 28.0;
+    public const double LOOKOUT_EDGE_DEG = 40.0;
     /// Across the near bank to the water: beyond it only the far bank's trees stand.
-    public const double LOOKOUT_REACH = 92.0;
+    public const double LOOKOUT_REACH = 100.0;
 
     static Rect2[] bounds_of((Vector2[] line, double offset)[] lines)
     {

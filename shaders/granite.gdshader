@@ -89,11 +89,11 @@ void fragment() {
 	float drift = dot(tri_albedo(p, w, relief_tile).rgb, vec3(0.3, 0.59, 0.11));
 	vec3 albedo = base_color * mix(0.82, 1.14, clamp(drift * 2.4, 0.0, 1.0));
 	// Grains: dark biotite flecks and pale quartz, a few millimetres across.
-	float grain = tri_noise(p, w, 11.0).r;
-	float grain2 = tri_noise(p * 1.7, w, 23.0).b;
-	albedo *= mix(1.0, 0.42, smoothstep(0.72, 0.84, grain));
+	float grain = tri_noise(p, w, 37.0).r;
+	float grain2 = tri_noise(p * 1.7, w, 61.0).b;
+	albedo *= mix(1.0, 0.62, smoothstep(0.74, 0.86, grain));
 	albedo = mix(albedo, vec3(0.80, 0.78, 0.74), smoothstep(0.80, 0.92, grain2) * 0.6);
-	albedo *= mix(0.94, 1.05, tri_noise(p, w, 4.0).g);
+	albedo *= mix(0.92, 1.06, tri_noise(p, w, 1.3).g);
 
 	vec3 n_world = tri_normal(p, n, w, relief_tile);
 	float up = clamp(n_world.y, 0.0, 1.0);

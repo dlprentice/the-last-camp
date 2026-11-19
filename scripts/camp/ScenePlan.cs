@@ -151,8 +151,15 @@ public partial class ScenePlan
         }
     }
 
+    List<Vector2> _lenses;
+
     public bool _blocked(Vector2 pos, double spacing)
     {
+        _lenses ??= _film_lens_points();
+        if (_near_film_lens(_lenses, pos))
+        {
+            return true;
+        }
         if (_shore_offset(pos) < 3.5)
         {
             return true;
@@ -617,6 +624,36 @@ public partial class ScenePlan
         }
     }
 
+    public const double FILM_LENS_CLEARANCE = 1.2;
+
+    /// Sampled lens positions of the showcase and one-night films, in the ground plane.
+    public List<Vector2> _film_lens_points()
+    {
+        var points = new List<Vector2>();
+        foreach (string name in new[] { "showcase", "one_night" })
+        {
+            foreach (Cinematic.Shot shot in Cinematic.sequence(name))
+            {
+                Spline path = new Spline(Cinematic.resolve(_field, shot.path, shot.absolute));
+                for (int i = 0; i < 48; i++)
+                {
+                    Vector3 p = Cinematic.camera_position(shot, path, _field, shot.duration * i / 47.0);
+                    points.Add(new Vector2(p.X, p.Z));
+                }
+            }
+        }
+        return points;
+    }
+
+    public static bool _near_film_lens(List<Vector2> lenses, Vector2 at)
+    {
+        foreach (Vector2 l in lenses)
+        {
+            if (l.DistanceSquaredTo(at) < FILM_LENS_CLEARANCE * FILM_LENS_CLEARANCE) return true;
+        }
+        return false;
+    }
+
     public void _place_dense_stands()
     {
         /// Add successive woodland age layers without moving existing authored trees.
@@ -624,6 +661,8 @@ public partial class ScenePlan
         /// clearance, culling and wildlife all see them. Never a visual-only overlay.
         RandomNumberGenerator rng = new RandomNumberGenerator();
         rng.Seed = unchecked((ulong)(226091));
+        // Where the film's lens passes at tree height: a new stand never grows there.
+        List<Vector2> lenses = _lenses ??= _film_lens_points();
         Godot.Collections.Dictionary cells = new Godot.Collections.Dictionary();
         double CELL = 5.0;
         foreach (ScenePlan.TreeEntry tree in trees)
@@ -666,7 +705,7 @@ public partial class ScenePlan
                 {
                     continue;
                 }
-                if (TerrainField.distance_to_polyline(at, _intro_lane) < 10.0)
+                if (TerrainField.distance_to_polyline(at, _intro_lane) < 10.0 || _near_film_lens(lenses, at))
                 {
                     continue;
                 }

@@ -15,16 +15,16 @@ namespace LastCamp;
 public static class BlazeNotch
 {
     /// Patch half-extents across and up the surface, and its grid.
-    public const double HALF_WIDTH = 0.085;
+    public const double HALF_WIDTH = 0.095;
     public const double HALF_HEIGHT = 0.07;
     public const int COLUMNS = 35;
     public const int ROWS = 29;
-    /// The notch itself: a horizontal V about 9 cm wide and 4 cm tall.
-    public const double CUT_HALF_WIDTH = 0.045;
-    public const double CUT_TOP = 0.024;
+    /// The notch itself: a horizontal V about 11 cm wide and 4 cm tall.
+    public const double CUT_HALF_WIDTH = 0.055;
+    public const double CUT_TOP = 0.026;
     public const double CUT_BOTTOM = -0.016;
     /// Height of the healed lip above the bark, and of the cut floor.
-    public const double LIP = 0.014;
+    public const double LIP = 0.018;
     public const double FLOOR = 0.0012;
     /// Everything stands this far off the host so the two never fight in depth.
     public const double SKIN = 0.0012;
@@ -159,7 +159,7 @@ public static class BlazeNotch
                 uvs[k] = uv;
                 colors[k] = color;
                 on_cut[k] = cut;
-                shade[k] = (float)(1.0 - 0.55 * depth);
+                shade[k] = (float)(1.0 - 0.7 * depth * depth);
             }
         }
         var lip = new MeshBuilder();
@@ -176,7 +176,7 @@ public static class BlazeNotch
                 bool is_cut = on_cut[k00] && on_cut[k10] && on_cut[k01] && on_cut[k11];
                 MeshBuilder mb = is_cut ? wood : lip;
                 long[] map = is_cut ? wood_index : lip_index;
-                long V(int k) => map[k] >= 0 ? map[k] : map[k] = mb.add_vertex(points[k], grid_normal(points, k), is_cut ? cut_uv(k) : uvs[k], is_cut ? new Color(0.95f, 0.91f, 0.84f) * shade[k] : colors[k], tangent(points, k));
+                long V(int k) => map[k] >= 0 ? map[k] : map[k] = mb.add_vertex(points[k], grid_normal(points, k), is_cut ? cut_uv(k) : uvs[k], is_cut ? new Color(1.0f, 0.96f, 0.88f) * shade[k] : colors[k], tangent(points, k));
                 // Wound so the face looks out along `outward`.
                 long a0 = V(k00), a1 = V(k10), a2 = V(k11), a3 = V(k01);
                 mb.add_triangle(a0, a2, a1);
