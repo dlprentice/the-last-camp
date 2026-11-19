@@ -1,8 +1,12 @@
 # Validation and known limits
 
-The source targets **Godot 4.8 beta4 .NET** (`4.8.beta4.mono.official.b070e63b1`) with .NET SDK 10.0.402, C#,
-Forward+ Vulkan and native Jolt. Results below are dated; the conversion checks began on September 26, 2026 with
-`4.8.dev6.mono.official.8898c2b3d` and .NET SDK 8.0.424 on Linux x86-64.
+The source targets **Godot 4.8 beta4 .NET** (`4.8.beta4.mono.official.b070e63b1`) with the .NET 10 SDK
+(`global.json` pins 10.0.402 with patch roll-forward; 10.0.403 ran) and the .NET 10.0.14 runtime, C#, Forward+
+Vulkan and native Jolt. Results below are dated and name the engine they ran on: the conversion checks began on
+September 26, 2026 with `4.8.dev6.mono.official.8898c2b3d` and .NET SDK 8.0.424; most measurements below are from
+dev6 and beta1. On beta4 (November 19, 2026) the build has no warnings, the C# and Python suites pass, the scene
+contract and all content fingerprints match, and the 15-waypoint traversal passes on the GPU with no engine
+error, core dump or NVIDIA Xid.
 
 ## Checked without rendering
 

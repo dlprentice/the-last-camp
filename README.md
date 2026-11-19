@@ -1,10 +1,12 @@
 # The Last Camp
 
-A first-person camping game made in **Godot**. Today it is one evening in the
-woods: carry firewood, tend the fire, aim skipping stones across the pond,
-light your lantern and turn in at the tent, then stay to explore when morning
-comes. It takes about 10 to 15 minutes, and there is no title menu or saved
-progress yet beyond your best stone skip.
+A quiet first-person story game made in **Godot**. You come to close your
+grandmother June's lakeside camp for the last time. Her letter and her voice send
+you to the places she and your grandfather Tom loved, and on the way you find what
+Tom was doing out here alone in his last summer. It is being built to a complete
+story of 25 to 35 minutes ([what "done" means](docs/DONE.md)). Today you can play the
+arrival evening and night: carry firewood, light the fire, skip stones, light your
+lantern and turn in; the later chapters are under construction.
 
 ![The camp and its wooded approach](docs/images/arrival.png)
 
@@ -32,9 +34,9 @@ godot --path . --fullscreen
 The first import builds Godot's local asset cache. Rebuild the C# assembly with
 `dotnet build` after changing source. Everything is constructed in code; opening
 the editor is optional, and the one-node main scene is only a bootstrap. The converted
-textures, models and audio are included: no asset downloads, Python packages
-or account sign-in are needed to play. After the loading screen, you start on
-the trail with control of the player. The optional `-- --intro` camera arrival
+textures and models are included. The audio is not: it is licensed, ships only
+in builds, and a clone plays silently with subtitles. After the loading screen, you
+start on the trail with control of the player. The optional `-- --intro` camera arrival
 can be skipped with Space or a click.
 
 The default preset starts at High and can adapt downward. Use
@@ -44,26 +46,20 @@ the player. Dense vegetation and shadows still make this a demanding scene.
 See [validation and limits](docs/validation.md) for measured results and the
 difference between interactive performance and offline movie output.
 
-Press **J** for the camp journal. There is no survival timer: the evening's
-activities introduce the interactions, and your best stone-skipping score is
-saved locally. Light and weather advance during normal play. Once the evening's
-activities are complete, the tent lets you rest until dusk and then sleep until dawn.
-Walking stays within a woodland area roughly 240 metres across around the camp
-and pond. The surrounding hills and forest continue as scenery. At the boundary,
-you can walk along it or turn back; a short hint points you toward the pond.
+Press **J** for June's journal, which holds what is left to do. There is no timer
+and no way to fail. Walking stays within a woodland area roughly 240 metres across
+around the camp and pond; the hills and forest beyond continue as scenery.
 
 ## Where it is going
 
-The finished game is a quiet story of about an hour. Your grandmother June can no
-longer manage the trail, so you come to close her camp for the last time, three days
-before the lease ends. Her journal and her voice send you to the places she and your
-grandfather Tom loved: a spring, their first fire ring, the heron blind across the
-pond by canoe, a birch grove and a lookout. On the way you find what Tom was doing
-out here alone in his last summer. You fish, split wood, keep the fire going through
-a night storm, watch the sun go down from Tom's bench, write the last page of June's
-journal, and on the final morning leave the clearing the way it was before anyone
-camped there. It will have a title menu, saves, settings and gamepad support. See
-[the design](docs/design.md) and [the roadmap](docs/roadmap.md).
+The finished game runs over two days and a last morning. You light June's fire on the
+first night, follow her journal to the old fire ring where she and Tom first camped,
+and open Tom's tackle tin to find his tally book and a route June never knew about.
+His blazes lead up twenty stone steps to a lookout over the pond. You keep the fire
+alive through a night storm, and on the last morning you strike the tent, rake out
+the ash and walk out. It has a title screen, one save, settings, voiced journal
+entries and an ending. See [DONE](docs/DONE.md), [the direction](docs/direction.md)
+and [the roadmap](docs/roadmap.md).
 
 ## Controls
 
