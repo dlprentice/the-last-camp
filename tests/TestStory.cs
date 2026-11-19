@@ -1,0 +1,313 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Godot;
+using LastCamp.Story;
+
+namespace LastCamp.Tests;
+
+/// The story spine without the world: the chapters run from events alone, the
+/// clock holds at a band's end, the storm has both outcomes and the one save
+/// survives corrupt files and failed writes.
+public partial class TestStory : TestCase
+{
+    private const string Dir = "user://story-tests";
+
+    private static StorySave FreshSlot(string name)
+    {
+        var slot = new StorySave($"{Dir}/{name}");
+        string real = ProjectSettings.GlobalizePath(slot.Directory);
+        if (System.IO.Directory.Exists(real)) System.IO.Directory.Delete(real, true);
+        System.IO.Directory.CreateDirectory(real);
+        return slot;
+    }
+
+    private static void Remove(StorySave slot)
+    {
+        string real = ProjectSettings.GlobalizePath(slot.Directory);
+        if (System.IO.Directory.Exists(real)) System.IO.Directory.Delete(real, true);
+    }
+
+    private static StoryState Full()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        foreach (string ev in new[] { StoryEvents.LetterRead, StoryEvents.LogCarried, StoryEvents.LogCarried, StoryEvents.LogCarried, "stone_skips:4" })
+            s.Raise(ev);
+        s.Advance(StoryEvents.RestBedroll);
+        s.Raise(StoryEvents.FireLit);
+        s.AddItem("june_letter");
+        s.AddItem("tally_book");
+        s.StormOutcome = "went_out";
+        s.StormMinFire = 0.02;
+        s.BandSeconds = 12.5;
+        s.ShelterSeconds = 4.25;
+        s.ClearingElapsed = 3.5;
+        s.BestSkips = 6;
+        s.RecordsMigrated = true;
+        WorldSnapshot w = s.World;
+        w.Clock = 21.25;
+        w.WeatherChapter = "shelter_rain";
+        w.WeatherSeconds = 7.5;
+        w.WeatherDuration = 30;
+        w.Cloud = 1;
+        w.Rain = 0.8;
+        w.Wet = 0.6;
+        w.FireIntensity = 0.73;
+        w.HasPosition = true;
+        w.X = -12.5;
+        w.Y = 1.25;
+        w.Z = 4.75;
+        w.Yaw = 1.5;
+        return s;
+    }
+
+    public void test_save_round_trip_keeps_every_field()
+    {
+        StorySave slot = FreshSlot("round-trip");
+        StoryState saved = Full();
+        assert_true(slot.Save(saved), "the save is written: " + slot.LastError);
+        StoryState? loaded = slot.Load();
+        assert_true(loaded != null, "the save loads back: " + slot.LastError);
+        if (loaded == null) return;
+        assert_eq(StorySave.Serialize(loaded), StorySave.Serialize(saved), "every saved field reads back the same");
+        assert_eq(loaded.Chapter.Id, StoryScript.Arrival, "chapter");
+        assert_eq(loaded.Band.Id, "night", "band");
+        assert_eq(loaded.ProgressOf(StoryScript.Chapters[0], StoryScript.Chapters[0].Bands[0], StoryScript.Chapters[0].Bands[0].Objectives[1]), 3, "objective progress");
+        assert_true(loaded.IsDone(loaded.Band.Objectives[0]), "the night's fire objective");
+        assert_false(loaded.IsDone(loaded.Band.Objectives[1]), "the night's lantern objective");
+        assert_near(loaded.World.Clock, 21.25, 0, "clock");
+        assert_eq(loaded.World.WeatherChapter, "shelter_rain", "weather chapter");
+        assert_near(loaded.World.WeatherSeconds, 7.5, 0, "weather seconds");
+        assert_near(loaded.World.Rain, 0.8, 0, "rain");
+        assert_near(loaded.World.Wet, 0.6, 0, "wetness");
+        assert_near(loaded.World.FireIntensity, 0.73, 0, "fire intensity");
+        assert_eq(string.Join(",", loaded.Items), "june_letter,tally_book", "story items");
+        assert_true(loaded.LinesPlayed.SetEquals(saved.LinesPlayed) && loaded.LinesPlayed.Contains("e1") && loaded.LinesPlayed.Contains("e3"), "lines played");
+        assert_eq(loaded.StormOutcome, "went_out", "storm outcome");
+        assert_near(loaded.StormMinFire, 0.02, 0, "storm minimum fire");
+        assert_true(loaded.World.HasPosition && loaded.World.X == -12.5 && loaded.World.Y == 1.25 && loaded.World.Z == 4.75 && loaded.World.Yaw == 1.5, "last safe position");
+        assert_eq(loaded.BestSkips, 6, "stone record");
+        assert_true(loaded.RecordsMigrated, "records migration flag");
+        assert_true(loaded.Facts.SetEquals(saved.Facts), "facts");
+        assert_false(File.Exists(ProjectSettings.GlobalizePath(slot.TempPath)), "no temporary file is left behind");
+        Remove(slot);
+    }
+
+    public void test_corrupt_or_partial_files_are_rejected_without_losing_the_slot()
+    {
+        StorySave slot = FreshSlot("corrupt");
+        assert_true(slot.Save(Full()), "first save");
+        string real = ProjectSettings.GlobalizePath(slot.SlotPath);
+        string good = File.ReadAllText(real);
+
+        // An interrupted write leaves only a partial temporary file: the slot still loads.
+        File.WriteAllText(ProjectSettings.GlobalizePath(slot.TempPath), good[..(good.Length / 2)]);
+        StoryState? kept = slot.Load();
+        assert_true(kept != null && kept.Band.Id == "night", "a partial temporary file never replaces the slot");
+
+        // A slot cut short, garbled or missing a field is rejected and left as it is.
+        foreach (string bad in new[] { good[..(good.Length / 2)], "{ not json", good.Replace("\"fire_intensity\"", "\"fire_heat\""), good.Replace("\"version\": 1", "\"version\": 99"), "" })
+        {
+            File.WriteAllText(real, bad);
+            assert_true(slot.Load() == null, "a damaged slot is rejected");
+            assert_true(slot.LastError.Length > 0, "the rejection says why");
+            assert_eq(File.ReadAllText(real), bad, "the rejected file is not touched");
+        }
+        string copy = slot.PreserveRejected();
+        assert_true(copy.Length > 0 && File.Exists(copy), "a rejected slot can be kept beside the new one");
+        Remove(slot);
+    }
+
+    public void test_failed_write_keeps_the_old_slot()
+    {
+        StorySave slot = FreshSlot("failed-write");
+        StoryState first = Full();
+        assert_true(slot.Save(first), "first save");
+        string before = File.ReadAllText(ProjectSettings.GlobalizePath(slot.SlotPath));
+        // A directory where the temporary file must go makes the write fail.
+        System.IO.Directory.CreateDirectory(ProjectSettings.GlobalizePath(slot.TempPath));
+        StoryState second = Full();
+        second.BestSkips = 7;
+        second.World.Clock = 22.5;
+        assert_false(slot.Save(second), "the write reports failure");
+        assert_true(slot.LastError.Length > 0, "the failure is reported");
+        assert_eq(File.ReadAllText(ProjectSettings.GlobalizePath(slot.SlotPath)), before, "the old slot is unchanged");
+        StoryState? loaded = slot.Load();
+        assert_true(loaded != null && loaded.BestSkips == 6 && loaded.World.Clock == 21.25, "the old slot still loads");
+        Remove(slot);
+    }
+
+    public void test_stone_record_migrates_once()
+    {
+        StorySave slot = FreshSlot("records");
+        string records = slot.Directory + "/camp-records.cfg";
+        using (var cfg = new ConfigFile())
+        {
+            cfg.SetValue("pond", "best_skips", 5);
+            assert_eq((long)cfg.Save(records), (long)Error.Ok, "old record written");
+        }
+        var state = new StoryState();
+        assert_true(StorySave.MigrateRecords(state, records), "the old record is read");
+        assert_eq(state.BestSkips, 5, "the best throw comes across");
+        assert_true(state.RecordsMigrated, "migration is recorded");
+        state.BestSkips = 2;
+        assert_false(StorySave.MigrateRecords(state, records), "a second migration does nothing");
+        assert_eq(state.BestSkips, 2, "a migrated story is not overwritten by the old file");
+        assert_true(File.Exists(ProjectSettings.GlobalizePath(records)), "the old record file is left in place");
+        var none = new StoryState();
+        assert_false(StorySave.MigrateRecords(none, slot.Directory + "/missing.cfg"), "no old file, nothing to migrate");
+        assert_true(none.RecordsMigrated && none.BestSkips == 0, "a missing record still counts as migrated");
+        Remove(slot);
+    }
+
+    /// Plays the finished story's events in order, as a bot would.
+    private static (StoryState state, List<string> lines) PlayThrough(bool keepFire)
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        var lines = new List<string>();
+        var variants = new Dictionary<string, string>();
+        s.LineTriggered += (id, _, variant) => { lines.Add(id); if (variant.Length > 0) lines.Add(id + ":" + variant); };
+        void Step(string ev) => s.Raise(ev);
+        bool End(string act) => s.Advance(act) != null;
+
+        Step(StoryEvents.PlaceTrailhead);
+        Step(StoryEvents.LetterRead);
+        for (int i = 0; i < 3; i++) Step(StoryEvents.LogCarried);
+        Step("stone_skips:0");
+        Step(StoryEvents.StoneSunk);
+        Step(StoryEvents.PlacePierEnd);
+        Step("stone_skips:3");
+        End(StoryEvents.SatPier);
+        Step(StoryEvents.FireLit);
+        Step(StoryEvents.LanternLit);
+        Step(StoryEvents.TentEntered);
+        End(StoryEvents.TurnedIn);
+
+        Step(StoryEvents.TinOpened);
+        Step(StoryEvents.PlaceOldRing);
+        Step(StoryEvents.BlazeFound);
+        End(StoryEvents.RestFire);
+        Step(StoryEvents.SatLookout);
+        Step(StoryEvents.StepLifted);
+        End(StoryEvents.StepLifted);
+
+        // The storm: the rain comes, the fire is fed twice, the player shelters.
+        double fire = 1.0;
+        for (int i = 0; i < 80; i++)
+        {
+            if (!keepFire && i == 60) fire = 0.0;
+            s.StormTick(1.0, fire, inTent: i >= 75);
+        }
+        Step(StoryEvents.FireFedInRain);
+        Step(StoryEvents.FireFedInRain);
+        for (int i = 0; i < (int)StoryScript.ShelterSeconds + 1; i++) s.StormTick(1.0, fire, inTent: true);
+        End(StoryEvents.TurnedIn);
+
+        Step(StoryEvents.TentStruck);
+        Step(StoryEvents.StonesScattered);
+        Step(StoryEvents.AshRaked);
+        End(StoryEvents.WalkedOut);
+        Step(StoryEvents.CreditsFinished);
+        return (s, lines);
+    }
+
+    public void test_bot_plays_every_chapter_to_the_epilogue_end()
+    {
+        (StoryState s, List<string> lines) = PlayThrough(keepFire: true);
+        assert_true(s.Finished, "the epilogue ends with the walk out");
+        assert_eq(s.Chapter.Id, StoryScript.Epilogue, "the story ends in the epilogue");
+        foreach ((Chapter chapter, Band band) in StoryScript.AllBands())
+            foreach (Objective objective in band.Objectives)
+                assert_true(s.ProgressOf(chapter, band, objective) >= objective.Count, $"{StoryState.Key(chapter, band, objective)} done");
+        foreach (LineTrigger line in StoryScript.Lines)
+            assert_eq(lines.Count(l => l == line.Id), 1, $"{line.Id} plays exactly once");
+        assert_eq(string.Join(" ", lines.Where(l => !l.Contains(':'))),
+            "m1 e1 m2 m3 m4 e2 e3 m5 m6 m7 e4 e5 e6 m8 m9 e7", "June's lines come in story order");
+        assert_true(lines.Contains("e7:survived"), "the postcard records the storm outcome");
+        assert_eq(s.Items.Count, 0, "the pure state adds items only through the session's hooks");
+    }
+
+    public void test_margin_notes_fall_silent_from_the_tin_to_the_lookout()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        var lines = new List<string>();
+        s.LineTriggered += (id, _, _) => lines.Add(id);
+        s.Raise(StoryEvents.TinOpened);
+        s.Raise(StoryEvents.TentEntered);
+        s.Raise(StoryEvents.LanternLit);
+        assert_eq(string.Join(" ", lines), "m7", "only the tin's own note plays while the tin is open");
+        s.Raise(StoryEvents.SatLookout);
+        s.Raise(StoryEvents.TentEntered);
+        assert_eq(string.Join(" ", lines), "m7 e5 m6", "notes come back after the lookout, once each");
+        s.Raise(StoryEvents.AshRaked);
+        s.Raise(StoryEvents.LanternLit);
+        assert_false(lines.Contains("m5"), "nothing follows June's last note until the postcard");
+        s.Raise(StoryEvents.CreditsFinished);
+        assert_eq(lines.Last(), "e7", "the postcard still plays");
+    }
+
+    public void test_band_clock_holds_until_its_objectives_are_done()
+    {
+        var s = new StoryState { RequireUnbuilt = true };
+        Band evening = s.Band;
+        assert_near(s.AllowedClock(evening.Start + 0.1), evening.Start + 0.1, 1e-9, "the clock runs inside the band");
+        assert_near(s.AllowedClock(23.0), evening.Hold, 1e-9, "the clock stops at the band's end");
+        assert_true(s.Advance(StoryEvents.RestBedroll) == null, "the band cannot end before its objectives");
+        s.Raise(StoryEvents.LetterRead);
+        s.Raise(StoryEvents.LogCarried);
+        s.Raise(StoryEvents.LogCarried);
+        s.Raise("stone_skips:2");
+        assert_false(s.BandDone, "two logs and two skips are not enough");
+        assert_true(s.Advance(StoryEvents.SatPier) == null, "still held");
+        assert_near(s.AllowedClock(23.0), evening.Hold, 1e-9, "still holding");
+        s.Raise(StoryEvents.LogCarried);
+        s.Raise("stone_skips:5");
+        assert_true(s.BandDone, "the objectives are done");
+        assert_near(s.AllowedClock(23.0), evening.Limit, 1e-9, "the clock may carry on to the sunset");
+        assert_true(s.Advance(StoryEvents.TurnedIn) == null, "an act that does not end this band does nothing");
+        BandTransition? t = s.Advance(StoryEvents.SatPier);
+        assert_true(t != null && t.ToBand!.Id == "night" && t.Act.Sunset && !t.Act.Fade, "sitting on the pier plays the sunset into the night");
+        assert_eq(s.ProgressOf(s.Band.Objectives[0]), 0, "an event from the evening does not complete the night");
+    }
+
+    public void test_unbuilt_places_do_not_hold_the_game()
+    {
+        var s = new StoryState();
+        assert_eq(string.Join(",", s.Required(s.Band).Select(o => o.Id)), "logs,skips", "the letter waits for its table");
+        assert_true(s.EndActFor(StoryEvents.SatPier) == null && s.EndActFor(StoryEvents.RestBedroll) != null, "rest ends the evening until the pier seat exists");
+        foreach ((Chapter chapter, Band band) in StoryScript.AllBands())
+        {
+            if (chapter.Id == StoryScript.Epilogue) continue;
+            assert_true(band.EndActs.Any(a => StoryEvents.IsBuilt(a.Event)), $"{chapter.Id}/{band.Id} can end in today's world");
+        }
+    }
+
+    public void test_storm_outcomes()
+    {
+        (StoryState kept, List<string> keptLines) = PlayThrough(keepFire: true);
+        (StoryState lost, List<string> lostLines) = PlayThrough(keepFire: false);
+        assert_eq(kept.StormOutcome, "survived", "a fire kept alive survives the storm");
+        assert_eq(lost.StormOutcome, "went_out", "a fire that dies in the rain is out");
+        assert_true(keptLines.Contains("e7:survived") && lostLines.Contains("e7:went_out"), "the postcard line follows the outcome");
+        assert_true(kept.Finished && lost.Finished, "neither outcome stops the story");
+
+        var s = new StoryState { RequireUnbuilt = true };
+        s.SetPosition(StoryScript.ChapterIndex(StoryScript.Marks), 2);
+        assert_true(s.Band.Storm, "the storm band");
+        var phases = new List<string>();
+        for (int i = 0; i < 120; i++)
+        {
+            WeatherPhase p = s.StormTick(1.0, 1.0, inTent: false);
+            if (phases.Count == 0 || phases[^1] != p.Chapter) phases.Add(p.Chapter);
+        }
+        assert_eq(string.Join(" ", phases), "gathering storm shelter_rain", "the band drives the storm and the rain holds");
+        assert_false(s.Sheltered, "the storm does not pass on its own");
+        for (int i = 0; i < 10; i++) s.StormTick(1.0, 1.0, inTent: true);
+        s.StormTick(1.0, 1.0, inTent: false);
+        assert_false(s.Sheltered, "leaving the tent starts the shelter over");
+        for (int i = 0; i <= (int)StoryScript.ShelterSeconds; i++) s.StormTick(1.0, 1.0, inTent: true);
+        assert_true(s.Sheltered, "sheltering in the tent lets it pass");
+        assert_eq(s.StormTick(1.0, 1.0, inTent: true).Chapter, "clearing", "then the sky clears");
+    }
+}
