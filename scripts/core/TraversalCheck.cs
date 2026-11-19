@@ -23,6 +23,7 @@ namespace LastCamp;
 /// falling through the ground, getting stuck or timing out.
 ///   godot --path . --fullscreen -- --skip-intro --quality=high --traverse="$PWD/local-data/traversal/run-1"
 ///   godot --headless --path . -- --skip-intro --traverse=/tmp/x    (physics only)
+/// Add --traverse-places to walk the micro cut's places as well (see _walk_places).
 /// Straight legs between authored points; the route walks around the fire
 /// ring and along the dock's centreline (start (-15.9, 6.3) towards the pond).
 public partial class TraversalCheck : Node
@@ -69,6 +70,10 @@ public partial class TraversalCheck : Node
         _check("the walking route needed no fall recovery", _player.RecoveryCount == 0);
         await _check_woodland_collision();
         await _check_world_safety();
+        if (Game.Instance.has_flag("traverse-places"))
+        {
+            await _walk_places();
+        }
         int expectedRecoveries = _player.RecoveryCount;
         await _interactions();
         _check("interactions needed no fall recovery", _player.RecoveryCount == expectedRecoveries);
@@ -224,6 +229,97 @@ public partial class TraversalCheck : Node
         await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
         _check("an injected fall-through recovers the last supported position", _player.RecoveryCount == recoveries + 1 &&
             _player.IsOnFloor() && _player.GlobalPosition.DistanceTo(before) < 0.25);
+    }
+
+    /// Opt-in (--traverse-places): the micro cut's walk through its places, on
+    /// the real controller. June's footpath to the old ring, Tom's route by his
+    /// blazes, up the twenty steps onto the loose one, June's painted path down to
+    /// the trail, out to the trailhead post and back up the trail to the fire.
+    private async Task _walk_places()
+    {
+        Places places = Game.Instance.camp.places;
+        if (places == null)
+        {
+            _check("the places are built", false);
+            return;
+        }
+        var arrived = new HashSet<string>();
+        var seen = new HashSet<int>();
+        int sat = 0;
+        Action<string> on_arrive = id => arrived.Add(id);
+        Action<int> on_blaze = i => seen.Add(i);
+        Action on_sit = () => sat++;
+        places.Arrived += on_arrive;
+        places.BlazeInView += on_blaze;
+        places.BenchSat += on_sit;
+        int recoveries = _player.RecoveryCount;
+        TerrainField field = Game.Instance.camp.field;
+
+        // Round the fire and its seats to where the footpath leaves the trail.
+        bool june = await _follow("to_footpath", new[] { new Vector2(-3.6f, 3.6f), TerrainField.TRAIL[6] });
+        june &= await _follow("june_path", PlacesLayout.JUNE_FOOTPATH);
+        await _screenshot("place_old_ring");
+        _check("June's footpath reaches the old ring", june && arrived.Contains(Places.OLD_RING));
+
+        Vector2[] route = PlacesLayout.TOMS_ROUTE;
+        bool tom = await _follow("toms_route", route[..^1]);
+        tom &= await _go_to("steps_foot", route[^1]);
+        _record("steps_foot", tom);
+        await _screenshot("place_steps_foot");
+        _check("Tom's route reaches the foot of his steps", tom);
+        _check($"Tom's blazes come into view along his route ({seen.Count} of {places.blazes.Count})", seen.Count * 2 >= places.blazes.Count);
+
+        bool climbed = await _follow("steps", PlacesLayout.STEP_LINE[1..]);
+        await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
+        double summit = field.height(PlacesLayout.TOMS_ROCK.X, PlacesLayout.TOMS_ROCK.Y);
+        _check($"the twenty steps climb to the summit (feet {_player.GlobalPosition.Y:F2}, summit {summit:F2})", climbed && _player.IsOnFloor() && _player.GlobalPosition.Y > summit + 0.04);
+        _check("arriving at Tom's Rock is reported", arrived.Contains(Places.TOMS_ROCK));
+        _check("the loose-step hook reports the player standing on it", places.IsPlayerOnLooseStep());
+        Vector3 view = new Vector3(PlacesLayout.FACE.X, 0, PlacesLayout.FACE.Y);
+        _player.yaw = Math.Atan2(-view.X, -view.Z);
+        _player.pitch = -0.12;
+        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+        await _screenshot("place_toms_rock_view");
+        places.SitOnBench();
+        _check("the bench hook reports sitting", sat == 1);
+
+        bool down = await _go_to("bench_side", PlacesLayout.local(0.35, -1.35));
+        down &= await _follow("painted_path", PlacesLayout.PAINTED_PATH);
+        _check("June's painted path leads down to the trail", down);
+        Godot.Collections.Array<Vector2> trail = TerrainField.TRAIL;
+        bool out_walk = await _go_to("trail_south", trail[1]);
+        out_walk &= await _go_to("trailhead", new Vector2(3.9f, 67.6f));
+        await _screenshot("place_trailhead");
+        _check("the trail leads out to the trailhead post", out_walk && arrived.Contains(Places.TRAILHEAD));
+        bool back = await _follow("trail_back", new[] { trail[1], trail[2], trail[3], trail[4], new Vector2(2.4f, 3.2f) });
+        _check("the trail leads back to the fire", back);
+        _check("the places walk needed no fall recovery", _player.RecoveryCount == recoveries);
+        places.Arrived -= on_arrive;
+        places.BlazeInView -= on_blaze;
+        places.BenchSat -= on_sit;
+    }
+
+    private async Task<bool> _follow(string label, IEnumerable<Vector2> points)
+    {
+        bool ok = true;
+        int i = 0;
+        foreach (Vector2 p in points)
+        {
+            string name = $"{label}_{i++}";
+            bool reached = await _go_to(name, p);
+            _record(name, reached);
+            ok &= reached;
+            if (!reached) break;
+        }
+        return ok;
+    }
+
+    private void _record(string name, bool reached)
+    {
+        Godot.Collections.Dictionary snap = _snapshot(name);
+        snap["reached"] = reached;
+        G.Call(_report["waypoints"], "append", snap);
+        G.print(G.format("TRAVERSAL waypoint=%s reached=%s pos=(%.2f %.2f %.2f) ground=%.2f floor=%s water=%.2f t=%.1f", new Godot.Collections.Array { name, reached, snap["x"], snap["y"], snap["z"], snap["ground"], snap["on_floor"], snap["water_depth"], snap["seconds"] }));
     }
 
     public async Task _interactions()
