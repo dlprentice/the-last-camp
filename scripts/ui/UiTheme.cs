@@ -150,8 +150,8 @@ public static class UiTheme
     {
         Texture = ImageTexture.CreateFromImage(PaperImage(256, 256, 1974)),
         TextureMarginLeft = 40, TextureMarginRight = 40, TextureMarginTop = 40, TextureMarginBottom = 40,
-        AxisStretchHorizontal = StyleBoxTexture.AxisStretchMode.TileFit,
-        AxisStretchVertical = StyleBoxTexture.AxisStretchMode.TileFit,
+        AxisStretchHorizontal = StyleBoxTexture.AxisStretchMode.Stretch,
+        AxisStretchVertical = StyleBoxTexture.AxisStretchMode.Stretch,
         ContentMarginLeft = 44, ContentMarginRight = 44, ContentMarginTop = 36, ContentMarginBottom = 36,
     };
 

@@ -145,7 +145,7 @@ public partial class UiShots : Node
     }
 
     private async Task Wait(double seconds) =>
-        await ToSignal(GetTree().CreateTimer(seconds, true, false, true), SceneTreeTimer.SignalName.Timeout);
+        await ToSignal(GetTree().CreateTimer(seconds, true, false, false), SceneTreeTimer.SignalName.Timeout);
 
     private async Task Shot(string name)
     {

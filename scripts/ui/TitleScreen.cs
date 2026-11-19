@@ -21,6 +21,7 @@ public partial class TitleScreen : Control
     private SettingsPanel _settings = null!;
     private CreditsRoll? _credits;
     private Control _titleBlock = null!;
+    private Control _statusGap = null!;
     private Camera3D? _camera;
     private Spline? _path, _look;
     private double _viewTime;
@@ -98,12 +99,13 @@ public partial class TitleScreen : Control
         no.Pressed += () => ShowMain(_newGame);
         _confirm.AddChild(no);
 
-        stack.AddChild(new Control { CustomMinimumSize = new Vector2(0, 14), MouseFilter = MouseFilterEnum.Ignore });
+        _statusGap = new Control { CustomMinimumSize = new Vector2(0, 14), MouseFilter = MouseFilterEnum.Ignore };
+        stack.AddChild(_statusGap);
         stack.AddChild(Status);
 
         _settings = new SettingsPanel { Visible = false };
         _settings.SetAnchorsPreset(LayoutPreset.TopLeft);
-        _settings.Position = new Vector2(128, 200);
+        _settings.Position = new Vector2(128, 110);
         _settings.Closed += () => ShowMain(_settingsButton);
         AddChild(_settings);
 
@@ -125,6 +127,7 @@ public partial class TitleScreen : Control
     {
         Status.Text = "";
         Status.Visible = false;
+        _statusGap.Visible = false;
         SetPlayable(true);
         Control focus = GetViewport()?.GuiGetFocusOwner()!;
         if (focus == null || focus is BaseButton { Disabled: true }) (_continue ?? _newGame).FocusQuietly();
@@ -159,6 +162,7 @@ public partial class TitleScreen : Control
             GD.PushWarning(_slot.LastError);
             Status.Text = "The new story could not be saved; your old one is kept.";
             Status.Visible = true;
+            _statusGap.Visible = true;
             ShowMain(_newGame);
             return;
         }
@@ -177,6 +181,7 @@ public partial class TitleScreen : Control
     public void OpenSettings()
     {
         _panel.Visible = false;
+        _titleBlock.Visible = false;
         _settings.Open();
     }
 
@@ -206,7 +211,7 @@ public partial class TitleScreen : Control
         if (world != null)
         {
             world.cycle_running = false;
-            world.hour = 19.45;
+            world.hour = 19.95;
         }
         _path = new Spline(IntroDolly.PATH);
         _look = new Spline(IntroDolly.LOOK);
