@@ -78,7 +78,7 @@ public partial class Tent : Node3D
     public const double TIN_LID = 0.018;
     public const double TIN_OPEN_DEG = 104.0;
     /// On the floor to the right of the bedroll, a step inside the door.
-    public static readonly Vector3 TIN_AT = new(0.34f, 0.004f, -0.42f);
+    public static readonly Vector3 TIN_AT = new(0.30f, 0.004f, -0.45f);
     public const double TIN_YAW = 0.42;
 
     public Node3D tackle_tin;
@@ -543,7 +543,8 @@ public partial class Tent : Node3D
             shape.Shape = box;
             shape.Position = new Vector3((float)(side * WIDTH * 0.25), (float)(HEIGHT * 0.5), 0.0f);
             Vector3 _t1 = shape.Rotation;
-            _t1.Z = (float)(-side * atan2(slope.X, slope.Y));
+            // Each wall leans in from its ground line to the ridge, like the canvas.
+            _t1.Z = (float)(side * atan2(slope.X, slope.Y));
             shape.Rotation = _t1;
             body.AddChild(shape);
         }

@@ -486,7 +486,8 @@ public partial class TraversalCheck : Node
             _check("closing the journal resumes play", !GetTree().Paused && Game.Instance.mode == Game.Mode.PLAY);
 
             // The pier end: sitting there runs the sunset into the night.
-            await _follow("to_pier", new[] { new Vector2(6.4f, 1.3f), new Vector2(3.8f, 3.8f), new Vector2(-3.6f, 3.6f), new Vector2(-9, 2), new Vector2(-14.2f, 6.6f), new Vector2(-16, 6.3f), new Vector2(-23.1f, 5.4f) });
+            // Onto the pier from the shore path, not the bank (its deck end is a step up from there).
+            await _follow("to_pier", new[] { new Vector2(6.4f, 1.3f), new Vector2(3.8f, 3.8f), new Vector2(-3.6f, 3.6f), new Vector2(-9, 2), new Vector2(-16, 6.3f), new Vector2(-23.1f, 5.4f) });
             Interactable pier = evening.PierSeat;
             await _aim_and_interact(pier.GlobalPosition, pier);
             await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
@@ -622,6 +623,7 @@ public partial class TraversalCheck : Node
         await _wait_for(() => story.Facts.Contains(LastCamp.Story.StoryEvents.TentStruck), Tent.PEG_SECONDS + Tent.FALL_SECONDS + Tent.PACK_SECONDS + 3);
         _check("striking the tent brings it down and packs it away", story.Facts.Contains(LastCamp.Story.StoryEvents.TentStruck) && !tent.Visible);
         await _screenshot("story_tent_struck");
+        await _go_to("story_round_woodpile", new Vector2(3.6f, -2.8f));
         await _go_to("story_to_fire", new Vector2(4.6f, -0.05f));
         await _go_to("story_fire_side", new Vector2(1.7f, 1.8f));
         await _aim_and_interact(fire.GlobalPosition + Vector3.Up * 0.3f, fire.body);
@@ -643,7 +645,7 @@ public partial class TraversalCheck : Node
         await _screenshot("story_stones_scattered");
         _check("the last morning is done", session.BandDone);
         Vector2 out_at = CampSession.WalkOutPoint;
-        bool walked = await _follow("story_walk_out", new[] { new Vector2(2.4f, 3.2f), trail[4], trail[3], trail[2], trail[1], new Vector2(3.9f, 67.6f), out_at });
+        bool walked = await _follow("story_walk_out", new[] { new Vector2(3.4f, 0.9f), new Vector2(3.8f, 3.8f), trail[4], trail[3], trail[2], trail[1], new Vector2(3.9f, 67.6f), out_at });
         await _wait_for(() => story.Finished, 3);
         _check("walking out past the trailhead post raises walked_out", walked && story.Finished && story.Facts.Contains(LastCamp.Story.StoryEvents.WalkedOut));
         await _wait_for(() => story.Facts.Contains(LastCamp.Story.StoryEvents.CreditsFinished), CampSession.EndingFallbackSeconds + 60);
@@ -667,7 +669,7 @@ public partial class TraversalCheck : Node
         OldFireRing ring = Game.Instance.camp.places.ring;
         Vector3 face = new Vector3(ring.notch_face.X, 0, ring.notch_face.Z).Normalized();
         Vector3 stand = ring.notch_world + face * 1.0f;
-        await _go_to("notch_side", new Vector2(stand.X, stand.Z));
+        await _approach(new Vector2(stand.X, stand.Z), new Vector2(ring.notch_world.X, ring.notch_world.Z), 1.25f);
         await _aim(ring.notch_world);
         await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
         G.print(G.format("TRAVERSAL notch distance=%.2f", _player.camera.GlobalPosition.DistanceTo(ring.notch_world)));
@@ -712,6 +714,27 @@ public partial class TraversalCheck : Node
             await ToSignal(GetTree().CreateTimer(5), SceneTreeTimer.SignalName.Timeout);
             G.print(G.format("TRAVERSAL rethrow pitch=%.3f skips=%d", new Godot.Collections.Array { pitches[i], (long)Game.Instance.camp.pond.last_skips }));
         }
+    }
+
+    /// Walks towards `target` until within `within` of `near` (horizontally), or
+    /// until it stops getting closer: for standing close to something on the ground.
+    private async Task _approach(Vector2 target, Vector2 near, float within)
+    {
+        double elapsed = 0, since = 0, best = double.PositiveInfinity;
+        while (elapsed < WAYPOINT_TIMEOUT && since < 2.0)
+        {
+            Vector2 pos = new(_player.GlobalPosition.X, _player.GlobalPosition.Z);
+            double d = pos.DistanceTo(near);
+            if (d < within || pos.DistanceTo(target) < ARRIVE) break;
+            Vector2 to = target - pos;
+            _player.yaw = Math.Atan2(-to.X, -to.Y);
+            Input.ActionPress("move_forward");
+            if (d < best - 0.05) { best = d; since = 0; } else since += GetPhysicsProcessDeltaTime();
+            elapsed += GetPhysicsProcessDeltaTime();
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        _release();
+        _record("notch_side", true);
     }
 
     private async Task _wait_for(Func<bool> done, double seconds)
