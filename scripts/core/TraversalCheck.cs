@@ -325,7 +325,17 @@ public partial class TraversalCheck : Node
         await _screenshot("after_quality_change");
         if (Game.Instance.session is CampSession evening)
         {
-            _check("camp journal recognises completed evening activities", evening.ReadyForNight);
+            // The route carries one log and throws one stone; the story counts
+            // both, and the rest of the evening's objectives go in through the
+            // same story events so the rest and sleep below can be checked.
+            var story = evening.Story;
+            _check("story counts the carried log and the throw", story.Facts.Contains(LastCamp.Story.StoryEvents.LogCarried) &&
+                story.Facts.Contains(LastCamp.Story.StoryEvents.StoneSkips));
+            evening.ReadLetter();
+            evening.TendFire();
+            evening.TendFire();
+            evening.RecordSkips(3);
+            _check("camp journal recognises completed evening activities", evening.BandDone);
             _player.GetViewport().PushInput(new InputEventAction { Action = "camp_journal", Pressed = true });
             await ToSignal(GetTree().CreateTimer(0.2, true), SceneTreeTimer.SignalName.Timeout);
             _check("journal input opens a paused readable journal", Game.Instance.hud.JournalVisible && GetTree().Paused);
@@ -348,9 +358,12 @@ public partial class TraversalCheck : Node
             await _aim_and_interact(bed.GlobalPosition, bed);
             await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
             _check("resting at the tent advances to dusk and restores control", !evening.Resting && _player.enabled && Game.Instance.world.hour > 20);
+            evening.TendFire();
+            if (!_player.lantern_on) _player.toggle_lantern();
+            _check("lighting the fire and the lantern completes the night", evening.BandDone);
             await _aim_and_interact(bed.GlobalPosition, bed);
             await ToSignal(GetTree().CreateTimer(3.0), SceneTreeTimer.SignalName.Timeout);
-            _check("sleeping completes the evening and returns to playable dawn", evening.MorningReached && evening.Completed == 4 && _player.enabled && Game.Instance.world.hour < 7);
+            _check("sleeping completes the evening and returns to playable dawn", evening.Story.Chapter.Id == LastCamp.Story.StoryScript.Marks && _player.enabled && Game.Instance.world.hour < 7);
             await _screenshot("morning_completed");
         }
     }

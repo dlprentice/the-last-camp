@@ -117,6 +117,7 @@ public partial class Firepit : Node3D
         {
             player.resting = !player.resting;
             Game.Instance.hud?.notify(player.resting ? "Resting by the fire. Move to stand." : "Back on your feet.");
+            Game.Instance.session?.RestByFire(player);
         }
     }
 
