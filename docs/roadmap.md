@@ -21,7 +21,9 @@ Work paused when the machine was given to other games; it resumes here.
 - **On branches (pushed, unfinished):**
   - `work/look`: camp ground, night, tent, daytime fire light and canopy. The reviewed
     part is merged; a fourth round (wet ground, firelight reach, path detail, tent hem
-    and interior, day shadows) is coded but not reviewed or looked at.
+    and interior, day shadows) is coded but not reviewed or looked at. Its tip fails one
+    meadow test (grass inside the walking ribbon, from the ragged path edge). Unseen risk: the
+    pond reflection has no TAA, so distant leaf dither may flicker in the water.
   - `work/places-look`: a site search for moving Tom's Rock so the seated view shows the
     whole pond. The rock has not moved; the best site found fills too little of the
     frame, and the probe test fails.
