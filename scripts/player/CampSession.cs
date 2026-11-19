@@ -524,14 +524,14 @@ public partial class CampSession : Node
         return moved > 0;
     }
 
-    /// Where the walk out counts: a few metres past the trailhead post, away from camp.
+    /// Where the walk out counts: on the trail itself, just past the trailhead post
+    /// (which stands beside the trail), away from camp.
     public static Vector2 WalkOutPoint
     {
         get
         {
-            Vector2 post = PlacesLayout.TRAILHEAD_POST;
             Vector2 away = (TerrainField.TRAIL[0] - TerrainField.TRAIL[1]).Normalized();
-            return post + away * 4.0f;
+            return TerrainField.TRAIL[0] + away * 1.5f;
         }
     }
     public const float WalkOutRadius = 2.5f;

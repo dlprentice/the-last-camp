@@ -645,7 +645,10 @@ public partial class TraversalCheck : Node
         await _screenshot("story_stones_scattered");
         _check("the last morning is done", session.BandDone);
         Vector2 out_at = CampSession.WalkOutPoint;
-        bool walked = await _follow("story_walk_out", new[] { new Vector2(3.4f, 0.9f), new Vector2(3.8f, 3.8f), trail[4], trail[3], trail[2], trail[1], new Vector2(3.9f, 67.6f), out_at });
+        bool walked = await _follow("story_walk_out", new[] { new Vector2(3.4f, 0.9f), new Vector2(3.8f, 3.8f), trail[4], trail[3], trail[2], trail[1], new Vector2(3.9f, 67.6f) });
+        // On past the post until the walk out counts: the ending then takes the
+        // player over (it suspends the controller), so this leg stops there.
+        walked &= await _walk_until(out_at, () => story.Finished, 20);
         await _wait_for(() => story.Finished, 3);
         _check("walking out past the trailhead post raises walked_out", walked && story.Finished && story.Facts.Contains(LastCamp.Story.StoryEvents.WalkedOut));
         // The HUD's credits roll; a player may let it run or skip it with Enter.
@@ -727,6 +730,24 @@ public partial class TraversalCheck : Node
 
     /// Walks towards `target` until within `within` of `near` (horizontally), or
     /// until it stops getting closer: for standing close to something on the ground.
+    /// Steers at `target` with the forward key until `done` holds (true), or the
+    /// time runs out (false).
+    private async Task<bool> _walk_until(Vector2 target, Func<bool> done, double seconds)
+    {
+        double elapsed = 0;
+        while (!done() && elapsed < seconds)
+        {
+            Vector2 to = target - new Vector2(_player.GlobalPosition.X, _player.GlobalPosition.Z);
+            if (to.Length() > 0.3f) _player.yaw = Math.Atan2(-to.X, -to.Y);
+            Input.ActionPress("move_forward");
+            elapsed += GetPhysicsProcessDeltaTime();
+            await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+        }
+        _release();
+        _record("story_walk_out_post", done());
+        return done();
+    }
+
     private async Task _approach(Vector2 target, Vector2 near, float within)
     {
         double elapsed = 0, since = 0, best = double.PositiveInfinity;
