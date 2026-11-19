@@ -18,7 +18,6 @@ public static class ScriptPins
 {
     public static readonly Type[] Types =
     {
-        typeof(AudioDirector.FootstepSet),
         typeof(AudioDirector.SmoothedValue),
         typeof(GdBox),
         typeof(GrassPlanter.Chunk),

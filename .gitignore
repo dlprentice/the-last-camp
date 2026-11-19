@@ -34,3 +34,4 @@ renders/
 !/audio/generated/
 !/audio/generated/*.json
 !/audio/generated/README.md
+/.claude/worktrees/
