@@ -292,15 +292,19 @@ public static class PlacesLayout
     /// How far the knob lifts the ground at `p`: a rounded top, a convex shoulder
     /// and a foot that runs out into the slope, steeper on the side that looks
     /// over the pond, its outline lobed so it is no cone.
-    public static double rock_rise(Vector2 p)
+    public static double rock_rise(Vector2 p) => rock_rise_at(p, TOMS_ROCK, FACE, bearing(SPUR_BEARING_DEG));
+
+    /// The knob's shape for a summit at `site` looking along `face`, its spur
+    /// running out along `spur_dir` (the probe judges candidate sites with it).
+    public static double rock_rise_at(Vector2 p, Vector2 site, Vector2 face, Vector2 spur_dir)
     {
-        Vector2 d = p - TOMS_ROCK;
+        Vector2 d = p - site;
         double dist = d.Length();
         if (dist <= ROCK_TOP_RADIUS) return ROCK_RISE;
         double a = Math.Atan2(d.Y, d.X);
         Vector2 dir = d / (float)dist;
-        double facing = Math.Max(0.0, FACE.Dot(dir));
-        double spur = Math.Max(0.0, bearing(SPUR_BEARING_DEG).Dot(dir));
+        double facing = Math.Max(0.0, face.Dot(dir));
+        double spur = Math.Max(0.0, spur_dir.Dot(dir));
         facing *= facing;
         spur *= spur * spur;
         double foot = ROCK_BASE_RADIUS * (1.0 - FRONT_STEEPEN * facing * facing) * (1.0 + SPUR_LENGTHEN * spur)
