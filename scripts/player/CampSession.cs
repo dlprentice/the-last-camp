@@ -133,7 +133,11 @@ public partial class CampSession : Node
         Player player = Game.Instance.player;
         Firepit fire = Game.Instance.camp.campsite.firepit;
         bool inTent = player != null && CampWeather.tent_shelter(Game.Instance.camp.campsite.tent.ToLocal(player.GlobalPosition + Vector3.Up * 0.5f));
-        if (inTent && !_inTent) Story.Raise(StoryEvents.TentEntered);
+        if (inTent && !_inTent)
+        {
+            Game.Instance.audio?.play_interact(Sounds.TentEnter);
+            Story.Raise(StoryEvents.TentEntered);
+        }
         _inTent = inTent;
         if (player != null)
         {
@@ -189,7 +193,12 @@ public partial class CampSession : Node
         if (Story.Band.Storm && Game.Instance.world.weather.rain > 0.3) Story.Raise(StoryEvents.FireFedInRain);
     }
 
-    public void LightFire() => Story.Raise(StoryEvents.FireLit);
+    public void LightFire()
+    {
+        // The match is struck once; later logs that night only feed the fire.
+        if (!Story.Facts.Contains(StoryEvents.FireLit)) Sound(Sounds.FireLight);
+        Story.Raise(StoryEvents.FireLit);
+    }
 
     public void UseLantern() => Story.Raise(StoryEvents.LanternLit);
 
@@ -215,26 +224,39 @@ public partial class CampSession : Node
     // ---- Hooks for places and props that are not built yet ----------------------
     // Each raises its event; nothing in the world calls them until the thing exists.
 
-    public void ReadLetter() { Story.AddItem("june_letter"); Story.Raise(StoryEvents.LetterRead); }
+    public void ReadLetter() { Sound(Sounds.LetterUnfold); Story.AddItem("june_letter"); Story.Raise(StoryEvents.LetterRead); }
     public void ReachPlace(string place) => Story.Raise("place:" + place);
     public void ReachTrailhead() => ReachPlace("trailhead");
     public void SitAtPierEnd(Player player) => _ = Sit(StoryEvents.SatPier, player);
     /// Whether Tom's tin can be opened yet: only after the old fire ring. The tin's
     /// interaction should offer itself only while this is true.
     public bool TinAvailable => Story.TinAvailable;
+    /// The tin's lid, then a page of Tom's tally book.
     public bool OpenTin()
     {
         if (!Story.TinAvailable) return false;
+        Sound(Sounds.TinOpen);
+        SoundLater(Sounds.PageTurn, 1.4);
         Story.AddItem("tally_book");
         Story.Raise(StoryEvents.TinOpened);
         return true;
     }
     public void FindBlaze() => Story.Raise(StoryEvents.BlazeFound);
     public void SitAtLookout(Player player) => _ = Sit(StoryEvents.SatLookout, player);
-    public void LiftStep(Player player) { Story.AddItem("tom_letter"); Story.Raise(StoryEvents.StepLifted); _ = EndBand(StoryEvents.StepLifted, player); }
-    public void StrikeTent() => Story.Raise(StoryEvents.TentStruck);
-    public void RakeAsh() => Story.Raise(StoryEvents.AshRaked);
-    public void ScatterStones() => Story.Raise(StoryEvents.StonesScattered);
+    /// The stone set aside, then the small tin pulled from the soil under it.
+    public void LiftStep(Player player) { Sound(Sounds.StepLift); SoundLater(Sounds.TinLift, 1.8); Story.AddItem("tom_letter"); Story.Raise(StoryEvents.StepLifted); _ = EndBand(StoryEvents.StepLifted, player); }
+    /// The pegs come out, then the canvas falls.
+    public void StrikeTent() { Sound(Sounds.TentPeg); SoundLater(Sounds.TentFall, 1.2); Story.Raise(StoryEvents.TentStruck); }
+    public void RakeAsh() { Sound(Sounds.AshRake); Story.Raise(StoryEvents.AshRaked); }
+    public void ScatterStones() { Sound(Sounds.RingStone); Story.Raise(StoryEvents.StonesScattered); }
+
+    private static void Sound(string id) => Game.Instance.audio?.play_interact(id);
+
+    private void SoundLater(string id, double seconds)
+    {
+        if (!IsInsideTree()) return;
+        GetTree().CreateTimer(seconds).Timeout += () => Sound(id);
+    }
     public void WalkOut(Player player) => _ = EndBand(StoryEvents.WalkedOut, player);
     public void FinishCredits() => Story.Raise(StoryEvents.CreditsFinished);
 
@@ -242,6 +264,7 @@ public partial class CampSession : Node
     /// where the band ends by it.
     private async Task Sit(string ev, Player player)
     {
+        Sound(Sounds.SitDown);
         Story.Raise(ev);
         if (ev == StoryEvents.SatLookout) await RunSunset(Story.Band.Limit);
         if (Story.CanEndBy(ev)) await EndBand(ev, player);
@@ -322,6 +345,7 @@ public partial class CampSession : Node
                 player?.begin();
             }
             Save();
+            if (transition.ChapterChanged) Sound(Sounds.CardIn);
             BandStarted?.Invoke(transition);
             Game.Instance.hud?.notify(transition.Finished ? "The camp is quiet. Stay as long as you like."
                 : transition.ChapterChanged ? $"{transition.ToChapter!.Title}. {transition.ToBand!.Title}." : $"{transition.ToBand!.Title}.");

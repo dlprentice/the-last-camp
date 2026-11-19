@@ -156,6 +156,7 @@ public sealed class StorySave
             ["fire_intensity"] = w.FireIntensity,
             ["items"] = new JsonArray(s.Items.Select(i => (JsonNode)i).ToArray()),
             ["lines_played"] = new JsonArray(s.LinesPlayed.OrderBy(l => l, StringComparer.Ordinal).Select(l => (JsonNode)l).ToArray()),
+            ["lines_heard"] = new JsonArray(s.LinesHeard.OrderBy(l => l, StringComparer.Ordinal).Select(l => (JsonNode)l).ToArray()),
             ["storm"] = new JsonObject
             {
                 ["outcome"] = s.StormOutcome,
@@ -217,6 +218,14 @@ public sealed class StorySave
                 if (!StoryScript.Lines.Any(l => l.Id == id)) { problem = $"unknown line '{id}'"; return null; }
                 s.LinesPlayed.Add(id);
             }
+            // Added after the first saves of this version: absent means nothing heard yet.
+            if (root["lines_heard"] is JsonArray heard)
+                foreach (JsonNode? line in heard)
+                {
+                    string id = line!.GetValue<string>();
+                    if (!StoryScript.Lines.Any(l => l.Id == id)) { problem = $"unknown line '{id}'"; return null; }
+                    s.LinesHeard.Add(id);
+                }
             JsonObject storm = Need(root, "storm").AsObject();
             s.StormOutcome = Need(storm, "outcome").GetValue<string>();
             if (s.StormOutcome is not ("" or "survived" or "went_out")) { problem = $"unknown storm outcome '{s.StormOutcome}'"; return null; }

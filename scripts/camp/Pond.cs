@@ -722,7 +722,7 @@ public partial class Pond : Node3D
             if (contact == StoneFlight.Contact.Skip || contact == StoneFlight.Contact.Sink)
             {
                 ripple(_playerStone.Position, Math.Max(0.15, 0.9 * Math.Pow(0.70, _playerStone.Skips)));
-                Game.Instance.audio?.water_impact(_playerStone.Position, _playerStone.Skips);
+                Game.Instance.audio?.water_impact(_playerStone.Position, _playerStone.Skips, contact == StoneFlight.Contact.Sink);
             }
         }
         _stone.GlobalPosition = _playerStone.Position;

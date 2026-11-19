@@ -256,7 +256,10 @@ public partial class Main : Node3D
         }
         loading.finish();
         if (!Game.Instance.is_tool_run() || Game.Instance.has_flag("session-check"))
+        {
             _sceneRoot.AddChild(new CampSession { Name = "Evening" });
+            _sceneRoot.AddChild(new VoicePlayer { Name = "Voice" });
+        }
         if (!Game.Instance.has_flag("intro") || Game.Instance.has_flag("skip-intro"))
         {
             player.begin();

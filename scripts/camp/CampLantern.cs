@@ -93,10 +93,7 @@ public partial class CampLantern : Node3D
     public void interact(Node _player)
     {
         set_lit(!lit);
-        if (Game.Instance.audio != null && Game.Instance.audio.HasMethod("play_interact"))
-        {
-            Game.Instance.audio.play_interact("lantern_toggle");
-        }
+        Game.Instance.audio?.play_interact(lit ? Sounds.LanternOn : Sounds.LanternOff);
     }
 
     public void set_lit(bool value)

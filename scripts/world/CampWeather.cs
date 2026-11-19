@@ -29,12 +29,8 @@ public partial class CampWeather : Node3D
     public MeshInstance3D _bolt;
     public StandardMaterial3D _bolt_material;
     public RainImpacts _impacts;
-    public AudioStreamPlayer _rain_audio;
-    public Godot.Collections.Array<AudioStreamPlayer> _thunder_voices = new Godot.Collections.Array<AudioStreamPlayer>();
-    public long _thunder_voice = 0;
     public double _rain_gain = 0.0;
     public double _rain_shelter_mix = 0.0;
-    public AudioEffectLowPassFilter _rain_filter;
     public Godot.Collections.Array<Vector2> _thunder_due = new Godot.Collections.Array<Vector2>();
     public double _thunder_clock = 0.0;
     public bool _roofs_ready = false;
@@ -213,10 +209,8 @@ public partial class CampWeather : Node3D
         }
         if (Game.Instance.audio != null && Game.Instance.audio.is_ready())
         {
-            if (_rain_audio == null)
-            {
-                _build_audio();
-            }
+            // The audio director plays the rain beds and the thunder; the weather
+            // only says how much rain there is and whether the listener is sheltered.
             _rain_gain = move_toward(_rain_gain, rain, delta * 0.5);
             bool sheltered = _chapter == "shelter_rain";
             if (camera != null && Game.Instance.camp != null && Game.Instance.camp.campsite != null)
@@ -228,17 +222,12 @@ public partial class CampWeather : Node3D
                 }
             }
             _rain_shelter_mix = move_toward(_rain_shelter_mix, sheltered ? 1.0 : 0.0, delta * 1.4);
-            _rain_audio.VolumeDb = (float)(linear_to_db(maxf(0.0001, _rain_gain)) + lerpf(-8.0, -5.0, _rain_shelter_mix));
-            _rain_filter.CutoffHz = (float)move_toward(_rain_filter.CutoffHz, sheltered ? 2800.0 : 9000.0, delta * 9000.0);
+            Game.Instance.audio.set_weather(_rain_gain, _rain_shelter_mix);
             for (long i = (long)_thunder_due.Count - 1; i > -1; i += -1)
             {
                 if (_thunder_clock >= _thunder_due[(int)i].X)
                 {
-                    AudioStreamPlayer voice = _thunder_voices[(int)(_thunder_voice % (long)_thunder_voices.Count)];
-                    _thunder_voice += 1;
-                    voice.VolumeDb = (float)((_chapter == "shelter_rain" ? -12.0 : -8.0) + linear_to_db(maxf(_thunder_due[(int)i].Y, 0.3)));
-                    voice.PitchScale = (float)(0.92 + (double)(_thunder_voice % 3) * 0.06);
-                    voice.Play();
+                    Game.Instance.audio.thunder(_thunder_due[(int)i].Y, _chapter == "shelter_rain" || sheltered);
                     if (Game.Instance.has_flag("film-quality") || Game.Instance.has_flag("cinematic"))
                     {
                         G.print("THUNDER_CUE chapter=", _chapter, " frames_drawn=", Engine.GetFramesDrawn());
@@ -342,39 +331,6 @@ public partial class CampWeather : Node3D
         AddChild(_bolt);
     }
 
-    public void _build_audio()
-    {
-        long bus = AudioServer.GetBusIndex("CampRain");
-        if (bus < 0)
-        {
-            bus = AudioServer.BusCount;
-            AudioServer.AddBus();
-            AudioServer.SetBusName((int)bus, "CampRain");
-            AudioServer.SetBusSend((int)bus, AudioDirector.BUS_AMBIENCE);
-        }
-        _rain_filter = new AudioEffectLowPassFilter();
-        _rain_filter.CutoffHz = 9000.0f;
-        AudioServer.AddBusEffect((int)bus, _rain_filter);
-        _rain_audio = new AudioStreamPlayer();
-        _rain_audio.Name = "RainSound";
-        AudioStreamOggVorbis rain_stream = _preload_rain.Duplicate() as AudioStreamOggVorbis;
-        rain_stream.Loop = true;
-        _rain_audio.Stream = rain_stream;
-        _rain_audio.Bus = "CampRain";
-        _rain_audio.VolumeDb = -80;
-        AddChild(_rain_audio);
-        _rain_audio.Play();
-        for (long i = 0; i < 4; i++)
-        {
-            AudioStreamPlayer voice = new AudioStreamPlayer();
-            voice.Name = G.format("ThunderSound%d", i);
-            voice.Stream = _preload_thunder;
-            voice.Bus = AudioDirector.BUS_SFX;
-            AddChild(voice);
-            _thunder_voices.Add(voice);
-        }
-    }
-
     public static bool tent_shelter(Vector3 local)
     {
         /// Same A-frame roof used by rain clipping, now also used by the live listener.
@@ -385,8 +341,4 @@ public partial class CampWeather : Node3D
         }
         return local.Y < Tent.HEIGHT * (1.0 - absf(local.X) / (Tent.WIDTH * 0.5));
     }
-    private static AudioStreamOggVorbis _preload_rain => _preload_rain_cache ??= Content.Load<AudioStreamOggVorbis>("res://audio/rain.ogg");
-    private static AudioStreamOggVorbis _preload_rain_cache;
-    private static AudioStreamWav _preload_thunder => _preload_thunder_cache ??= Content.Load<AudioStreamWav>("res://audio/thunder.wav");
-    private static AudioStreamWav _preload_thunder_cache;
 }

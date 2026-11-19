@@ -417,8 +417,8 @@ committed generator.
 - **Soundscape first.** Wind, water, fire, birds, insects, rain, Foley and June's voice
   carry the game, as they carry the film. Whether the title and credits get a short
   theme from the SoundFont pipeline is David's decision (see the end); the default
-  is no music anywhere. `scripts/audio/CampScore.cs`, the retained synthesis study,
-  stays as a tested generator that the game does not play.
+  is no music anywhere. Every sound is generated with ElevenLabs
+  ([direction](direction.md)); nothing is synthesised in code.
 - **Voice**: the local voice kit through a new `tools/voice.py`, copying the kids'
   games' working pattern in full: June's voice is designed once and its reference
   committed with its settings; every line is cloned from that reference with the
@@ -426,14 +426,13 @@ committed generator.
   matching and speaker similarity; subtitle timings come from Whisper's word
   timestamps. The tool writes OGG files and subtitle timings to `audio/voice/`. The
   voice is warm and elderly with a slight rasp.
-- **New synthesised sounds**, made in `Synth.cs` and AudioDirector:
+- **New sounds**, generated with ElevenLabs and added to the manifest:
   - activities: paddle strokes and drips, the canoe's knock on the hull, reel ratchet,
     line whip, bobber plop, a fish splash and flap, axe chop and split, tarp flap and
     tie-off, peg pull and cloth fall, stone set-down, ash rake, bucket fill and
     pour, fire hiss when doused, pot simmer;
   - interface: page turn, pencil, camera shutter and wind-on, soft wooden clicks;
   - wildlife: loon and heron calls.
-  The existing credited recordings stay.
 - **Mix**: voice ducks ambience by 6 dB. Everything goes through the shared room and
   distance model already used for the world. Over a 10-minute gameplay capture the
   mix targets −20 LUFS integrated (±2) with true peak at or below −1 dBTP. Voice

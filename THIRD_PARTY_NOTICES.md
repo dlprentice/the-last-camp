@@ -10,10 +10,18 @@ alterations. Keep them with redistributed copies and derivative films:
 
 - [Texture sources](textures/SOURCES.md): eight Poly Haven PBR sets and ambientCG Fabric061, CC0 1.0.
 - [Model sources](models/SOURCES.md): 35 Poly Haven models, CC0 1.0.
-- [Recorded sounds](audio/SOURCES.md): CC0 recordings and the CC BY 3.0 water/thunder recordings by Mike Koenig and Mark DiAngelo.
+- [Sound sources](audio/SOURCES.md): no third-party recordings.
 
-The original generated textures and environmental synthesis are project work.
-No background music is used in the released film. The asset-specific notices
+## Generated audio
+
+All of the game's audio is generated with ElevenLabs and licensed for this game. It
+is not covered by the project's MIT license, is not redistributed in this
+repository and ships only inside builds. Every sound is listed by id in
+[`audio/generated/manifest.json`](audio/generated/manifest.json) and June's lines in
+[`audio/generated/voice.json`](audio/generated/voice.json).
+
+The original generated textures are project work. No background music is used in
+the game or the released film. The asset-specific notices
 above take precedence over the project's MIT license for third-party files.
 
 ## Hash without Sine

@@ -39,6 +39,8 @@ public sealed class StoryState
     /// Every event base name raised so far (for line rules and later bands).
     public readonly HashSet<string> Facts = new();
     public readonly HashSet<string> LinesPlayed = new();
+    /// Lines the player heard to the end (the voice player records them for the journal).
+    public readonly HashSet<string> LinesHeard = new();
     /// Things the player carries home: `june_letter`, `tally_book`, `tom_letter`.
     public readonly List<string> Items = new();
     /// "", then "survived" or "went_out" once the storm band has ended.

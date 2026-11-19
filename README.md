@@ -132,11 +132,12 @@ longer than the film's running time. See [the rendering guide](docs/development.
 
 Created by **David Prentice**. Original project code and documentation use the
 [MIT license](LICENSE). Third-party shader code and assets retain their own
-licenses; the recordings include **CC BY 3.0**, so this is not an all-CC0 asset pack.
+licenses. The game's audio is generated with ElevenLabs and licensed: it ships in
+builds, not in this repository, so a clone plays silently with subtitles.
 
 [Complete credit index](CREDITS.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 If you share the film, include a link to the credits alongside it. The source
-contains all nine material sets, 35 credited model assets and six recording
-sources. The README screenshots are unaltered captures of the earlier release; they are
+contains all nine material sets and 35 credited model assets; the audio manifest
+lists every sound by id. The README screenshots are unaltered captures of the earlier release; they are
 not new evidence for the C# conversion.

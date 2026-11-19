@@ -324,7 +324,7 @@ public partial class Campsite : Node3D
             Game.Instance.hud?.notify("Carry the log to the fire.");
             if (Game.Instance.audio != null)
             {
-                Game.Instance.audio.play_interact("pickup");
+                Game.Instance.audio.play_interact(Sounds.LogPickup);
             }
         }
     }

@@ -18,7 +18,7 @@ order. There are no editor tools, authored resource files or GDScript components
 | `scripts/camp/` | Scene plan, forest, ridge coverage, understory, pond, camp props, scanned dressing, wildlife and interactions |
 | `scripts/player/` | First-person movement, carried items, stone flight, the evening activity loop and photo camera |
 | `scripts/props/` | Generated prop meshes and shared materials |
-| `scripts/audio/` | Environmental sound direction, recordings and synthesis |
+| `scripts/audio/` | The sound layer over the ElevenLabs manifest, and June's voice and subtitles |
 | `shaders/` | Materials, water, atmosphere, clouds, particles, compute shaders and post effects |
 | `tests/`, `tools/` | Local regressions, asset preparation, build, capture and media inspection |
 
@@ -87,10 +87,15 @@ heat distortion. Cloth uses native soft bodies. Shared placement constraints
 keep props supported and reserve walking/camera routes.
 
 Birds, fish and insects have authored behaviours and paths; they are not a
-complete ecological simulation. The audio director combines credited field
-recordings with generated wildlife calls and Foley, applying distance,
-shelter and underwater filtering. `CampScore.cs` is a retained synthesis
-study; the film does not construct its music player.
+complete ecological simulation. All sound comes from the ElevenLabs bank listed
+in `audio/generated/manifest.json` (the files are licensed and not in Git).
+`SoundBank` reads the manifest and treats a missing file as silence;
+`AudioDirector` normalises each file from its measured loudness to a category
+target and plays the time-of-day, wind, rain, fire and pond beds, footsteps by
+surface, wildlife and weather one-shots and the action sounds, with distance,
+shelter and underwater filtering. `VoicePlayer` plays June's lines from
+`audio/generated/voice.json` when the story spine raises them, subtitles them
+and ducks the ambience under her voice.
 
 Normal play starts directly on the trail. `CampSession` advances an unhurried
 evening around fire tending, lantern use and scored stone skipping, with a paused

@@ -279,6 +279,7 @@ public partial class Camp : Node3D
         if (world != null)
         {
             audio.set_daylight(world.daylight());
+            audio.set_hour(world.hour);
             audio.set_wind(clampf((world.wind_strength() - 0.4) / 0.6, 0.0, 1.0));
         }
         if (campsite != null && campsite.firepit != null)
@@ -293,42 +294,33 @@ public partial class Camp : Node3D
         audio.Name = "Audio";
         AddChild(audio);
         Game.Instance.audio = audio;
-        Godot.Collections.Array<Vector3> shore = new Godot.Collections.Array<Vector3>();
-        for (long i = 0; i < 8; i++)
+        // The pond laps at the pier posts: both sides of the outer half of the pier.
+        Godot.Collections.Array<Vector3> lap = new Godot.Collections.Array<Vector3>();
+        if (campsite != null && campsite.dock != null)
         {
-            double a = (double)i / 8.0 * TAU;
-            Vector2 p = TerrainField.shore_point(a);
-            shore.Add(new Vector3(p.X, (float)(TerrainField.WATER_LEVEL + 0.05), p.Y));
-        }
-        Godot.Collections.Array<Vector3> canopy = new Godot.Collections.Array<Vector3>();
-        if (plan != null)
-        {
-            foreach (ScenePlan.TreeEntry entry in plan.near_trees())
+            Dock dock = campsite.dock;
+            double length = dock.total_length();
+            foreach (double along in new[] { 0.55, 0.95 })
             {
-                if ((long)canopy.Count >= 8)
+                foreach (double side in new[] { -0.5, 0.5 })
                 {
-                    break;
+                    Vector3 local = new Vector3((float)(side * Dock.WIDTH), 0.0f, (float)(-length * along));
+                    Vector3 at = dock.ToGlobal(local);
+                    lap.Add(new Vector3(at.X, (float)(TerrainField.WATER_LEVEL + 0.05), at.Z));
                 }
-                if (entry.position.Length() < 18.0 || entry.position.Length() > 55.0)
-                {
-                    continue;
-                }
-                double y = field.height(entry.position.X, entry.position.Y) + 6.0;
-                canopy.Add(new Vector3(entry.position.X, (float)y, entry.position.Y));
             }
         }
-        if ((canopy.Count == 0))
+        else
         {
-            canopy.Add(new Vector3(20.0f, 8.0f, -18.0f));
-            canopy.Add(new Vector3(-16.0f, 8.0f, -22.0f));
-            canopy.Add(new Vector3(18.0f, 7.0f, 20.0f));
+            Vector2 p = TerrainField.shore_point(0.0);
+            lap.Add(new Vector3(p.X, (float)(TerrainField.WATER_LEVEL + 0.05), p.Y));
         }
         Vector3 fire_pos = new Vector3(TerrainField.FIRE.X, 0.55f, TerrainField.FIRE.Y);
         if (campsite != null)
         {
             fire_pos = campsite.firepit.GlobalPosition + new Vector3(0.0f, 0.45f, 0.0f);
         }
-        audio.setup(fire_pos, shore, canopy);
+        audio.setup(fire_pos, lap);
         Player player = Game.Instance.player;
         if (player != null)
         {

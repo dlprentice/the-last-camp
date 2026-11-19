@@ -207,26 +207,33 @@ public partial class Hud : CanvasLayer
             _toggle_pause();
             _journal.Visible = opening;
             if (opening) _menu.Visible = false;
+            Game.Instance.audio?.play_interact(opening ? Sounds.JournalOpen : Sounds.JournalClose);
             GetViewport().SetInputAsHandled();
         }
         else if (@event.IsActionPressed("quality_menu"))
         {
             _quality_panel.Visible = !_quality_panel.Visible;
+            Game.Instance.audio?.play_interact(Sounds.UiMove);
         }
         else if (@event.IsActionPressed("toggle_stats"))
         {
             _stats_visible = !_stats_visible;
             _stats_panel.Visible = _stats_visible;
+            Game.Instance.audio?.play_interact(Sounds.UiMove);
         }
         else if (@event.IsActionPressed("pause"))
         {
+            // Opening the pause menu moves focus to it; leaving it is the choice to resume.
+            bool opening = Game.Instance.mode == Game.Mode.PLAY;
             _toggle_pause();
+            Game.Instance.audio?.play_interact(opening ? Sounds.UiMove : Sounds.UiSelect);
         }
         else if (Game.Instance.mode == Game.Mode.PAUSED && @event is InputEventKey && ((InputEventKey)@event).IsPressed())
         {
             InputEventKey key = ((InputEventKey)@event);
             if (key.Keycode == Key.Q)
             {
+                Game.Instance.audio?.play_interact(Sounds.UiSelect);
                 if (Game.Instance.session != null) Game.Instance.session.SaveAndQuit();
                 else Game.Instance.quit_cleanly();
             }
