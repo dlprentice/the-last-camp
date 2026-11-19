@@ -121,7 +121,7 @@ storm.
 | m4 | the pier, first time at the end | He built this the summer you were born. He measured it with his feet. |
 | m5 | first time the lantern is lit | Wick down a little. It smokes if you're greedy. |
 | m6 | entering the tent | Mind the left corner, it's been damp since 1996. |
-| m7 | opening Tom's tackle tin | His stones. I never touched them. Go on, though. |
+| m7 | opening Tom's tackle tin, after the old ring | His stones. I never touched them. Go on, though. |
 | m8 | waking after the storm | Whatever the sky said last night, I'll have said it'd be fine. |
 | m9 | raking the ash, the last line before the walk out; nothing follows until the credits | All of it, love. They'll never know we were here. |
 

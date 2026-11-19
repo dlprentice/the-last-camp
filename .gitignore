@@ -28,3 +28,9 @@ renders/
 
 # Claude Code per-machine settings: can hold approved commands verbatim
 .claude/settings.local.json
+
+# Licensed ElevenLabs audio ships only in builds; only its manifest is tracked.
+/audio/generated/**
+!/audio/generated/
+!/audio/generated/*.json
+!/audio/generated/README.md
