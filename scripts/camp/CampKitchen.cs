@@ -57,7 +57,7 @@ public partial class CampKitchen : Node3D
             }
             arrays[(int)Mesh.ArrayType.TexUV] = Variant.From(uv.ToArray());
             ArrayMesh mesh = new ArrayMesh();
-            mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+            MeshCommit.AddSurface(mesh, arrays);
             FieldKit.add(this, mesh, wood, new Vector3(0, (float)(TOP - 0.021), (float)(((double)i - 2.5) * 0.115)), "TableBoard");
         }
         MeshBuilder frame = new MeshBuilder();

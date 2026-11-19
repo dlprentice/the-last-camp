@@ -594,7 +594,7 @@ public partial class GrassPlanter
         {
             lods = new Godot.Collections.Dictionary { { 0.006, Variant.From(clump_lod_indices(blades, segments, new List<int>(new List<int> { 0, 2, 4 })).ToArray()) }, { 0.018, Variant.From(clump_lod_indices(blades, segments, new List<int>(new List<int> { 0, 3 })).ToArray()) }, { 0.05, Variant.From(clump_lod_indices(blades, segments, new List<int>(new List<int> { 0 })).ToArray()) } };
         }
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, mb._arrays(), new Godot.Collections.Array<Godot.Collections.Array>(), lods, (Mesh.ArrayFormat)mb._format_flags());
+        MeshCommit.AddSurface(mesh, mb._arrays(), lods, (Mesh.ArrayFormat)mb._format_flags());
         return mesh;
     }
 

@@ -519,15 +519,15 @@ public partial class MeshBuilder : RefCounted
             {
                 for (long s = 0, s_end = existing.GetSurfaceCount(); s < s_end; s++)
                 {
-                    importer.AddSurface(Mesh.PrimitiveType.Triangles, existing.SurfaceGetArrays((int)s), new Godot.Collections.Array<Godot.Collections.Array>(), new Godot.Collections.Dictionary(), existing.SurfaceGetMaterial((int)s), existing.SurfaceGetName((int)s), (uint)existing.Call("surface_get_format", s).AsInt64());
+                    MeshCommit.AddSurface(importer, existing.SurfaceGetArrays((int)s), existing.SurfaceGetMaterial((int)s), existing.SurfaceGetName((int)s), (uint)existing.Call("surface_get_format", s).AsInt64());
                 }
             }
-            importer.AddSurface(Mesh.PrimitiveType.Triangles, _arrays(), new Godot.Collections.Array<Godot.Collections.Array>(), new Godot.Collections.Dictionary(), material, "", (uint)_format_flags());
-            importer.GenerateLods(25.0f, 60.0f, new Godot.Collections.Array());
+            MeshCommit.AddSurface(importer, _arrays(), material, "", (uint)_format_flags());
+            MeshCommit.GenerateLods(importer, 25.0f, 60.0f);
             return importer.GetMesh();
         }
         ArrayMesh mesh = existing != null ? existing : new ArrayMesh();
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, _arrays(), new Godot.Collections.Array<Godot.Collections.Array>(), new Godot.Collections.Dictionary(), (Mesh.ArrayFormat)_format_flags());
+        MeshCommit.AddSurface(mesh, _arrays(), null, (Mesh.ArrayFormat)_format_flags());
         if (material != null)
         {
             mesh.SurfaceSetMaterial((int)((long)mesh.GetSurfaceCount() - 1), material);

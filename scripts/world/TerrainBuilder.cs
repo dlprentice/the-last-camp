@@ -160,7 +160,7 @@ public partial class TerrainBuilder
         arrays[(int)Mesh.ArrayType.Color] = Variant.From(colors.ToArray());
         arrays[(int)Mesh.ArrayType.Index] = Variant.From(indices.ToArray());
         ArrayMesh mesh = new ArrayMesh();
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+        MeshCommit.AddSurface(mesh, arrays);
         if (material != null)
         {
             mesh.SurfaceSetMaterial(0, material);
@@ -216,7 +216,7 @@ public partial class TerrainBuilder
                 arrays[(int)Mesh.ArrayType.Color] = color;
                 arrays[(int)Mesh.ArrayType.Index] = indices;
                 var chunk = new ArrayMesh();
-                chunk.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+                MeshCommit.AddSurface(chunk, arrays);
                 chunk.SurfaceSetMaterial(0, mesh.SurfaceGetMaterial(0));
                 result.Add(chunk);
             }

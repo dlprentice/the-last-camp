@@ -32,7 +32,7 @@ public partial class TestTerrainChunks : TestCase
         arrays[(int)Mesh.ArrayType.Color] = colors;
         arrays[(int)Mesh.ArrayType.Index] = indices.ToArray();
         using var source = new ArrayMesh();
-        source.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+        MeshCommit.AddSurface(source, arrays);
         var chunks = TerrainBuilder.split_render_mesh(source, 2);
         using var canonical = source.SurfaceGetArrays(0);
         positions = canonical[(int)Mesh.ArrayType.Vertex].AsVector3Array();
