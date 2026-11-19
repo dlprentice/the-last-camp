@@ -52,11 +52,18 @@ public partial class TerrainFieldEnhanced : TerrainField
         if (h > WATER_LEVEL + 0.35)
         {
             double relief = _relief(p);
-            // Tom's summit keeps the relief of its centre, so the pad stays level
-            // for the bench and its loose footstone at the height the probe saw.
+            // Tom's knob keeps the relief of its centre, so its summit pad stays
+            // level for the bench and its loose footstone at the height the probe
+            // saw, and its flanks and the steps' line rise as its own shape does.
             if (places_enabled)
             {
-                double summit = smoothstep(3.0, 8.0, p.DistanceTo(PlacesLayout.TOMS_ROCK));
+                double summit = smoothstep(PlacesLayout.ROCK_BASE_RADIUS * 0.6, PlacesLayout.ROCK_BASE_RADIUS, p.DistanceTo(PlacesLayout.TOMS_ROCK));
+                if (p.DistanceTo(PlacesLayout.TOMS_ROCK) < PlacesLayout.ROCK_REACH)
+                {
+                    // The steps' line keeps it right down to the first step.
+                    double off = PlacesLayout.distance_to(p, PlacesLayout.STEP_LINE, out _);
+                    summit = minf(summit, smoothstep(PlacesLayout.STEP_CUT_INNER, PlacesLayout.STEP_CUT_OUTER + 1.5, off));
+                }
                 if (summit < 1.0)
                 {
                     relief = lerpf(_relief(PlacesLayout.TOMS_ROCK), relief, summit);

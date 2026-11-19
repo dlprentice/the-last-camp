@@ -31,13 +31,22 @@ public static class PlacesLayout
     /// The outcrop's summit. PlacesProbe.find_toms_rock returns this point from
     /// the field without the places; a test keeps the two in step.
     public static readonly Vector2 TOMS_ROCK = new(26.0f, 70.0f);
-    /// The outcrop lifts the ground this far above the surrounding slope.
-    public const double ROCK_RISE = 6.0;
+    /// The knob lifts the ground this far above the surrounding slope.
+    public const double ROCK_RISE = 10.0;
     public const double ROCK_TOP_RADIUS = 2.0;
-    public const double ROCK_BASE_RADIUS = 17.0;
+    /// Its foot on the gentle side, where the steps climb; towards the view it
+    /// falls more steeply, by up to FRONT_STEEPEN of that.
+    public const double ROCK_BASE_RADIUS = 20.0;
+    public const double FRONT_STEEPEN = 0.3;
+    public const double FRONT_DROP = 0.45;
+    /// A long, gentler spur runs out to the south-west, June's way down.
+    public const double SPUR_BEARING_DEG = 242.0;
+    public const double SPUR_LENGTHEN = 0.2;
+    /// No part of the knob reaches farther than this from its summit.
+    public const double ROCK_REACH = ROCK_BASE_RADIUS * 1.15 * (1.0 + SPUR_LENGTHEN);
     /// The summit is levelled out to this radius for the bench and its footstone.
-    public const double SUMMIT_PAD_INNER = 1.9;
-    public const double SUMMIT_PAD_OUTER = 3.4;
+    public const double SUMMIT_PAD_INNER = 1.4;
+    public const double SUMMIT_PAD_OUTER = 2.6;
     /// Eye height of someone sitting on the bench, above the summit.
     public const double SEATED_EYE = 1.15;
     /// The bench looks north-west: between the pond (about 319 degrees from here)
@@ -61,8 +70,8 @@ public static class PlacesLayout
     /// level across it, as a dug-in step path would be.
     public static readonly Vector2[] STEP_LINE =
     {
-        polar(15.0, 30.0), polar(14.0, 58.0), polar(12.8, 86.0), polar(11.6, 114.0), polar(10.4, 142.0),
-        polar(9.4, 168.0), polar(7.2, 140.0), polar(6.0, 108.0), polar(4.8, 76.0), polar(3.3, 50.0),
+        polar(18.5, 26.0), polar(16.6, 52.0), polar(14.8, 80.0), polar(13.0, 108.0), polar(11.4, 136.0),
+        polar(10.0, 164.0), polar(7.8, 140.0), polar(6.3, 110.0), polar(4.9, 80.0), polar(3.4, 52.0),
         polar(1.05, 35.0), LOOSE_STEP,
     };
     public const double STEP_CUT_INNER = 0.8;
@@ -93,17 +102,17 @@ public static class PlacesLayout
         new(-28.6f, -49.2f), new(-22.4f, -51.6f), new(-14.0f, -57.0f), new(-4.0f, -57.6f), new(5.4f, -53.6f),
         new(13.0f, -47.6f), new(18.6f, -40.2f), new(24.8f, -33.6f), new(32.4f, -27.6f), new(38.4f, -18.6f),
         new(43.0f, -7.6f), new(44.0f, 4.4f), new(41.6f, 15.6f), new(37.6f, 26.0f), new(35.8f, 36.4f),
-        new(35.4f, 46.2f), new(34.4f, 52.6f), STEP_LINE[0],
+        new(35.4f, 46.2f), STEP_LINE[0],
     };
     public const double TOMS_ROUTE_TARGET = 208.0;
 
-    /// June's painted path from the summit down the west flank to the trail,
-    /// which takes it on to camp. Design length, Rock to camp: 110 m.
+    /// June's painted path from the summit down the knob's long south-west spur
+    /// (the gentlest way off it) to the trail's end by the trailhead, where the
+    /// trail takes it on to camp. Design length, Rock to camp: 110 m.
     public static readonly Vector2[] PAINTED_PATH =
     {
-        local(-0.9, -1.4), new(19.8f, 74.6f), new(15.6f, 74.4f), new(13.4f, 70.0f), new(15.8f, 65.4f),
-        new(14.2f, 60.0f), new(15.6f, 54.8f), new(12.8f, 49.8f), new(9.0f, 46.2f), new(6.2f, 41.8f),
-        new(4.0f, 37.6f), new(2.1f, 33.6f),
+        local(-0.9, -1.4), polar(5.5, 228.0), polar(10.5, 240.0), polar(16.0, 238.0), new(10.2f, 79.6f),
+        new(6.0f, 80.2f), new(3.0f, 76.0f), new(3.98f, 69.6f),
     };
     public const double PAINTED_PATH_TARGET = 110.0;
 
@@ -247,7 +256,11 @@ public static class PlacesLayout
     /// out of the lookout's view down to the pond.
     public static bool keeps_trees_out(Vector2 p)
     {
-        if (p.DistanceTo(TOMS_ROCK) < 9.0 || p.DistanceTo(OLD_RING) < 4.6 || p.DistanceTo(TRAILHEAD_POST) < 2.6) return true;
+        if (p.DistanceTo(TOMS_ROCK) < 11.0 || p.DistanceTo(OLD_RING) < 4.6 || p.DistanceTo(TRAILHEAD_POST) < 2.6) return true;
+        // Nothing stands on the knob's front flank, whose crowns would rise into
+        // the seated view either side of it.
+        Vector2 off = p - TOMS_ROCK;
+        if (off.Length() < ROCK_BASE_RADIUS * 1.05 && FACE.Dot(off.Normalized()) > 0.1) return true;
         return in_lookout_view(p, 0.0);
     }
 
@@ -276,6 +289,29 @@ public static class PlacesLayout
         return open * open * (3.0 - 2.0 * open) * (far >= 1.0 ? 1.0 : far);
     }
 
+    /// How far the knob lifts the ground at `p`: a rounded top, a convex shoulder
+    /// and a foot that runs out into the slope, steeper on the side that looks
+    /// over the pond, its outline lobed so it is no cone.
+    public static double rock_rise(Vector2 p)
+    {
+        Vector2 d = p - TOMS_ROCK;
+        double dist = d.Length();
+        if (dist <= ROCK_TOP_RADIUS) return ROCK_RISE;
+        double a = Math.Atan2(d.Y, d.X);
+        Vector2 dir = d / (float)dist;
+        double facing = Math.Max(0.0, FACE.Dot(dir));
+        double spur = Math.Max(0.0, bearing(SPUR_BEARING_DEG).Dot(dir));
+        facing *= facing;
+        spur *= spur * spur;
+        double foot = ROCK_BASE_RADIUS * (1.0 - FRONT_STEEPEN * facing * facing) * (1.0 + SPUR_LENGTHEN * spur)
+            * (1.0 + 0.06 * Math.Sin(3.0 * a + 1.3) + 0.04 * Math.Sin(5.0 * a + 0.4));
+        double t = Math.Clamp((dist - ROCK_TOP_RADIUS) / (foot - ROCK_TOP_RADIUS), 0.0, 1.0);
+        // Towards the view the shoulder is short: the ground falls away close in
+        // front of the bench.
+        t = Math.Pow(t, 1.0 - FRONT_DROP * facing);
+        return ROCK_RISE * (1.0 - t * t * (3.0 - 2.0 * t));
+    }
+
     /// How much of the ground is the outcrop's bare, stony skin (1 on its upper
     /// flanks, 0 beyond its foot): grass thins there and the soil shows.
     public static double outcrop_cover(Vector2 p)
@@ -292,9 +328,9 @@ public static class PlacesLayout
         return h - Math.Floor(h);
     }
 
-    public const double LOOKOUT_BEARING_DEG = 309.0;
-    public const double LOOKOUT_CORE_DEG = 28.0;
-    public const double LOOKOUT_EDGE_DEG = 40.0;
+    public const double LOOKOUT_BEARING_DEG = 305.0;
+    public const double LOOKOUT_CORE_DEG = 33.0;
+    public const double LOOKOUT_EDGE_DEG = 48.0;
     /// Across the near bank to the water: beyond it only the far bank's trees stand.
     public const double LOOKOUT_REACH = 100.0;
 

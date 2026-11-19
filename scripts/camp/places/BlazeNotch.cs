@@ -8,10 +8,13 @@ namespace LastCamp;
 
 /// Tom's blaze: a small knife notch, never paint. Bark cannot be cut away from a
 /// shared tree mesh, so the notch is built as a thin patch that lies on the host's
-/// own surface (sampled from its triangles, with its UVs and vertex colour) and
-/// rises into a healed callus lip around a V-shaped cut of weathered wood. The
-/// patch is in the host's local space, so it takes the same transform and, on a
-/// tree, the same trunk bend as the bark under it.
+/// own surface (sampled from its triangles, with its UVs and vertex colour), rising
+/// into a slight healed callus round the cut. Over the cut's opening lies a second
+/// patch whose shader traces the notch itself, a horizontal V about 13 cm long and
+/// 2.5 cm deep, into the wood: the view ray is followed down to the two knife
+/// faces, so the cut shows its depth, its walls and the dark band of bark at its
+/// rim from any angle. The patches are in the host's local space, so they take the
+/// same transform and, on a tree, the same trunk bend as the bark under them.
 public static class BlazeNotch
 {
     /// Patch half-extents across and up the surface, and its grid.
@@ -19,14 +22,20 @@ public static class BlazeNotch
     public const double HALF_HEIGHT = 0.07;
     public const int COLUMNS = 35;
     public const int ROWS = 29;
-    /// The notch itself: a horizontal V about 11 cm wide and 4 cm tall.
-    public const double CUT_HALF_WIDTH = 0.055;
-    public const double CUT_TOP = 0.026;
-    public const double CUT_BOTTOM = -0.016;
-    /// Height of the healed lip above the bark, and of the cut floor.
-    public const double LIP = 0.018;
-    public const double FLOOR = 0.0012;
-    /// Everything stands this far off the host so the two never fight in depth.
+    /// The notch: a lens-shaped opening about 13 cm across and 3.5 cm tall, its
+    /// two faces meeting in a crease 2.5 cm in, nearer the bottom.
+    public const double CUT_HALF_WIDTH = 0.065;
+    public const double CUT_TOP = 0.022;
+    public const double CUT_BOTTOM = -0.013;
+    public const double CUT_DEPTH = 0.025;
+    /// Share of the opening's height from its bottom edge to the crease.
+    public const double CREASE_AT = 0.36;
+    /// Bark thickness at the cut's rim, where its dark section shows.
+    public const double BARK = 0.008;
+    /// Height of the healed callus above the bark round the cut.
+    public const double LIP = 0.005;
+    /// Everything stands this far off the host so the two never fight in depth;
+    /// the cut's patch lies this far again above the callus.
     public const double SKIN = 0.0012;
 
     public struct Triangle
@@ -95,31 +104,37 @@ public static class BlazeNotch
     }
 
     /// Height of the patch above the host at (across, up) on the notch's face,
-    /// and whether that point is on the cut wood.
+    /// and whether that point lies in the cut's opening.
     public static double profile(double across, double up, out bool cut) => profile(across, up, out cut, out _);
 
-    /// The notch is a knife's two strokes: a lens-shaped V, widest at its middle and
-    /// running out to points at both ends, its faces meeting in a crease nearer the
-    /// bottom (the upper stroke cut at a shallower angle). `depth` is 0 at its rim
-    /// and 1 in the crease.
+    /// The patch's height is the callus, which swells round the opening and falls
+    /// back to the bark at the patch's edge. `depth` is how far in the cut's
+    /// surface lies under this point, metres (0 outside the opening).
     public static double profile(double across, double up, out bool cut, out double depth)
     {
         double edge = Math.Max(Math.Abs(across) / HALF_WIDTH, Math.Abs(up) / HALF_HEIGHT);
-        // The healed lip swells within the patch and falls back to the bark at its edge.
-        double lip = LIP * (1.0 - smoothstep(0.5, 1.0, edge));
-        double t = Math.Min(Math.Abs(across) / CUT_HALF_WIDTH, 1.0);
-        double spread = 1.0 - t * t;
-        double crease = CUT_BOTTOM + (CUT_TOP - CUT_BOTTOM) * 0.38;
+        double lip = LIP * (1.0 - smoothstep(0.55, 1.0, edge));
+        depth = cut_depth(across, up);
+        cut = depth > 0.0;
+        return SKIN + lip;
+    }
+
+    /// The notch is a knife's two strokes: a V, widest at its middle and
+    /// running out to points at both ends, its faces meeting in a crease nearer the
+    /// bottom (the upper stroke cut at a shallower angle). Depth of the cut surface
+    /// below the opening at (across, up), metres; 0 outside it. The cut shader
+    /// (shaders/blaze_cut.gdshader) carries the same function.
+    public static double cut_depth(double across, double up)
+    {
+        double t = Math.Abs(across) / CUT_HALF_WIDTH;
+        double spread = 1.0 - Math.Pow(t, 1.4);
+        if (spread <= 0.0) return 0.0;
+        double crease = CUT_BOTTOM + (CUT_TOP - CUT_BOTTOM) * CREASE_AT;
         double top = crease + (CUT_TOP - crease) * spread;
         double bottom = crease - (crease - CUT_BOTTOM) * spread;
-        depth = 0.0;
-        if (spread > 0.0 && up < top && up > bottom)
-        {
-            depth = up >= crease ? (top - up) / Math.Max(top - crease, 1e-6) : (up - bottom) / Math.Max(crease - bottom, 1e-6);
-            depth = Math.Clamp(depth, 0.0, 1.0) * Math.Sqrt(spread);
-        }
-        cut = depth > 0.02;
-        return SKIN + lip - (lip + SKIN - FLOOR) * depth;
+        if (up >= top || up <= bottom) return 0.0;
+        double d = up >= crease ? (top - up) / Math.Max(top - crease, 1e-6) : (up - bottom) / Math.Max(crease - bottom, 1e-6);
+        return CUT_DEPTH * Math.Clamp(d, 0.0, 1.0) * Math.Sqrt(spread);
     }
 
     static double smoothstep(double a, double b, double x)
@@ -130,8 +145,9 @@ public static class BlazeNotch
 
     /// Builds the notch on `host` around the surface point seen from `centre`
     /// looking back along `outward`, with `up` the notch's vertical. Returns a
-    /// two-surface mesh (lip on the host's material, then the cut), or null if the
-    /// host has no surface there.
+    /// two-surface mesh (the callus on the host's material, then the cut, whose UV
+    /// is the point's (across, up) on the notch in metres), or null if the host
+    /// has no surface there.
     public static ArrayMesh build(ArrayMesh host, int surface, Vector3 centre, Vector3 outward, Vector3 up, out Vector3 surface_centre)
     {
         outward = outward.Normalized();
@@ -141,10 +157,11 @@ public static class BlazeNotch
         surface_centre = centre;
         if (cast(tris, centre + outward * 1.5f, -outward, out Vector3 middle, out _, out _, out _)) surface_centre = middle;
         var points = new Vector3[COLUMNS * ROWS];
+        var normals = new Vector3[COLUMNS * ROWS];
         var uvs = new Vector2[COLUMNS * ROWS];
+        var patch = new Vector2[COLUMNS * ROWS];
         var colors = new Color[COLUMNS * ROWS];
         var on_cut = new bool[COLUMNS * ROWS];
-        var shade = new float[COLUMNS * ROWS];
         for (int j = 0; j < ROWS; j++)
         {
             for (int i = 0; i < COLUMNS; i++)
@@ -153,13 +170,14 @@ public static class BlazeNotch
                 double b = (j / (double)(ROWS - 1) * 2.0 - 1.0) * HALF_HEIGHT;
                 Vector3 from = centre + across_dir * (float)a + up_dir * (float)b + outward * 1.5f;
                 if (!cast(tris, from, -outward, out Vector3 hit, out Vector3 n, out Vector2 uv, out Color color)) return null;
-                double lift = profile(a, b, out bool cut, out double depth);
+                double lift = profile(a, b, out bool cut);
                 int k = j * COLUMNS + i;
                 points[k] = hit + n * (float)lift;
+                normals[k] = n;
                 uvs[k] = uv;
+                patch[k] = new Vector2((float)a, (float)b);
                 colors[k] = color;
                 on_cut[k] = cut;
-                shade[k] = (float)(1.0 - 0.7 * depth * depth);
             }
         }
         var lip = new MeshBuilder();
@@ -168,26 +186,43 @@ public static class BlazeNotch
         var wood_index = new long[points.Length];
         Array.Fill(lip_index, -1L);
         Array.Fill(wood_index, -1L);
+        long L(int k) => lip_index[k] >= 0 ? lip_index[k] : lip_index[k] = lip.add_vertex(points[k], grid_normal(points, k), uvs[k], colors[k], tangent(points, k));
+        long W(int k) => wood_index[k] >= 0 ? wood_index[k] : wood_index[k] = wood.add_vertex(points[k] + normals[k] * (float)SKIN, grid_normal(points, k), patch[k], colors[k], tangent(points, k));
         for (int j = 0; j + 1 < ROWS; j++)
         {
             for (int i = 0; i + 1 < COLUMNS; i++)
             {
                 int k00 = j * COLUMNS + i, k10 = k00 + 1, k01 = k00 + COLUMNS, k11 = k01 + 1;
-                bool is_cut = on_cut[k00] && on_cut[k10] && on_cut[k01] && on_cut[k11];
-                MeshBuilder mb = is_cut ? wood : lip;
-                long[] map = is_cut ? wood_index : lip_index;
-                long V(int k) => map[k] >= 0 ? map[k] : map[k] = mb.add_vertex(points[k], grid_normal(points, k), is_cut ? cut_uv(k) : uvs[k], is_cut ? new Color(1.0f, 0.96f, 0.88f) * shade[k] : colors[k], tangent(points, k));
-                // Wound so the face looks out along `outward`.
-                long a0 = V(k00), a1 = V(k10), a2 = V(k11), a3 = V(k01);
-                mb.add_triangle(a0, a2, a1);
-                mb.add_triangle(a0, a3, a2);
+                // The callus is whole. Wound so the face looks out along `outward`.
+                long a0 = L(k00), a1 = L(k10), a2 = L(k11), a3 = L(k01);
+                lip.add_triangle(a0, a2, a1);
+                lip.add_triangle(a0, a3, a2);
+                // The cut's patch covers every cell near the opening; its shader
+                // trims it to the opening's exact edge.
+                if (!near_cut(on_cut, i, j)) continue;
+                long w0 = W(k00), w1 = W(k10), w2 = W(k11), w3 = W(k01);
+                wood.add_triangle(w0, w2, w1);
+                wood.add_triangle(w0, w3, w2);
             }
         }
         ArrayMesh mesh = lip.commit();
         if (!wood.is_empty()) wood.commit(null, false, mesh);
         return mesh;
+    }
 
-        Vector2 cut_uv(int k) => new Vector2((k % COLUMNS) / (float)(COLUMNS - 1) * 0.12f, (k / COLUMNS) / (float)(ROWS - 1) * 0.10f);
+    /// True when the cell at (i, j) or one next to it has a corner in the opening.
+    static bool near_cut(bool[] on_cut, int i, int j)
+    {
+        for (int dj = -1; dj <= 2; dj++)
+        {
+            for (int di = -1; di <= 2; di++)
+            {
+                int ii = i + di, jj = j + dj;
+                if (ii < 0 || jj < 0 || ii >= COLUMNS || jj >= ROWS) continue;
+                if (on_cut[jj * COLUMNS + ii]) return true;
+            }
+        }
+        return false;
     }
 
     public static ShaderMaterial cut_material(bool bends_with_tree)
@@ -195,6 +230,12 @@ public static class BlazeNotch
         var mat = new ShaderMaterial { Shader = Content.Load<Shader>("res://shaders/blaze_cut.gdshader") };
         Camp.bind_prop_pbr(mat, "wood");
         mat.SetShaderParameter("wind_response", bends_with_tree ? 1.0 : 0.0);
+        mat.SetShaderParameter("cut_half_width", CUT_HALF_WIDTH);
+        mat.SetShaderParameter("cut_top", CUT_TOP);
+        mat.SetShaderParameter("cut_bottom", CUT_BOTTOM);
+        mat.SetShaderParameter("cut_depth", CUT_DEPTH);
+        mat.SetShaderParameter("crease_at", CREASE_AT);
+        mat.SetShaderParameter("bark_thickness", BARK);
         return mat;
     }
 

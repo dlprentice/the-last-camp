@@ -49,10 +49,6 @@ public partial class TomsRock : Node3D
     public const double BENCH_SUPPORT_X = 0.42;
     public const double BENCH_SUPPORT_SINK = 0.08;
 
-    /// Exposed bedrock: ledges this far from the summit, along rings of the outcrop.
-    public const double LEDGE_INNER = 2.6;
-    public const double LEDGE_OUTER = 13.5;
-
     public struct Ledge
     {
         public GraniteSlab.Shape shape;
@@ -212,81 +208,10 @@ public partial class TomsRock : Node3D
     public void build()
     {
         Material granite = GraniteSlab.material();
-        _build_ledges(granite);
+        _build_bedrock(granite);
         _build_steps(granite);
         _build_bench(granite);
         _build_loose_step(granite);
-    }
-
-    /// Clear of the steps, the paths, the bench and the bench's view.
-    public static bool ledge_clear(TerrainField field, Vector2 at, double reach, double top)
-    {
-        double keep = reach + 0.7;
-        if (PlacesLayout.distance_to(at, PlacesLayout.STEP_LINE, out _) < keep) return false;
-        if (PlacesLayout.distance_to(at, PlacesLayout.PAINTED_PATH, out _) < keep) return false;
-        if (PlacesLayout.distance_to(at, PlacesLayout.TOMS_ROUTE, out _) < keep) return false;
-        if (at.DistanceTo(PlacesLayout.BENCH) < keep + 0.9 || at.DistanceTo(PlacesLayout.LOOSE_STEP) < keep + 0.9) return false;
-        // In front of the bench a ledge may stand, but only below the seated sight line.
-        if (PlacesLayout.lookout_openness(at) > 0.0)
-        {
-            double eye = field.height(PlacesLayout.BENCH.X, PlacesLayout.BENCH.Y) + PlacesLayout.SEATED_EYE;
-            double d = at.DistanceTo(PlacesLayout.BENCH);
-            double line = eye - (eye - TerrainField.WATER_LEVEL) * d / PlacesLayout.BENCH.DistanceTo(TerrainField.POND_CENTRE);
-            if (top > line - 0.8) return false;
-        }
-        return true;
-    }
-
-    /// The outcrop's bedrock: broad, low granite ledges laid along its contours,
-    /// tipped with the slope and settled so no part of their lower half stands
-    /// above the ground. Seeded; the same field always gives the same rock.
-    public static List<Ledge> ledges(TerrainField field)
-    {
-        var rng = new RandomNumberGenerator { Seed = 1971 };
-        var list = new List<Ledge>();
-        int index = 0;
-        for (double r = LEDGE_INNER; r <= LEDGE_OUTER; r += 1.5)
-        {
-            double circumference = Math.Tau * r;
-            int count = Math.Max(3, (int)(circumference / 3.4));
-            double offset = rng.Randf() * 360.0;
-            for (int i = 0; i < count; i++)
-            {
-                double bearing = offset + i * 360.0 / count + rng.RandfRange(-8f, 8f);
-                double rr = r + rng.RandfRange(-0.5f, 0.5f);
-                Vector2 at = PlacesLayout.polar(rr, bearing);
-                double scale = Mathf.Lerp(1.0f, 0.7f, (float)((rr - LEDGE_INNER) / (LEDGE_OUTER - LEDGE_INNER)));
-                Vector3 size = new(rng.RandfRange(2.8f, 5.0f) * (float)scale, rng.RandfRange(1.1f, 1.9f) * (float)scale, rng.RandfRange(2.0f, 3.4f) * (float)scale);
-                long seed = 900 + index++;
-                double roundness = rng.RandfRange(0.38f, 0.55f);
-                double yaw_jitter = rng.RandfRange(-0.35f, 0.35f);
-                // Long axis along the contour; up leans halfway to the slope's normal.
-                Vector2 radial = (at - PlacesLayout.TOMS_ROCK).Normalized();
-                Vector3 tangent = new(-radial.Y, 0, radial.X);
-                Vector3 normal = field.normal(at.X, at.Y, 1.0);
-                Vector3 up = (Vector3.Up + normal).Normalized();
-                Vector3 x_axis = (tangent - up * tangent.Dot(up)).Normalized().Rotated(up, (float)yaw_jitter);
-                Vector3 z_axis = x_axis.Cross(up).Normalized();
-                Basis basis = new(x_axis, up, z_axis);
-                double origin_y = double.PositiveInfinity;
-                for (int k = 0; k < 16; k++)
-                {
-                    double a = k / 16.0 * Math.Tau;
-                    Vector3 local = new((float)(Math.Cos(a) * size.X * 0.45), size.Y * 0.1f, (float)(Math.Sin(a) * size.Z * 0.45));
-                    Vector3 w = basis * local;
-                    origin_y = Math.Min(origin_y, field.height(at.X + w.X, at.Y + w.Z) - w.Y);
-                }
-                double top = origin_y + size.Y * 0.5;
-                double reach = Math.Max(size.X, size.Z) * 0.5;
-                if (!ledge_clear(field, at, reach, top)) continue;
-                list.Add(new Ledge
-                {
-                    shape = new GraniteSlab.Shape { size = size, roundness = roundness, rough = 0.16, seed = seed },
-                    pose = new Transform3D(basis, new Vector3(at.X, (float)origin_y, at.Y)),
-                });
-            }
-        }
-        return list;
     }
 
     /// The summit's own rock: low, broad slabs of the bedrock showing through the
@@ -330,13 +255,14 @@ public partial class TomsRock : Node3D
         return list;
     }
 
-    public void _build_ledges(Material granite)
+    /// The outcrop's bedrock (scanned rock, OutcropRock) and the summit's pavement.
+    public void _build_bedrock(Material granite)
     {
         var holder = new Node3D { Name = "Bedrock" };
         AddChild(holder);
         int i = 0;
-        var all = ledges(field);
-        all.AddRange(pavement(field));
+        OutcropRock.build(holder, field);
+        var all = pavement(field);
         foreach (Ledge l in all)
         {
             ArrayMesh mesh = GraniteSlab.build(l.shape, l.pose, field.height);
