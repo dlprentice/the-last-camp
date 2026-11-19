@@ -514,6 +514,29 @@ public partial class Tent : Node3D
         }
         FieldKit.add(bedroll, quilting.commit(), FieldKit.solid(new Color(0.16f, 0.22f, 0.12f), 0.96), Vector3.Zero, "QuiltStitching");
         FieldKit.add(bedroll, FieldKit.rounded_box(new Vector3(0.40f, 0.075f, 0.28f), 0.034), PropMaterials.triplanar("canvas", new Color(0.61f, 0.57f, 0.43f), 3.0), new Vector3(0, 0.1475f, 0.70f), "Pillow");
+        // Someone sleeps here: a wool blanket rolled at the foot, and a book left
+        // face-down by the pillow, open at the page they stopped on.
+        MeshBuilder roll = new MeshBuilder();
+        Godot.Collections.Array<Vector3> roll_axis = new Godot.Collections.Array<Vector3>();
+        Godot.Collections.Array<double> roll_radii = new Godot.Collections.Array<double>();
+        for (long i = 0; i < 9; i++)
+        {
+            double t = (double)i / 8.0;
+            roll_axis.Add(new Vector3((float)((t - 0.5) * 0.50), (float)(0.185 + sin(t * 9.0) * 0.004), (float)(-0.80 + sin(t * PI) * 0.01)));
+            roll_radii.Add(0.072 - 0.006 * absf(t - 0.5));
+        }
+        roll.add_tube(roll_axis, roll_radii, 12, null, 1.0, 1.0, 0.0, true);
+        FieldKit.add(bedroll, roll.commit(), PropMaterials.triplanar("canvas", new Color(0.42f, 0.20f, 0.14f), 2.4), Vector3.Zero, "Blanket");
+        Node3D book = new Node3D { Name = "Book", Position = new Vector3(0.13f, 0.112f, 0.36f), Rotation = new Vector3(0.0f, 0.42f, 0.0f) };
+        bedroll.AddChild(book);
+        // Spine up, the two halves of the cover tented over the open pages.
+        foreach (float side in new[] { -1.0f, 1.0f })
+        {
+            MeshInstance3D cover = FieldKit.add(book, FieldKit.rounded_box(new Vector3(0.112f, 0.006f, 0.21f), 0.002), FieldKit.solid(new Color(0.30f, 0.12f, 0.08f), 0.8), new Vector3(side * 0.054f, 0.012f, 0.0f), side < 0 ? "CoverLeft" : "CoverRight");
+            cover.Rotation = new Vector3(0.0f, 0.0f, side * -0.16f);
+            MeshInstance3D pages = FieldKit.add(book, FieldKit.rounded_box(new Vector3(0.104f, 0.014f, 0.198f), 0.003), FieldKit.solid(new Color(0.80f, 0.75f, 0.62f), 0.9), new Vector3(side * 0.052f, 0.004f, 0.0f), side < 0 ? "PagesLeft" : "PagesRight");
+            pages.Rotation = new Vector3(0.0f, 0.0f, side * -0.16f);
+        }
         // Rounded waxed canvas with a front pocket, straps, buckles and a roll.
 
         Node3D pack = FieldKit.pack(this, new Vector3(0.28f, 0.014f, (float)(LENGTH * 0.5 - 0.57)));

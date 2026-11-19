@@ -78,12 +78,21 @@ void fragment() {
 	float mildew = smoothstep(0.62, 0.78, texture(noise_tex, world_pos.xz * 9.0 + world_pos.y * 6.0).r) * low;
 	albedo = mix(albedo, albedo * vec3(0.55, 0.5, 0.42), low * ground_darkening);
 	// Earth splashed up the hem: an uneven tide line a hand high, speckled above.
+	// COLOR.r is the share of the wall's height (1 at the ridge), so this is
+	// metres above the ground line; the sod cloth carries 0. The earlier band
+	// (a hand high, at 0.62) did render but read as a shadow, not dirt.
 	float hem_h = v_height * 1.6;
-	float tide = 0.13 + 0.08 * texture(noise_tex, world_pos.xz * 1.3 + vec2(world_pos.y)).g;
-	float splash = 1.0 - smoothstep(tide * 0.6, tide, hem_h);
-	float speckle = smoothstep(0.66, 0.80, texture(noise_tex, world_pos.xz * 14.0 + vec2(hem_h * 11.0)).r)
-		* (1.0 - smoothstep(tide, tide * 2.6, hem_h));
-	albedo = mix(albedo, vec3(0.075, 0.055, 0.035), clamp(splash * 0.78 + speckle * 0.5, 0.0, 0.85));
+	float tide = 0.20 + 0.10 * texture(noise_tex, world_pos.xz * 1.3 + vec2(world_pos.y)).g;
+	float splash = 1.0 - smoothstep(tide * 0.45, tide, hem_h);
+	float speckle = smoothstep(0.62, 0.78, texture(noise_tex, world_pos.xz * 14.0 + vec2(hem_h * 11.0)).r)
+		* (1.0 - smoothstep(tide, tide * 2.4, hem_h));
+	// Damp wicks higher than the splashes: a soft darker band to about 0.5 m.
+	float damp = (1.0 - smoothstep(0.15, 0.55, hem_h)) * (0.55 + 0.45 * scene_wetness);
+	albedo *= 1.0 - 0.32 * damp;
+	albedo = mix(albedo, vec3(0.055, 0.040, 0.026), clamp(splash * 0.88 + speckle * 0.6, 0.0, 0.92));
+	// The ridge pole and its lashing shade a narrow strip of cloth below them.
+	float ridge_shade = smoothstep(0.955, 0.99, v_height);
+	albedo *= 1.0 - 0.38 * ridge_shade;
 	albedo = mix(albedo, albedo * vec3(0.42, 0.40, 0.34), mildew * 0.6);
 	float fire_d = length(world_pos - fire_position);
 	float warmth = exp(-fire_d * 0.35) * fire_intensity * 0.3;
@@ -100,14 +109,14 @@ void fragment() {
 	float film = smoothstep(0.35, 0.95, scene_wetness) * (0.30 + runoff * 0.70) * exterior * (1.0 - splash * 0.7);
 	ALBEDO = albedo * (1.0 - soaked * 0.32);
 	ROUGHNESS = mix(mix(orm.g, 0.98, 0.3), mix(0.84, 0.39, exterior), soaked) + seam * 0.05;
-	SPECULAR = mix(0.25, mix(0.20, 0.38, exterior), soaked);
+	SPECULAR = mix(0.25, mix(0.20, 0.38, exterior), soaked) * (1.0 - 0.6 * splash);
 	CLEARCOAT = film * 0.45;
 	CLEARCOAT_ROUGHNESS = 0.22;
-	AO = orm.r;
+	AO = orm.r * (1.0 - 0.5 * ridge_shade);
 	// Forward+ already orients two-sided normals before fragment().
 	NORMAL_MAP = texture(normal_tex, UV).rgb;
 	NORMAL_MAP_DEPTH = normal_strength * (1.0 - film * 0.25);
-	BACKLIGHT = albedo * translucency;
+	BACKLIGHT = albedo * translucency * (1.0 - 0.8 * splash) * (1.0 - 0.6 * ridge_shade);
 	EMISSION = albedo * vec3(1.0, 0.42, 0.12) * warmth * 0.1;
 	// Lantern light through the cloth: brightest near the flame, fading over
 	// the panels, and swamped by daylight. Seams and the doubled ridge, being

@@ -675,7 +675,7 @@ public partial class TerrainField
         double h = is_nan(known_height) ? height_fast(x, z) : known_height;
         double s = is_nan(known_slope) ? slope(x, z) : known_slope;
         double dry_land = smoothstep(0.03, 0.30, h - WATER_LEVEL);
-        double trail_edge = smoothstep(0.34, 1.22, walking_distance(new Vector2((float)x, (float)z)));
+        double trail_edge = smoothstep(0.24, 1.10, walking_distance(new Vector2((float)x, (float)z)));
         double pad_edge = 1.0 - smoothstep(0.1, 0.85, camp_wear(new Vector2((float)x, (float)z)));
         // The material mask already suppressed grass at the trail; multiplying it
         // twice left wide bald bands. Plant from habitat instead: shorter woodland
