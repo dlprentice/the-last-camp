@@ -245,7 +245,7 @@ def capture(options: argparse.Namespace, checked: dict, out: Path, manifest: dic
     if "offscreen" in tools:
         # The optional machine wrapper owns display isolation and the GPU lock.
         marker = "^CAPTURE_DONE" if options.mode == "screenshots" else "^CINEMATIC_DONE"
-        args = ["env", f"GODOT={tools['godot']}", tools["offscreen"], "--output", f"LASTCAMP-{os.getpid()}", "--path", str(ROOT),
+        args = ["env", f"GODOT={tools['godot']}", tools["offscreen"], "--shared", "--max-hold", "600", "--output", f"LASTCAMP-{os.getpid()}", "--path", str(ROOT),
                 "--driver", options.display_driver or "x11", "--timeout", str(options.timeout),
                 "--qa", str(out / "offscreen"), "--done-marker", marker, "--", *args[1:]]
     manifest["engine_command"] = args

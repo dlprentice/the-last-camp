@@ -201,7 +201,7 @@ def capture(options: argparse.Namespace, tools: dict, out: Path, manifest: dict)
             "--rendering-driver", "vulkan", "--disable-vsync", "--write-movie", str(avi),
             "--fixed-fps", str(FPS), "--", *game_args(options, out)]
     if "offscreen" in tools:
-        args = ["env", f"GODOT={tools['godot']}", tools["offscreen"], "--output", f"LASTCAMP-{os.getpid()}", "--path", str(ROOT), "--driver", "x11",
+        args = ["env", f"GODOT={tools['godot']}", tools["offscreen"], "--shared", "--max-hold", "600", "--output", f"LASTCAMP-{os.getpid()}", "--path", str(ROOT), "--driver", "x11",
                 "--timeout", str(options.timeout), "--qa", str(out / "offscreen"),
                 "--done-marker", "^CAPTURE_DONE", "--", *args[1:]]
     manifest["engine_command"] = args
