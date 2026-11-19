@@ -29,8 +29,9 @@ public partial class Quality : Node
 
     public QualityPreset current = QualityPreset.ultra();
 
-    /// Keep the cinematic scene at a minimum 30 fps during ordinary play.
-    public const double AUTO_TUNE_LIMIT_MS = 33.3;
+    /// Automatic quality steps down when the mean frame misses the preset's
+    /// own target (its frame cap, else 60 fps) by more than this share.
+    public const double AUTO_TUNE_SLACK = 1.15;
     public const double AUTO_TUNE_SAMPLE_SECONDS = 3.0;
 
     public bool @explicit = false;
@@ -39,7 +40,7 @@ public partial class Quality : Node
     {
         ProcessMode = Node.ProcessModeEnum.Always;
         @explicit = Game.Instance.has_flag("quality") || Game.Instance.has_flag("cinematic") || Game.Instance.has_flag("capture");
-        string requested = Game.Instance.arg_value("quality", Game.Instance.has_flag("cinematic") || Game.Instance.has_flag("capture") ? "ultra" : "high").ToLowerInvariant();
+        string requested = Game.Instance.arg_value("quality", Game.Instance.has_flag("cinematic") || Game.Instance.has_flag("capture") ? "ultra" : QualityPreset.DEFAULT_TIER_NAME).ToLowerInvariant();
         apply(tier_from_name(requested));
     }
 
@@ -75,7 +76,7 @@ public partial class Quality : Node
                 return;
             }
             double mean = total / maxf((double)frames, 1.0);
-            if (mean <= AUTO_TUNE_LIMIT_MS || current.tier == QualityPreset.Tier.LOW)
+            if (mean <= auto_tune_limit_ms(current) || current.tier == QualityPreset.Tier.LOW)
             {
                 return;
             }
@@ -109,6 +110,8 @@ public partial class Quality : Node
         }
     }
 
+    public static double auto_tune_limit_ms(QualityPreset p) => 1000.0 / (p.max_fps > 0 ? p.max_fps : 60) * AUTO_TUNE_SLACK;
+
     public static QualityPreset.Tier tier_from_name(string name)
     {
         switch (name)
@@ -127,13 +130,42 @@ public partial class Quality : Node
     public void apply(QualityPreset.Tier tier)
     {
         bool movie = Game.Instance.has_flag("film-quality") || Game.Instance.has_flag("cinematic") && !Game.Instance.has_flag("capture-quality");
-        current = movie && tier == QualityPreset.Tier.ULTRA ? QualityPreset.film() : QualityPreset.for_tier(tier);
+        apply_preset(movie && tier == QualityPreset.Tier.ULTRA ? QualityPreset.film() : QualityPreset.for_tier(tier));
+    }
+
+    /// Applies a complete preset object. Profile cases pass modified copies of
+    /// the current preset; ordinary play goes through `apply(tier)`.
+    public void apply_preset(QualityPreset preset)
+    {
+        current = preset;
         // Explicit diagnostic overrides also survive in-game quality changes.
         if (Game.Instance.has_flag("sdfgi")) current.sdfgi = true;
         if (Game.Instance.has_flag("no-sdfgi")) current.sdfgi = false;
+        // Grass review: `--dense-distant-grass` restores the older 0.18 floor;
+        // `--grass-floor=<share>` sets any floor for a side-by-side comparison.
+        if (Game.Instance.has_flag("dense-distant-grass")) current.grass_distance_floor = 0.18;
+        if (Game.Instance.has_flag("grass-floor") && double.TryParse(Game.Instance.arg_value("grass-floor", ""), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double floor))
+            current.grass_distance_floor = Math.Clamp(floor, 0.01, 1.0);
         _apply_viewport(Game.Instance.render_viewport ?? GetTree().Root, current);
         _apply_renderer(current);
+        _apply_frame_cap(current);
         EmitSignal(SignalName.preset_changed, current);
+    }
+
+    /// The preset's frame cap holds in play and in route benchmarks (which
+    /// measure the pacing a player gets); `--uncapped` benchmarks run free.
+    /// Other tool runs and headless runs keep whatever cap they started with
+    /// (-1: leave `Engine.MaxFps` alone).
+    public static long frame_cap(QualityPreset p, bool headless, bool tool_run, bool benchmark, bool uncapped)
+    {
+        if (headless || (tool_run && !benchmark)) return -1;
+        return uncapped ? 0 : Math.Max(p.max_fps, 0);
+    }
+
+    private void _apply_frame_cap(QualityPreset p)
+    {
+        long cap = frame_cap(p, DisplayServer.GetName() == "headless", Game.Instance.is_tool_run(), Game.Instance.has_flag("benchmark"), Game.Instance.has_flag("uncapped"));
+        if (cap >= 0) Engine.MaxFps = (int)cap;
     }
 
     public void _apply_viewport(Viewport viewport, QualityPreset p)

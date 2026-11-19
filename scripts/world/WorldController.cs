@@ -793,6 +793,9 @@ public partial class WorldController : Node3D
         sun.DirectionalShadowMaxDistance = (float)p.directional_shadow_distance;
         switch (p.directional_shadow_splits)
         {
+            case 1:
+                sun.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal;
+                break;
             case 2:
                 sun.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel2Splits;
                 break;

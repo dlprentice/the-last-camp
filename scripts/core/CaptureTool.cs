@@ -546,6 +546,43 @@ public partial class CaptureTool : Node
         Game.Instance.quit_cleanly(0);
     }
 
+    /// `--profile` preset levers ("lever ..."), applied on top of the run's preset.
+    public static readonly (string Name, Action<QualityPreset> Change)[] PRESET_LEVERS =
+    {
+        ("lever scale 0.67", p => p.render_scale = 0.67),
+        ("lever scale 0.59", p => p.render_scale = 0.59),
+        ("lever scale 0.5", p => p.render_scale = 0.5),
+        ("lever shadow dist 50", p => p.directional_shadow_distance = 50.0),
+        ("lever shadow dist 35", p => p.directional_shadow_distance = 35.0),
+        ("lever shadow 1 split", p => p.directional_shadow_splits = 1),
+        ("lever shadow atlas 1024", p => p.directional_shadow_size = 1024),
+        ("lever soft shadow low", p => p.soft_shadow_quality = RenderingServer.ShadowQuality.SoftLow),
+        ("lever contact off", p => p.contact_shadows = false),
+        ("lever ssao medium", p => p.ssao_quality = RenderingServer.EnvironmentSsaoQuality.Medium),
+        ("lever ssil medium", p => p.ssil_quality = RenderingServer.EnvironmentSsilQuality.Medium),
+        ("lever ssil off", p => p.ssil = false),
+        ("lever ssr off", p => p.ssr = false),
+        ("lever fog 64", p => { p.fog_volume_size = 64; p.fog_volume_depth = 64; }),
+        ("lever refl 0.3", p => p.reflection_scale = 0.3),
+        ("lever refl 0.25 half", p => { p.reflection_scale = 0.25; p.reflection_half_rate = true; }),
+        ("lever refl off", p => p.planar_reflections = false),
+        ("lever grass floor 0.045", p => p.grass_distance_floor = 0.045),
+        ("lever grass floor 0.18", p => p.grass_distance_floor = 0.18),
+        ("lever grass density 0.5", p => p.grass_density = 0.5),
+        ("lever grass distance 160", p => p.grass_distance = 160.0),
+        ("lever grass distance 110", p => p.grass_distance = 110.0),
+        ("lever foliage 0.8", p => p.foliage_distance = 0.8),
+        ("lever lod bias 0.75", p => p.lod_bias = 0.75),
+        ("lever sky radiance 128", p => p.sky_radiance = Sky.RadianceSizeEnum.Size128),
+        ("lever parallax 0", p => p.parallax_steps = 0),
+        ("lever parallax 4", p => p.parallax_steps = 4),
+        ("lever grass density 0.35", p => p.grass_density = 0.35),
+        ("lever foliage 0.65", p => p.foliage_distance = 0.65),
+        ("lever lod bias 0.5", p => p.lod_bias = 0.5),
+        ("lever ssao low", p => p.ssao_quality = RenderingServer.EnvironmentSsaoQuality.Low),
+        ("lever ssao off", p => p.ssao = false),
+    };
+
     public async void run_profile(string out_path)
     {
         /// `--profile`: measures the GPU cost of each renderer feature at the two
@@ -783,6 +820,19 @@ public partial class CaptureTool : Node
     GetViewport().Scaling3DScale = 0.77f;
 }) } } };
         Godot.Collections.Dictionary report = new Godot.Collections.Dictionary();
+        // Preset levers: each applies a copy of the running preset with one
+        // setting changed, through the same path as a menu change, so a case
+        // measures exactly what a preset would buy. Restoration re-applies the
+        // tier. Ranked levers become preset values in `QualityPreset`.
+        foreach ((string name, Action<QualityPreset> change) in PRESET_LEVERS)
+        {
+            cases.Add(new Godot.Collections.Dictionary { { (StringName)"name", name }, { (StringName)"apply", Callable.From(() =>
+            {
+                QualityPreset changed = Quality.Instance.current.copy();
+                change(changed);
+                Quality.Instance.apply_preset(changed);
+            }) } });
+        }
         List<string> wanted = G.split(Game.Instance.arg_value("profile-cases", ""), ",", false);
         List<string> views = G.split(Game.Instance.arg_value("profile-views", "fire,pond"), ",", false);
         double initialHour = world.hour;

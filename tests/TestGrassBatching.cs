@@ -15,21 +15,36 @@ public partial class TestGrassBatching : TestCase
         assert_eq(Understory.grass_draw_count(bounds, Vector3.Zero, 0), 0, "empty cells remain empty");
         int far = Understory.grass_draw_count(bounds, new Vector3(120, 1, 120), population);
         assert_true(far > 0 && far < population / 4, "far cells keep cover with fewer native instances");
+        foreach (float floor in new[] { 0.18f, 0.045f })
         for (int direction = 0; direction < 16; direction++)
         for (int distance = 0; distance <= 160; distance += 4)
         {
             float angle = direction * MathF.Tau / 16;
             Vector3 camera = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle)) * distance + new Vector3(-8, 2, -8);
-            int draw = Understory.grass_draw_count(bounds, camera, population);
+            int draw = Understory.grass_draw_count(bounds, camera, population, floor);
             for (int x = 0; x <= 4; x++)
             for (int z = 0; z <= 4; z++)
             {
                 Vector3 plant = bounds.Position + new Vector3(x * 4, 1, z * 4);
-                float survivorLimit = Math.Min(1, Understory.grass_density_at(plant.DistanceTo(camera)) + Understory.GrassDensityBlend);
+                float survivorLimit = Math.Min(1, Understory.grass_density_at(plant.DistanceTo(camera), floor) + Understory.GrassDensityBlend);
                 assert_true(draw >= Math.Ceiling(population * (double)survivorLimit),
                     "native prefix includes every plant that can survive the shader's transition, even at cell corners");
             }
         }
+    }
+
+    public void test_distant_floor_changes_only_the_far_population()
+    {
+        for (int distance = 0; distance <= 39; distance++)
+            assert_eq(Understory.grass_density_at(distance, 0.045f), Understory.grass_density_at(distance, 0.18f),
+                "a lower distant floor leaves the foreground density curve unchanged");
+        var bounds = new Aabb(new Vector3(-16, -2, -16), new Vector3(16, 9, 16));
+        int sparse = Understory.grass_draw_count(bounds, new Vector3(120, 1, 120), 400, 0.045f);
+        int dense = Understory.grass_draw_count(bounds, new Vector3(120, 1, 120), 400, 0.18f);
+        assert_lt(sparse, dense / 2.0, "the lower floor submits far fewer distant clumps");
+        assert_gt(Understory.grass_cull_margin(0.5f, 0.045f), Understory.grass_cull_margin(0.5f, 0.18f),
+            "wider surviving clumps get a wider culling margin");
+        assert_eq(Understory.grass_cull_margin(0, 0.045f), 0.0f, "hill grass keeps its own bounds");
     }
 
     public void test_quality_round_trip_retains_uploaded_instances()
@@ -53,6 +68,10 @@ public partial class TestGrassBatching : TestCase
             plants.apply_quality(lower);
             assert_true(plants._replant_thread == null, "lowering quality does not launch a rebuild");
             assert_lt(plants.blade_count, full * 0.5, "lower density reduces submitted instances");
+            lower.grass_distance_floor = 0.07;
+            plants.apply_quality(lower);
+            assert_eq(plants.grass_density_minimum, 0.07f, "the preset sets the distant floor");
+            assert_true(plants.grass_material.GetShaderParameter("density_lod").AsVector4().Z == 0.07f, "the shader receives the preset's floor");
             var original = QualityPreset.high();
             original.grass_density = 0.7;
             original.grass_distance = 24;
