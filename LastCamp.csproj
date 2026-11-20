@@ -18,4 +18,13 @@
   <ItemGroup Condition="'$(Configuration)' == 'ExportRelease'">
     <Compile Remove="tests/**/*.cs;tools/**/*.cs" />
   </ItemGroup>
+  <!-- Patched GodotSharp, fleet1 build (godot#125198), from the directory GODOT_FLEET1_NUPKGS names.
+       Remove this block and nuget.config when the engine leaves beta4. -->
+  <PropertyGroup>
+    <DisableImplicitGodotSharpReferences>true</DisableImplicitGodotSharpReferences>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="GodotSharp" Version="4.8.0-beta.4-fleet1" />
+    <PackageReference Include="GodotSharpEditor" Version="$(PackageVersion_GodotSharp)" Condition=" '$(Configuration)' == 'Debug' " />
+  </ItemGroup>
 </Project>
