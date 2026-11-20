@@ -147,11 +147,11 @@ public partial class Main : Node3D
             await ridges.bake_ridges(camp.forest);
             camp.forest.attach_ridge_impostors(ridges);
         }
-        if (Game.Instance.has_flag("impostors"))
+        if (!Game.Instance.has_flag("full-tree-meshes"))
         {
             TreeImpostors impostors = new TreeImpostors();
             camp.AddChild(impostors);
-            loading.set_progress("Baking tree impostors", 0.90);
+            loading.set_progress("Baking tree impostors", 0.92);
             await impostors.bake(camp.forest);
             if (!IsInsideTree())
             {
@@ -261,6 +261,13 @@ public partial class Main : Node3D
             capture4.run_capture(Game.Instance.arg_value("capture", "res://local-data/captures"), Game.Instance.arg_value("shots", ""));
             return;
         }
+        if (Game.Instance.has_flag("hand-review"))
+        {
+            loading.finish();
+            BeginPlay();
+            _run_hand_review(Game.Instance.arg_value("hand-review", "local-data/hand-review"));
+            return;
+        }
         if (loading.TitleMode)
         {
             // The title takes over: the live camp behind the menu until the player
@@ -276,6 +283,37 @@ public partial class Main : Node3D
 
     /// Hands the built world to play: the story session, June's voice, then the
     /// intro dolly or the player (and the traversal check when asked).
+    private async void _run_hand_review(string outDir)
+    {
+        string absDir = System.IO.Path.IsPathRooted(outDir)
+            ? outDir : ProjectSettings.GlobalizePath("res://" + outDir);
+        System.IO.Directory.CreateDirectory(absDir);
+        if (loading != null && IsInstanceValid(loading)) loading.Visible = false;
+        Game.Instance.hud_visible = false;
+        player.GlobalPosition = new Vector3(3.6f, (float)Game.Instance.camp.field.height(3.6, 3.2), 3.2f);
+        player.yaw = deg_to_rad(42.0);
+        player.pitch = deg_to_rad(-8.0);
+        Game.Instance.world.hour = 20.4;
+        foreach ((string tag, bool lantern, string item) in new[]
+        {
+            ("hand_lantern", true, ""),
+            ("hand_log", false, "log"),
+            ("hand_stone", false, "stone"),
+        })
+        {
+            player.lantern_on = lantern;
+            if (player.hand_lantern != null) player.hand_lantern.Visible = lantern;
+            player.held_item = item;
+            for (int i = 0; i < 12; i++) await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+            using Image img = GetViewport().GetTexture().GetImage();
+            string path = System.IO.Path.Combine(absDir, $"{tag}.png");
+            img.SavePng(path);
+            GD.Print($"HAND_REVIEW_SNAP {path}");
+        }
+        Game.Instance.quit_cleanly(0);
+    }
+
     public void BeginPlay()
     {
         if (!Game.Instance.is_tool_run() || Game.Instance.has_flag("session-check"))

@@ -100,7 +100,7 @@ public partial class BiomeDressing : Node3D
             customs.Add(new Color(rng.Randf(), (float)(cos(yaw) * 0.5 + 0.5), (float)(sin(yaw) * 0.5 + 0.5), rng.RandfRange(0.08f, 0.24f)));
             colors.Add(new Color(rng.RandfRange(0.78f, 0.96f), rng.RandfRange(0.92f, 1.08f), rng.RandfRange(0.72f, 0.92f), rng.RandfRange(0.0f, 0.30f)));
         }
-        _add_margin_multimesh("WetSedges", GrassPlanter.clump_mesh(9, 2, 0.035, 917), _wet_grass_material(false), transforms, customs, colors);
+        _add_margin_multimesh("WetSedges", GrassPlanter.clump_mesh(5, 2, 0.042, 917), _wet_grass_material(false), transforms, customs, colors, false);
     }
 
     public void _build_rush_pockets()
@@ -200,7 +200,7 @@ public partial class BiomeDressing : Node3D
         return mat;
     }
 
-    public void _add_margin_multimesh(string node_name, ArrayMesh mesh, Material material, Godot.Collections.Array<Transform3D> transforms, Godot.Collections.Array<Color> customs, Godot.Collections.Array<Color> colors)
+    public void _add_margin_multimesh(string node_name, ArrayMesh mesh, Material material, Godot.Collections.Array<Transform3D> transforms, Godot.Collections.Array<Color> customs, Godot.Collections.Array<Color> colors, bool reflects = true)
     {
         if ((transforms.Count == 0))
         {
@@ -222,9 +222,10 @@ public partial class BiomeDressing : Node3D
         node.Name = node_name;
         node.Multimesh = mm;
         node.MaterialOverride = material;
-        node.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+        node.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         node.GIMode = GeometryInstance3D.GIModeEnum.Disabled;
-        node.Layers = unchecked((uint)(1));
+        node.Layers = unchecked((uint)(reflects ? 1 : Pond.GRASS_LAYER));
+        node.VisibilityRangeEnd = 95.0f;
         AddChild(node);
     }
 

@@ -30,9 +30,9 @@ public partial class GrassPlanter
     }
 
     public const double CHUNK_SIZE = 8.0;
-    /// Stand density multiplier over the authored clump count: the meadow is
-    /// meant to read as thick grass everywhere the camera can see.
-    public const double NEAR_DENSITY_BOOST = 3.2;
+    /// Stand density multiplier over the authored clump count: keeps a lush, continuous
+    /// meadow carpet while cutting excessive overdraw so laptops hold 60 fps.
+    public const double NEAR_DENSITY_BOOST = 2.15;
     public const long FLOATS_PER_INSTANCE = 20;
     public const double SUITABILITY_RESOLUTION = 1.0;
     public const double CLUMPS_PER_SQUARE_METRE = 22.0;

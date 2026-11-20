@@ -74,6 +74,7 @@ public partial class Player : CharacterBody3D
     public double stone_charge;
     private MeshInstance3D _heldLog;
     private MeshInstance3D _heldStone;
+    private Node3D _playerArm;
     public bool lantern_on = false;
 
     public double _bob_phase = 0.0;
@@ -121,7 +122,7 @@ public partial class Player : CharacterBody3D
 
         hand_socket = new Node3D();
         hand_socket.Name = "HandSocket";
-        hand_socket.Position = new Vector3(0.34f, -0.42f, -0.55f);
+        hand_socket.Position = new Vector3(0.32f, -0.34f, -0.54f);
         camera.AddChild(hand_socket);
 
         interact_ray = new RayCast3D();
@@ -148,6 +149,16 @@ public partial class Player : CharacterBody3D
         GC.KeepAlive(stone_mesh);
         GC.KeepAlive(stone_material);
         hand_socket.AddChild(_heldStone);
+        const string handPath = "res://assets/models/player_hand.glb";
+        if (ResourceLoader.Exists(handPath))
+        {
+            _playerArm = GD.Load<PackedScene>(handPath).Instantiate<Node3D>();
+            _playerArm.Name = "ForegroundArm";
+            _playerArm.Visible = false;
+            foreach (Node n in _playerArm.FindChildren("*", "MeshInstance3D", true, false))
+                if (n is MeshInstance3D mi) mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            hand_socket.AddChild(_playerArm);
+        }
         FloorMaxAngle = (float)deg_to_rad(52.0);
         FloorSnapLength = 0.4f;
         CollisionMask = 1;
@@ -171,7 +182,7 @@ public partial class Player : CharacterBody3D
         hand_lantern.Name = "HandLantern";
         hand_lantern.Visible = false;
         hand_lantern.Scale = Vector3.One * 0.62f;
-        hand_lantern.Position = new Vector3(0.0f, -0.3f, 0.0f);
+        hand_lantern.Position = new Vector3(-0.02f, -0.15f, -0.02f);
         hand_socket.AddChild(hand_lantern);
         MeshInstance3D metal = new MeshInstance3D();
         metal.Mesh = PropMeshes.hurricane_metal();
@@ -371,9 +382,32 @@ public partial class Player : CharacterBody3D
             stone_charge = 0;
         }
         bool holdingVisible = enabled && Game.Instance.mode == Game.Mode.PLAY;
-        _heldLog.Visible = holdingVisible && held_item == "log";
-        _heldStone.Visible = holdingVisible && held_item == "stone";
-        _heldStone.Position = new Vector3(0.02f, (float)(0.18 + stone_charge * 0.035), (float)(-0.1 + stone_charge * 0.025));
+        bool holdingLog = holdingVisible && held_item == "log";
+        bool holdingStone = holdingVisible && held_item == "stone";
+        bool holdingLantern = holdingVisible && lantern_on && !holdingLog && !holdingStone;
+        _heldLog.Visible = holdingLog;
+        _heldStone.Visible = holdingStone;
+        _heldStone.Position = new Vector3(0.02f, (float)(0.12 + stone_charge * 0.035), (float)(-0.09 + stone_charge * 0.025));
+        if (_playerArm != null)
+        {
+            _playerArm.Visible = holdingLog || holdingStone || holdingLantern;
+            if (holdingStone)
+            {
+                _playerArm.Position = new Vector3(0.03f, (float)(0.105 + stone_charge * 0.035), (float)(-0.075 + stone_charge * 0.025));
+                _playerArm.Rotation = new Vector3((float)(0.16 + stone_charge * 0.14), 0.10f, -0.14f);
+            }
+            else if (holdingLog)
+            {
+                _playerArm.Position = new Vector3(0.06f, 0.105f, -0.055f);
+                _playerArm.Rotation = new Vector3(0.14f, -0.15f, 0.28f);
+            }
+            else if (holdingLantern)
+            {
+                // Curled fingers wrap cleanly around the hurricane lantern's top bail arch (Y = -0.15 + 0.38*0.62 ~ +0.085)
+                _playerArm.Position = new Vector3(-0.01f, 0.088f, -0.015f);
+                _playerArm.Rotation = new Vector3(0.04f, 0.04f, -0.06f);
+            }
+        }
 
         double speed = crouching ? CROUCH_SPEED : running ? RUN_SPEED : WALK_SPEED;
         if (in_water)

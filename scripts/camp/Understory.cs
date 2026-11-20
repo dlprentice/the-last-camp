@@ -17,7 +17,7 @@ namespace LastCamp;
 /// scene plan and wildflowers through the clearing.
 public partial class Understory : Node3D
 {
-    public const long FERN_COUNT = 2600;
+    public const long FERN_COUNT = 1600;
     /// Plants are batched per cell so culling works on the parts of the woodland in
     /// view, and only cells near the camera cast sun shadows (distant plant shadows
     /// are invisible but cost a full pass per cascade).
@@ -113,9 +113,9 @@ public partial class Understory : Node3D
             grass_material.Shader = Content.Load<Shader>("res://shaders/grass.gdshader");
             apply_quality(Quality.Instance.current);
         }
-        // Thin blades, loosely spread: a close-up blade wider than a finger reads
-        // as a strap, and a tight bunch of them as a planted plug.
-        ArrayMesh blade = GrassPlanter.clump_mesh(7, 5, 0.0135, 77, 2.2);
+        // Five slightly broader curved blades with 2 vertical segments preserve a lush
+        // wind-swept meadow while halving grass geometry and fragment overdraw.
+        ArrayMesh blade = GrassPlanter.clump_mesh(5, 2, 0.022, 77, 2.2);
         _upload_grass(GrassPlanter.merge_chunks(planter.chunks, 16), blade, grass_material, "Grass");
         if (distant_grass_material == null)
         {
@@ -126,9 +126,10 @@ public partial class Understory : Node3D
             distant_grass_material.SetShaderParameter("fade_end", 800.0);
         }
         ArrayMesh distant_blade = GrassPlanter.clump_mesh(5, 1, 0.055, 901);
-        _upload_grass(planter.distant_chunks, distant_blade, distant_grass_material, "HillGrass");
+        List<GrassPlanter.Chunk> mergedDistant = GrassPlanter.merge_chunks(planter.distant_chunks, 128);
+        _upload_grass(mergedDistant, distant_blade, distant_grass_material, "HillGrass");
         ApplyGrassBudget();
-        G.print(G.format("Groundcover hills: %d clumps in %d batches, %d shrubs, extent %.0f m", new Godot.Collections.Array { distant_clump_count, (long)planter.distant_chunks.Count, distant_shrub_count, GrassPlanter.DISTANT_EXTENT }));
+        G.print(G.format("Groundcover hills: %d clumps in %d batches, %d shrubs, extent %.0f m", new Godot.Collections.Array { distant_clump_count, (long)mergedDistant.Count, distant_shrub_count, GrassPlanter.DISTANT_EXTENT }));
     }
 
     public void _upload_grass(List<GrassPlanter.Chunk> chunks, ArrayMesh mesh, ShaderMaterial material, string prefix)
@@ -371,14 +372,14 @@ public partial class Understory : Node3D
             // The atlas frond grows from a real rachis, connected to the crown.
             Godot.Collections.Array<Vector3> stem_points = new Godot.Collections.Array<Vector3> { new Vector3(0, 0.006f, 0) };
             Godot.Collections.Array<double> stem_radii = new Godot.Collections.Array<double> { 0.004 };
-            for (long step = 0; step < 13; step++)
+            for (long step = 0; step < 5; step++)
             {
-                double t = (double)step / 12.0;
+                double t = (double)step / 4.0;
                 stem_points.Add(dir * (float)length * (float)(0.15 + 0.85 * t) + Vector3.Up * (float)(length * (t - 0.72 * t * t) + tilt + 0.05));
                 stem_radii.Add(lerpf(0.003, 0.0006, t));
             }
             long stem_start = mb.vertex_count();
-            mb.add_tube(stem_points, stem_radii, 5, new Color(0.4f, 0.5f, 0, 1), 1, 1, 0, true);
+            mb.add_tube(stem_points, stem_radii, 3, new Color(0.4f, 0.5f, 0, 1), 1, 1, 0, true);
             for (long vertex = stem_start, vertex_end = mb.vertex_count(); vertex < vertex_end; vertex++)
             {
                 mb.uvs[(int)vertex] = new Vector2(-1, -1);
@@ -386,7 +387,7 @@ public partial class Understory : Node3D
                 _t1.R = (float)clampf(mb.vertices[(int)vertex].Length() / length, 0, 1);
                 mb.colors[(int)vertex] = _t1;
             }
-            long segments = 8;
+            long segments = 4;
             long prev_l = -1;
             long prev_r = -1;
             for (long i = 0, i_end = segments + 1; i < i_end; i++)
@@ -897,19 +898,41 @@ public partial class Understory : Node3D
             node.LodBias = _grassLodBias;
             _set_range(node, node.Name.ToString().StartsWith("HillGrass_", StringComparison.Ordinal) ? 800 : p.grass_distance);
         }
+        bool castSmallShadows = p.tier >= QualityPreset.Tier.HIGH;
         foreach (MultiMeshInstance3D node2 in meadow_cells)
         {
             if (node2.Name.ToString().StartsWith("MeadowTussocks_", StringComparison.Ordinal)) node2.LodBias = _grassLodBias;
+            node2.CastShadow = castSmallShadows ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off;
             _set_range(node2, p.grass_distance);
         }
         foreach (MultiMeshInstance3D node3 in fern_cells)
         {
+            node3.LodBias = (float)p.lod_bias;
+            node3.CastShadow = castSmallShadows ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off;
             _set_range(node3, 110.0 * p.foliage_distance);
         }
         foreach (Godot.Collections.Dictionary pair in shadow_cells)
         {
+            MultiMeshInstance3D near = pair["near"].As<MultiMeshInstance3D>();
             MultiMeshInstance3D far = pair["far"].As<MultiMeshInstance3D>();
-            far.VisibilityRangeEnd = G.op("+", 110.0 * p.foliage_distance, pair["half"]).AsSingle();
+            double half = pair["half"].AsDouble();
+            near.LodBias = (float)p.lod_bias;
+            far.LodBias = (float)p.lod_bias;
+            if (!castSmallShadows)
+            {
+                near.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+                near.VisibilityRangeEnd = (float)(110.0 * p.foliage_distance + half);
+                far.Visible = false;
+            }
+            else
+            {
+                near.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+                double shadowRange = p.tier == QualityPreset.Tier.HIGH ? 24.0 : FERN_SHADOW_RANGE;
+                near.VisibilityRangeEnd = (float)(shadowRange + half);
+                far.Visible = true;
+                far.VisibilityRangeBegin = (float)(shadowRange + half - 0.5);
+                far.VisibilityRangeEnd = (float)(110.0 * p.foliage_distance + half);
+            }
         }
         float floor = (float)Math.Clamp(p.grass_distance_floor, 0.01, 1.0);
         bool floorChanged = floor != grass_density_minimum;

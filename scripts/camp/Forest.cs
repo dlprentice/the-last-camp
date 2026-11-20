@@ -558,7 +558,7 @@ public partial class Forest : Node3D
 
     public void _apply_switch_distance()
     {
-        double d = _switch_override < 0.0 ? TreeImpostors.SWITCH_DISTANCE * _foliage_distance : _switch_override;
+        double d = _switch_override < 0.0 ? maxf(62.0, TreeImpostors.SWITCH_DISTANCE * _foliage_distance) : _switch_override;
         foreach (Godot.Collections.Dictionary n in impostor_nodes)
         {
             foreach (Variant hero in new Godot.Collections.Array { n["bark"], n["leaves"] })
@@ -586,6 +586,21 @@ public partial class Forest : Node3D
     {
         _foliage_distance = p.foliage_distance;
         set_leaf_lod(NEAR_LEAF_LOD, FAR_LEAF_LOD, p.foliage_distance);
+        float treeLodBias = p.tier <= QualityPreset.Tier.MEDIUM ? 0.50f
+            : p.tier == QualityPreset.Tier.HIGH ? 0.72f
+            : (float)p.lod_bias;
+        foreach (MeshInstance3D mi in near_instances) mi.LodBias = treeLodBias;
+        foreach (MultiMeshInstance3D mmi in far_multimeshes) mmi.LodBias = treeLodBias;
+        foreach (MultiMeshInstance3D mmi in ridge_multimeshes) mmi.LodBias = treeLodBias;
+        // Distant ridge impostors start at 140 m; skip their shadow-only draws when sun shadows end closer.
+        bool ridgeShadows = p.directional_shadow_distance > 125.0;
+        foreach (Node child in GetChildren())
+        {
+            if (child is MultiMeshInstance3D mmi && mmi.Name.ToString().StartsWith("RidgeCanopyShadow", StringComparison.Ordinal))
+            {
+                mmi.Visible = ridgeShadows;
+            }
+        }
         if (!(impostor_nodes.Count == 0))
         {
             _apply_switch_distance();

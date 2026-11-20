@@ -590,12 +590,17 @@ public partial class Pond : Node3D
         _mirror_camera(camera, reflection_camera);
         if (_half_rate && _reflection_visible)
         {
-            // Half-rate mirror: refresh every other frame (the ripples hide the lag).
-            _frame_parity = (_frame_parity + 1) % 2;
+            // Throttle mirror refresh on play presets (water ripples smoothly mask 2-3 frame cadence).
+            int stride = Quality.Instance?.current?.tier <= QualityPreset.Tier.MEDIUM ? 3 : 2;
+            _frame_parity = (_frame_parity + 1) % stride;
             reflection_viewport.RenderTargetUpdateMode = _frame_parity == 0 ? SubViewport.UpdateMode.Once : SubViewport.UpdateMode.Disabled;
+            reflection_viewport.MeshLodThreshold = stride >= 3 ? 8.0f : 5.0f;
+            reflection_camera.Far = stride >= 3 ? 220.0f : 420.0f;
         }
         else
         {
+            reflection_viewport.MeshLodThreshold = 4.0f;
+            reflection_camera.Far = 700.0f;
             _apply_update_mode(false);
         }
         _reflection_visible = true;

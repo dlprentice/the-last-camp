@@ -18,8 +18,8 @@ public partial class TestQualityPresets : TestCase
     public void test_high_is_full_detail_at_an_even_thirty()
     {
         QualityPreset high = QualityPreset.high();
-        assert_eq(high.max_fps, 30L, "High caps at 30 so its pacing is even");
-        assert_near(Quality.auto_tune_limit_ms(high), 1000.0 / 30 * Quality.AUTO_TUNE_SLACK, 1e-9, "automatic quality judges High against its cap");
+        assert_eq(high.max_fps, 0L, "High runs uncapped toward 60 fps");
+        assert_near(Quality.auto_tune_limit_ms(high), 1000.0 / 60 * Quality.AUTO_TUNE_SLACK, 1e-9, "automatic quality judges uncapped High against 60 fps");
         QualityPreset fallback = QualityPreset.for_tier(QualityPreset.DEFAULT_TIER);
         assert_true(high.render_scale >= fallback.render_scale, "High renders at least the default's resolution");
         assert_true(high.grass_distance >= fallback.grass_distance, "High keeps at least the default's grass range");
@@ -29,12 +29,13 @@ public partial class TestQualityPresets : TestCase
 
     public void test_frame_cap_applies_to_play_and_benchmarks_only()
     {
-        QualityPreset high = QualityPreset.high();
-        assert_eq(Quality.frame_cap(high, false, false, false, false), 30L, "ordinary play takes the preset's cap");
-        assert_eq(Quality.frame_cap(high, false, true, true, false), 30L, "a route benchmark measures the pacing a player gets");
-        assert_eq(Quality.frame_cap(high, false, true, true, true), 0L, "--uncapped benchmarks run free");
-        assert_eq(Quality.frame_cap(high, false, true, false, false), -1L, "other tool runs keep their own frame cap");
-        assert_eq(Quality.frame_cap(high, true, false, false, false), -1L, "headless runs keep the headless cap");
+        QualityPreset capped = QualityPreset.high();
+        capped.max_fps = 30;
+        assert_eq(Quality.frame_cap(capped, false, false, false, false), 30L, "ordinary play takes the preset's cap");
+        assert_eq(Quality.frame_cap(capped, false, true, true, false), 30L, "a route benchmark measures the pacing a player gets");
+        assert_eq(Quality.frame_cap(capped, false, true, true, true), 0L, "--uncapped benchmarks run free");
+        assert_eq(Quality.frame_cap(capped, false, true, false, false), -1L, "other tool runs keep their own frame cap");
+        assert_eq(Quality.frame_cap(capped, true, false, false, false), -1L, "headless runs keep the headless cap");
     }
 
     public void test_copy_is_independent_and_complete()

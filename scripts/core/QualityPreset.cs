@@ -157,32 +157,34 @@ public partial class QualityPreset : RefCounted
         QualityPreset p = new QualityPreset();
         p.tier = QualityPreset.Tier.HIGH;
         p.display_name = "High";
-        // Full detail at an even, capped 30 fps: about 30 ms of main-view GPU
-        // time on the reference laptop cannot hold 60, so it does not try.
-        p.max_fps = 30;
-        p.contact_shadows = true;
-        // Measured on the RTX 4060 Laptop (2026-09-10): the frame is fragment-bound
-        // in vegetation, so the atlas and internal resolution are the levers that
-        // pay without changing the layout. Ultra keeps the full-size settings.
+        // High targets smooth 60 fps on mid-range GPUs by trimming redundant screen-space GI/SSR
+        // passes (planar pond reflections and sky/direct/campfire light carry the scene cleanly).
+        p.max_fps = 0;
+        p.contact_shadows = false;
         p.render_scale = 0.77;
         p.upscaler = Viewport.Scaling3DModeEnum.Fsr2;
         p.directional_shadow_size = 2048;
-        // Two cascades to 80 m keep half the atlas for nearby contact shadows.
-        p.directional_shadow_distance = 80.0;
+        p.directional_shadow_distance = 75.0;
         p.directional_shadow_splits = 2;
         p.fire_shadow_casters = 0xFFFFF & ~Pond.GRASS_LAYER;
         p.soft_shadow_quality = RenderingServer.ShadowQuality.SoftMedium;
+        p.positional_shadow_atlas = 2048;
+        p.ssao_quality = RenderingServer.EnvironmentSsaoQuality.Medium;
+        p.ssil = false;
         p.sdfgi_cascades = 5;
-        p.ssr_steps = 24;
-        p.fog_volume_size = 96;
-        p.fog_volume_depth = 96;
-        p.reflection_scale = 0.4;
+        p.ssr = false;
+        p.ssr_steps = 16;
+        p.fog_volume_size = 48;
+        p.fog_volume_depth = 48;
+        p.reflection_scale = 0.32;
         p.reflection_half_rate = true;
-        p.grass_density = 0.7;
-        p.grass_distance = 285.0;
+        p.grass_density = 0.50;
+        p.grass_distance = 135.0;
         p.grass_lod_bias = 0.25;
-        p.parallax_steps = 10;
-        p.ridge_detail = 0.75;
+        p.foliage_distance = 0.85;
+        p.lod_bias = 0.65;
+        p.parallax_steps = 4;
+        p.ridge_detail = 0.72;
         return p;
     }
 
@@ -191,35 +193,35 @@ public partial class QualityPreset : RefCounted
         QualityPreset p = new QualityPreset();
         p.tier = QualityPreset.Tier.MEDIUM;
         p.display_name = "Medium";
-        p.render_scale = 0.59;
+        p.render_scale = 0.67;
         p.upscaler = Viewport.Scaling3DModeEnum.Fsr2;
         p.directional_shadow_size = 2048;
-        p.directional_shadow_distance = 80.0;
+        p.directional_shadow_distance = 55.0;
         p.directional_shadow_splits = 2;
         p.fire_shadow_casters = 0xFFFFF & ~Pond.GRASS_LAYER;
-        p.soft_shadow_quality = RenderingServer.ShadowQuality.SoftLow;
+        p.soft_shadow_quality = RenderingServer.ShadowQuality.SoftVeryLow;
         p.positional_shadow_atlas = 2048;
-        p.ssao_quality = RenderingServer.EnvironmentSsaoQuality.Medium;
+        p.ssao_quality = RenderingServer.EnvironmentSsaoQuality.VeryLow;
         p.ssil = false;
         p.sdfgi_cascades = 4;
         p.sdfgi_ray_count = RenderingServer.EnvironmentSdfgiRayCount.Count8;
         p.ssr = false;
-        p.fog_volume_size = 64;
-        p.fog_volume_depth = 64;
+        p.fog_volume_size = 32;
+        p.fog_volume_depth = 32;
         p.dof = false;
         p.sky_radiance = Sky.RadianceSizeEnum.Size128;
         p.reflection_scale = 0.25;
         p.reflection_half_rate = true;
-        p.grass_density = 0.5;
-        p.grass_distance = 160.0;
+        p.grass_density = 0.36;
+        p.grass_distance = 82.0;
         p.grass_lod_bias = 0.25;
         p.grass_distance_floor = 0.045;
-        p.foliage_distance = 0.8;
-        p.lod_bias = 0.75;
+        p.foliage_distance = 0.68;
+        p.lod_bias = 0.48;
         p.ridge_detail = 0.5;
         p.particle_scale = 0.7;
         p.anisotropy = Viewport.AnisotropicFiltering.Anisotropy8X;
-        p.parallax_steps = 4;
+        p.parallax_steps = 0;
         return p;
     }
 

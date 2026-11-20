@@ -898,16 +898,17 @@ public partial class ScannedDressing : Node3D
             Godot.Collections.Array transforms = group["transforms"].AsGodotArray();
             Godot.Collections.Dictionary spec = LIBRARY[v.model].AsGodotDictionary();
             bool plant = G.eq(spec["kind"], "plant");
+            string kind = spec["kind"].AsString();
             MultiMeshInstance3D near = _make_batch(key, v, transforms, spec, true);
             if (plant)
             {
                 MultiMeshInstance3D far = _make_batch(key + "|far", v, transforms, spec, false);
-                _ranges.Add(new Godot.Collections.Dictionary { { "node", near }, { "fade", SHADOW_RANGE }, { "begin", 0.0 }, { "half", _half(near) } });
-                _ranges.Add(new Godot.Collections.Dictionary { { "node", far }, { "fade", spec["fade"] }, { "begin", SHADOW_RANGE }, { "half", _half(far) } });
+                _ranges.Add(new Godot.Collections.Dictionary { { "node", near }, { "fade", SHADOW_RANGE }, { "full_fade", spec["fade"] }, { "begin", 0.0 }, { "half", _half(near) }, { "kind", kind }, { "model", v.model }, { "twin", "near" } });
+                _ranges.Add(new Godot.Collections.Dictionary { { "node", far }, { "fade", spec["fade"] }, { "full_fade", spec["fade"] }, { "begin", SHADOW_RANGE }, { "half", _half(far) }, { "kind", kind }, { "model", v.model }, { "twin", "far" } });
             }
             else
             {
-                _ranges.Add(new Godot.Collections.Dictionary { { "node", near }, { "fade", spec["fade"] }, { "begin", 0.0 }, { "half", _half(near) } });
+                _ranges.Add(new Godot.Collections.Dictionary { { "node", near }, { "fade", spec["fade"] }, { "full_fade", spec["fade"] }, { "begin", 0.0 }, { "half", _half(near) }, { "kind", kind }, { "model", v.model }, { "twin", "single" } });
             }
         }
     }
@@ -944,12 +945,74 @@ public partial class ScannedDressing : Node3D
 
     public void _quality(QualityPreset p)
     {
+        // High-poly photoscans ship with native mesh LODs (meshes/generate_lods=true).
+        // Play presets step down scan LODs early and skip sun-shadow passes on small
+        // undergrowth/pebbles (which sit beneath shadow-casting trees), keeping full
+        // camp richness while cutting millions of sub-pixel triangles per frame.
+        float scanLodBias = p.tier == QualityPreset.Tier.LOW ? 0.16f
+            : p.tier == QualityPreset.Tier.MEDIUM ? 0.24f
+            : p.tier == QualityPreset.Tier.HIGH ? 0.42f
+            : (float)p.lod_bias;
+        double plantDistScale = p.tier == QualityPreset.Tier.LOW ? 0.42
+            : p.tier == QualityPreset.Tier.MEDIUM ? 0.52
+            : p.tier == QualityPreset.Tier.HIGH ? 0.72
+            : 1.0;
+        bool plantShadows = p.tier >= QualityPreset.Tier.HIGH;
+        double plantShadowRange = p.tier == QualityPreset.Tier.HIGH ? 22.0 : SHADOW_RANGE;
+
         foreach (Godot.Collections.Dictionary entry in _ranges)
         {
             MultiMeshInstance3D node = entry["node"].As<MultiMeshInstance3D>();
             double half = entry["half"].AsDouble();
-            node.VisibilityRangeBegin = (float)(G.op("<=", entry["begin"], 0.0).AsBool() ? 0.0 : G.to_float(entry["begin"]) * p.foliage_distance + half - 0.5);
-            node.VisibilityRangeEnd = (float)(G.to_float(entry["fade"]) * p.foliage_distance + half);
+            string kind = entry["kind"].AsString();
+            string model = entry["model"].AsString();
+            string twin = entry["twin"].AsString();
+            bool smallPebble = model == "stone_01" || model == "rock_07" || model == "rock_09";
+            node.LodBias = kind == "plant" || smallPebble ? scanLodBias : MathF.Min(1.0f, scanLodBias * 1.35f);
+
+            if (kind == "plant")
+            {
+                double fullFade = G.to_float(entry["full_fade"]) * p.foliage_distance * plantDistScale;
+                if (!plantShadows)
+                {
+                    if (twin == "far")
+                    {
+                        node.Visible = false;
+                        continue;
+                    }
+                    node.Visible = true;
+                    node.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+                    node.VisibilityRangeBegin = 0.0f;
+                    node.VisibilityRangeEnd = (float)(fullFade + half);
+                }
+                else
+                {
+                    node.Visible = true;
+                    double split = Math.Min(plantShadowRange * p.foliage_distance, fullFade);
+                    if (twin == "near")
+                    {
+                        node.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+                        node.VisibilityRangeBegin = 0.0f;
+                        node.VisibilityRangeEnd = (float)(split + half);
+                    }
+                    else
+                    {
+                        node.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+                        node.VisibilityRangeBegin = (float)(split + half - 0.5);
+                        node.VisibilityRangeEnd = (float)(fullFade + half);
+                    }
+                }
+            }
+            else
+            {
+                node.Visible = true;
+                node.CastShadow = (smallPebble && p.tier <= QualityPreset.Tier.HIGH)
+                    ? GeometryInstance3D.ShadowCastingSetting.Off
+                    : GeometryInstance3D.ShadowCastingSetting.On;
+                double distScale = smallPebble ? plantDistScale : 1.0;
+                node.VisibilityRangeBegin = 0.0f;
+                node.VisibilityRangeEnd = (float)(G.to_float(entry["fade"]) * p.foliage_distance * distScale + half);
+            }
             node.VisibilityRangeFadeMode = GeometryInstance3D.VisibilityRangeFadeModeEnum.Disabled;
         }
     }

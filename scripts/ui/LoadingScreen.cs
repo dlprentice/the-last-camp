@@ -17,7 +17,7 @@ public partial class LoadingScreen : CanvasLayer
     public static readonly string[] TitleBypassFlags =
     {
         "session-check", "benchmark", "profile", "traverse", "cinematic", "capture", "review-route",
-        "review-assets", "package-check", "check-pond", "scene-smoke",
+        "review-assets", "package-check", "check-pond", "scene-smoke", "hand-review",
     };
 
     /// True when a run with these parsed arguments shows the title.

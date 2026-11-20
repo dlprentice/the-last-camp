@@ -214,21 +214,21 @@ public partial class HabitatDiversity : Node3D
                     double reach = rng.RandfRange(0.20f, 0.39f);
                     Godot.Collections.Array<Vector3> points = new Godot.Collections.Array<Vector3>();
                     Godot.Collections.Array<double> radii = new Godot.Collections.Array<double>();
-                    for (long j = 0; j < 15; j++)
+                    for (long j = 0; j < 10; j++)
                     {
-                        double t = j / 14.0;
+                        double t = j / 9.0;
                         Vector3 at2 = out2 * (float)t * (float)reach + Vector3.Up * (float)(0.018 + sin(t * PI * 0.76) * 0.17);
                         points.Add(at2);
-                        radii.Add(0.002 * (1.0 - t * 0.70));
+                        radii.Add(0.0022 * (1.0 - t * 0.70));
                         if (j > 0)
                         {
                             foreach (Variant side in new Godot.Collections.Array { -1.0, 1.0 })
                             {
-                                _leaf(mb, at2, out2.Rotated(Vector3.Up, G.op("*", side, 1.05).AsSingle()), 0.087 * pow(1.0 - t * 0.88, 0.8), 0.014, 0.008, new Color(0.08f, 0.22f, 0.055f), false);
+                                _leaf(mb, at2, out2.Rotated(Vector3.Up, G.op("*", side, 1.05).AsSingle()), 0.087 * pow(1.0 - t * 0.88, 0.8), 0.014, 0.008, new Color(0.08f, 0.22f, 0.055f), false, 3, true);
                             }
                         }
                     }
-                    mb.add_tube(points, radii, 4, new Color(0.10f, 0.19f, 0.06f));
+                    mb.add_tube(points, radii, 3, new Color(0.10f, 0.19f, 0.06f));
                 }
                 break;
             case (long)HabitatDiversity.Form.RUSH:
@@ -264,7 +264,7 @@ public partial class HabitatDiversity : Node3D
                     double a4 = rng.Randf() * TAU;
                     Vector3 out4 = new Vector3((float)cos(a4), 0, (float)sin(a4));
                     Vector3 at4 = out4 * rng.RandfRange(0.0f, 0.16f) + Vector3.Up * rng.RandfRange(0.004f, 0.014f);
-                    _leaf(mb, at4, out4, rng.RandfRange(0.07f, 0.14f), 0.037, 0.008, new Color(0.23f, 0.115f, 0.045f).Lerp(new Color(0.39f, 0.24f, 0.08f), rng.Randf()), true);
+                    _leaf(mb, at4, out4, rng.RandfRange(0.07f, 0.14f), 0.037, 0.008, new Color(0.23f, 0.115f, 0.045f).Lerp(new Color(0.39f, 0.24f, 0.08f), rng.Randf()), true, 7, false);
                 }
                 break;
         }
@@ -273,31 +273,32 @@ public partial class HabitatDiversity : Node3D
         return mb.commit(null, true);
     }
 
-    public static void _leaf(MeshBuilder mb, Vector3 at, Vector3 @out, double length, double width, double lift, Color tint, bool lobed)
+    public static void _leaf(MeshBuilder mb, Vector3 at, Vector3 @out, double length, double width, double lift, Color tint, bool lobed, long rows = 5, bool twoCol = false)
     {
         long start = mb.vertex_count();
         Vector3 side = new Vector3(-@out.Z, 0, @out.X);
-        for (long row = 0; row < 9; row++)
+        long cols = twoCol ? 2 : 3;
+        for (long row = 0; row < rows; row++)
         {
-            double t = row / 8.0;
+            double t = row / (double)(rows - 1);
             double w = maxf(sin(t * PI), 0.01) * width;
             if (lobed)
             {
                 w *= 0.78 + 0.22 * cos(t * PI * 8.0);
             }
-            for (long col = 0; col < 3; col++)
+            for (long col = 0; col < cols; col++)
             {
-                double u = (double)col - 1.0;
+                double u = twoCol ? (col == 0 ? -1.0 : 1.0) : (double)col - 1.0;
                 Vector3 p = at + @out * (float)t * (float)length + side * (float)u * (float)w + Vector3.Up * (float)(sin(t * PI) * lift + u * u * sin(t * PI) * width * 0.16);
-                mb.add_vertex(p, Vector3.Up, new Vector2((float)(col / 2.0), (float)t), tint * (float)(col == 1 ? 0.90 : 1.0));
+                mb.add_vertex(p, Vector3.Up, new Vector2((float)(col / (double)(cols - 1)), (float)t), tint * (float)(!twoCol && col == 1 ? 0.90 : 1.0));
             }
         }
-        for (long row2 = 0; row2 < 8; row2++)
+        for (long row2 = 0; row2 < rows - 1; row2++)
         {
-            for (long col2 = 0; col2 < 2; col2++)
+            for (long col2 = 0; col2 < cols - 1; col2++)
             {
-                long a = start + row2 * 3 + col2;
-                mb.add_quad_facing(a, a + 1, a + 4, a + 3, Vector3.Up);
+                long a = start + row2 * cols + col2;
+                mb.add_quad_facing(a, a + 1, a + cols + 1, a + cols, Vector3.Up);
             }
         }
     }
@@ -313,13 +314,18 @@ public partial class HabitatDiversity : Node3D
 
     public void _quality(QualityPreset p)
     {
-        material.SetShaderParameter("fade_start", 85.0 * p.foliage_distance);
-        material.SetShaderParameter("fade_end", 140.0 * p.foliage_distance);
+        // Small ground rosettes, fernlets and leaf litter dissolve cleanly once sub-pixel.
+        double fadeStart = p.tier <= QualityPreset.Tier.MEDIUM ? 26.0 : p.tier == QualityPreset.Tier.HIGH ? 42.0 : 85.0 * p.foliage_distance;
+        double fadeEnd = p.tier <= QualityPreset.Tier.MEDIUM ? 42.0 : p.tier == QualityPreset.Tier.HIGH ? 66.0 : 140.0 * p.foliage_distance;
+        material.SetShaderParameter("fade_start", fadeStart);
+        material.SetShaderParameter("fade_end", fadeEnd);
+        float bias = p.tier <= QualityPreset.Tier.MEDIUM ? 0.45f : p.tier == QualityPreset.Tier.HIGH ? 0.65f : (float)p.lod_bias;
         // Range-cull each cell once its plants have faded out (range is measured to
         // the bounds' centre, so add half the cell bounds' diagonal).
         foreach (MultiMeshInstance3D node in batches)
         {
-            node.VisibilityRangeEnd = (float)(140.0 * p.foliage_distance + node.Multimesh.CustomAabb.Size.Length() * 0.5 + 2.0);
+            node.LodBias = bias;
+            node.VisibilityRangeEnd = (float)(fadeEnd + node.Multimesh.CustomAabb.Size.Length() * 0.5 + 2.0);
         }
     }
 
