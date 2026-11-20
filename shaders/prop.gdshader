@@ -106,6 +106,8 @@ void fragment() {
 
 	float wet = 1.0 - smoothstep(0.0, max(wet_band, 0.001), world_pos.y - water_level);
 	wet = max(wet, scene_wetness * (0.55 + max(n.y, 0.0) * 0.45) * (1.0 - metallic));
+	vec3 soaked_albedo = albedo * albedo * 1.75;
+	albedo = mix(albedo, min(soaked_albedo, albedo), wet * 0.50);
 	albedo *= 1.0 - wet * wet_darkening;
 	float film = smoothstep(0.30, 0.95, wet) * (1.0 - moss * 0.65);
 	// Below the surface the water itself carries the reflection: a glossy
@@ -113,8 +115,8 @@ void fragment() {
 	float submerged = 1.0 - smoothstep(-0.06, 0.02, world_pos.y - water_level);
 	film *= 1.0 - submerged;
 	rough = mix(rough, 0.78, submerged);
-	// Wet stone is glossy, not a mirror: the old 0.14 floor turned boulders chrome.
-	rough = mix(rough, 0.42 + patch * 0.12, wet * (0.95 - moss * 0.3));
+	// Wet stone is satin-dark, not a mirror: a pale broad sheen reads as frost.
+	rough = mix(rough, 0.48 + patch * 0.14, wet * (0.85 - moss * 0.3));
 	n_world = normalize(mix(n_world, n, film * 0.35));
 
 	float fire_d = length(world_pos - fire_position);
@@ -135,10 +137,10 @@ void fragment() {
 	ALBEDO = albedo;
 	ROUGHNESS = clamp(rough, 0.04, 1.0);
 	METALLIC = metallic * (1.0 - moss);
-	SPECULAR = 0.45;
-	// A thin, rough coat: the old 0.65 mirror coat turned wet boulders chrome.
-	CLEARCOAT = film * 0.12;
-	CLEARCOAT_ROUGHNESS = 0.32 + moss * 0.30;
+	SPECULAR = mix(0.38, 0.24, wet * (1.0 - metallic));
+	// A restrained satin coat: high specular or clearcoat turns wet boulders pale.
+	CLEARCOAT = film * 0.08;
+	CLEARCOAT_ROUGHNESS = 0.38 + moss * 0.25;
 	AO = mix(1.0, orm.r, ao_strength);
 	AO_LIGHT_AFFECT = 0.4;
 	NORMAL = view_normal_from_world(VIEW_MATRIX, n_world);

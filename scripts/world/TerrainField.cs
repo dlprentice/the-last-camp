@@ -591,7 +591,7 @@ public partial class TerrainField
         double wobble = _variation.GetNoise2D((float)(x * 3.0), (float)(z * 3.0)) * 0.35;
         Vector2 p = new Vector2((float)x, (float)z);
 
-        double trail = 1.0 - smoothstep(0.32 + wobble, 1.22 + wobble, walking_distance(p));
+        double trail = 1.0 - smoothstep(0.28 + wobble * 0.7, 0.96 + wobble * 0.7, walking_distance(p));
         trail = maxf(trail, camp_wear(p) * (0.85 + wobble));
         if (places_enabled)
         {

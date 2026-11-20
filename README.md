@@ -3,10 +3,10 @@
 A quiet first-person story game made in **Godot**. You come to close your
 grandmother June's lakeside camp for the last time. Her letter and her voice send
 you to the places she and your grandfather Tom loved, and on the way you find what
-Tom was doing out here alone in his last summer. It is being built to a complete
-story of 25 to 35 minutes ([what "done" means](docs/DONE.md)). Today you can play the
-arrival evening and night: carry firewood, light the fire, skip stones, light your
-lantern and turn in; the later chapters are under construction.
+Tom was doing out here alone in his last summer. The complete two-day story
+(arrival evening, the old fire ring, Tom's Rock at sunset, the night storm, and
+the closing dawn through credits and June's postcard) is playable on `master`
+([what "done" means](docs/DONE.md)).
 
 ![The camp and its wooded approach](docs/images/arrival.png)
 
@@ -39,8 +39,9 @@ in builds, and a clone plays silently with subtitles. After the loading screen, 
 start on the trail with control of the player. The optional `-- --intro` camera arrival
 can be skipped with Space or a click.
 
-The default preset starts at High and can adapt downward. Use
-`godot --path . --fullscreen -- --quality=medium` to select a fixed preset.
+The default preset starts at Medium (59% FSR2) for smoother pacing, with High
+capped at 30 FPS. Use `godot --path . --fullscreen -- --quality=high` to select a
+fixed preset.
 The distant woodland uses lit canopy atlases, with full geometry returning near
 the player. Dense vegetation and shadows still make this a demanding scene.
 See [validation and limits](docs/validation.md) for measured results and the

@@ -222,7 +222,7 @@ public static class BlazeNotch
     /// `up` the notch's vertical (the crease runs square to it). `metres_per_unit`
     /// is the host's scale, so the cut keeps its size in metres. Returns null if the
     /// host has no clean surface there.
-    public static Carved carve(ArrayMesh host, int surface, Vector3 centre, Vector3 outward, Vector3 up, double metres_per_unit, ulong seed)
+    public static Carved carve(ArrayMesh host, int surface, Vector3 centre, Vector3 outward, Vector3 up, double metres_per_unit, ulong seed, bool warn_on_skip = true)
     {
         outward = outward.Normalized();
         Vector3 across = up.Cross(outward).Normalized();
@@ -262,16 +262,21 @@ public static class BlazeNotch
         };
         Vector2 flat(Vector3 p) { Vector3 q = p - sc; return new Vector2(q.Dot(across), q.Dot(upd)); }
 
-        // The host's triangles over the patch: facing out, near the surface there.
+        // The host's triangles over the patch: facing out, passing near the
+        // surface depth at the patch (a tall leaning/flaring trunk triangle may
+        // have one root vertex farther out while crossing the patch cleanly).
         var region = new List<int>();
-        double depth_reach = 0.15 / k;
+        double depth_reach = 0.18 / k;
         for (int t = 0; t + 2 < idx.Length; t += 3)
         {
             int ia = idx[t], ib = idx[t + 1], ic = idx[t + 2];
-            if ((nrm[ia] + nrm[ib] + nrm[ic]).Normalized().Dot(outward) < 0.3f) continue;
-            bool close = true;
-            foreach (int i in new[] { ia, ib, ic }) close &= Math.Abs((v[i] - sc).Dot(outward)) < depth_reach;
-            if (!close) continue;
+            if ((nrm[ia] + nrm[ib] + nrm[ic]).Normalized().Dot(outward) < 0.12f) continue;
+            double da = (v[ia] - sc).Dot(outward);
+            double db = (v[ib] - sc).Dot(outward);
+            double dc = (v[ic] - sc).Dot(outward);
+            double dmin = Math.Min(da, Math.Min(db, dc));
+            double dmax = Math.Max(da, Math.Max(db, dc));
+            if (dmin > depth_reach || dmax < -depth_reach) continue;
             Vector2 pa = flat(v[ia]), pb = flat(v[ib]), pc = flat(v[ic]);
             double x0 = Math.Min(pa.X, Math.Min(pb.X, pc.X)), x1 = Math.Max(pa.X, Math.Max(pb.X, pc.X));
             double y0 = Math.Min(pa.Y, Math.Min(pb.Y, pc.Y)), y1 = Math.Max(pa.Y, Math.Max(pb.Y, pc.Y));
@@ -440,7 +445,7 @@ public static class BlazeNotch
         double patch_area = 2.0 * hw * (top - bottom);
         if (Math.Abs(covered - patch_area) > patch_area * 0.002)
         {
-            GD.PushWarning($"BlazeNotch: host covers {covered / patch_area:P1} of the notch's patch; not carved");
+            if (warn_on_skip) GD.PushWarning($"BlazeNotch: host covers {covered / patch_area:P1} of the notch's patch; not carved");
             return null;
         }
 

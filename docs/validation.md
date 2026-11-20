@@ -8,16 +8,16 @@ dev6 and beta1. On beta4 (November 19, 2026) the build has no warnings, the C# a
 contract and all content fingerprints match, and the 15-waypoint traversal passes on the GPU with no engine
 error, core dump or NVIDIA Xid.
 
-Open on beta4, November 19, 2026:
+Open on beta4, November 20, 2026:
 
-- **An intermittent engine abort in headless runs.** Some headless traversals abort with `/root:
-  propagate_notification()` called from a non-main thread, followed by `FATAL: Condition "gchandle.is_released()"`
-  or a segmentation fault, on a native engine worker thread. It was about one run in nine before the paper UI and
-  more often after it; a fix that keeps every engine object off worker threads is being verified, and the engine's
-  symbol files are being used to name the faulting frames.
-- **Content fingerprints are pending a rebaseline.** The new places and paths change terrain, vegetation-plan,
-  grass, meadow and dressing keys, an expected group for this step. The fixtures are regenerated once the places'
-  full-size stills have been reviewed, as the rebaseline procedure requires. The scene contract passes.
+- **2026-11-20 verification on `master` (Godot 4.8 beta4 .NET with patched GodotSharp `fleet1`):**
+  - `dotnet build -nologo`: 0 warnings, 0 errors.
+  - C# suite (`RunTests.cs`): **158 passed, 0 failed**; Python suite: **56 passed, 0 failed**.
+  - `SceneContractProbe`: **PASS** (`6e27e314...`, unchanged); `FingerprintProbe`: **PASS** (`973/973` rebaselined after places, look round 4, and Tom's Rock lookout review).
+  - Full automated playthrough (`--session-check --traverse-story`): **PASS** (`136/136` waypoints, `0` failures, `0` fall recoveries, `573.6 s` across all 6 story bands through credits and June's postcard); GPU places + interactions traversal verified on RTX 4060 (`0` failures, `0` `BlazeNotch` warnings after height-band fallback).
+  - Visual & audio inspection: 15 fresh 1080p RTX 4060 stills (`camp`, `night_fire`, `rain_rocks`, `rain_deck`, `grass_near`, `path_grazing`, `place_lookout`, `place_ring_notch`, `place_tree_notch`, `place_steps`, `place_loose_step`, `place_old_ring`, `place_trailhead`) and live traversal frames reviewed at 1:1; 1m 25s audition reel of 17 ElevenLabs ambiences, Foley cues, and June's voice entries measured −17.8 LUFS / −1.0 dBFS peak and auditioned directly.
+  - Exported Linux release (`tools/export_linux.py`, `114/114` sounds + `31/31` voice files packaged, `GodotSharp.dll` `fleet1`) cold-launched on RTX 4060 Laptop at 1920×1080 (`DOTNET_TieredCompilation=0`): world ready in 47.6 s, peak working set 5.92 GB, 0 gen2 collections, **Medium (59% FSR2, default)** 32.42 ms mean / 62.47 ms p99 (30.8 FPS, 24.18 ms main-view GPU), **High (77% FSR2, 30 FPS cap)** 41.12 ms mean / 57.47 ms p99 (24.3 FPS, 34.79 ms main-view GPU). Zero core dumps and zero NVIDIA Xids.
+- **Remaining open limits:** interactive 60 FPS on the RTX 4060 Laptop, a 30-minute soak, foreground first-person hands, and human playthrough / listening / moving-footage sign-off.
 
 ## Checked without rendering
 

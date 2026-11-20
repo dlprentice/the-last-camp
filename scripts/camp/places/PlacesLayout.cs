@@ -49,9 +49,9 @@ public static class PlacesLayout
     public const double SUMMIT_PAD_OUTER = 2.6;
     /// Eye height of someone sitting on the bench, above the summit.
     public const double SEATED_EYE = 1.15;
-    /// The bench looks north-west: between the pond (about 319 degrees from here)
-    /// and the late-August sunset (about 289 degrees).
-    public const double BENCH_BEARING_DEG = 305.0;
+    /// The bench looks north-west: framing the pond (about 318 degrees from here)
+    /// and the late-August sunset (about 289 degrees) together.
+    public const double BENCH_BEARING_DEG = 311.0;
     public static readonly Vector2 FACE = bearing(BENCH_BEARING_DEG);
     /// To the right of someone sitting on the bench (north-east).
     public static readonly Vector2 RIGHT = new(-FACE.Y, FACE.X);
@@ -328,7 +328,7 @@ public static class PlacesLayout
         return h - Math.Floor(h);
     }
 
-    public const double LOOKOUT_BEARING_DEG = 305.0;
+    public const double LOOKOUT_BEARING_DEG = 311.0;
     public const double LOOKOUT_CORE_DEG = 33.0;
     public const double LOOKOUT_EDGE_DEG = 48.0;
     /// Across the near bank to the water: beyond it only the far bank's trees stand.

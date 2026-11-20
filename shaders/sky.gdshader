@@ -238,8 +238,12 @@ void sky() {
 		vec3 moon_sky = atm_scatter(origin, view_dir, moon, sun_intensity * 0.0025 * moon_intensity, haze, 6, 3, mie_g, t2);
 		col += moon_sky * vec3(0.8, 0.9, 1.15) * moon_up * sun_down;
 	}
-	// Faint airglow so the night sky never clips to black.
-	col += vec3(0.55, 0.7, 1.0) * night_sky_floor * sun_down * (0.6 + 0.4 * clamp(1.0 - dir.y, 0.0, 1.0));
+	// Faint airglow and cool horizon scatter so dark pine silhouettes separate
+	// from the starry night sky without washing out the campfire ambient.
+	float night_horizon = pow(1.0 - clamp(dir.y, 0.0, 1.0), 3.0) * smoothstep(-0.04, 0.04, dir.y);
+	float horizon_vis = AT_CUBEMAP_PASS ? 0.25 : 1.0;
+	col += vec3(0.55, 0.7, 1.0) * night_sky_floor * sun_down * (0.65 + 0.45 * clamp(1.0 - dir.y, 0.0, 1.0));
+	col += vec3(0.32, 0.46, 0.78) * night_sky_floor * 2.4 * night_horizon * sun_down * horizon_vis;
 
 	// Ambient references for cloud shading: straight up and towards the sun.
 	vec3 tz;

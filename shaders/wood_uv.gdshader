@@ -64,18 +64,22 @@ void fragment() {
 	float band = 1.0 - smoothstep(0.0, 0.32, abs(above - 0.06));
 	float algae = algae_amount * band * v_shore_exposure * (0.4 + 0.6 * texture(noise_tex, world_pos.xz * 1.3 + world_pos.y * 2.0).g);
 	albedo = mix(albedo, vec3(0.07, 0.10, 0.05), algae);
-	albedo *= 1.0 - wet * 0.4;
+	vec3 soaked_albedo = albedo * albedo * 1.65;
+	albedo = mix(albedo, min(soaked_albedo, albedo), wet * 0.55);
+	albedo *= 1.0 - wet * 0.48;
 	float film = smoothstep(0.25, 0.95, wet) * (0.45 + upness * 0.55);
-	float rough = mix(orm.g * roughness_scale, 0.16 + patch * 0.08, wet * 0.95);
+	// Rain-soaked timber darkens to satin; a near-mirror coat reflects the
+	// storm sky as white frost across horizontal planks.
+	float rough = mix(orm.g * roughness_scale, 0.38 + patch * 0.12, wet * 0.85);
 
 	float fire_d = length(world_pos - fire_position);
 	float warmth = exp(-fire_d * 0.42) * fire_intensity * fire_warmth;
 
 	ALBEDO = albedo;
 	ROUGHNESS = clamp(rough, 0.05, 1.0);
-	SPECULAR = mix(0.4, 0.5, wet);
-	CLEARCOAT = film * 0.65;
-	CLEARCOAT_ROUGHNESS = 0.10 + patch * 0.10;
+	SPECULAR = mix(0.36, 0.24, wet);
+	CLEARCOAT = film * 0.14;
+	CLEARCOAT_ROUGHNESS = 0.34 + patch * 0.14;
 	AO = mix(1.0, orm.r, ao_strength);
 	AO_LIGHT_AFFECT = 0.4;
 	NORMAL_MAP = nrm;

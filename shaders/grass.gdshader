@@ -37,6 +37,7 @@ varying vec3 v_world_normal;
 varying float v_ground_blend;
 varying float v_side;
 varying float v_blade;
+varying float v_patch;
 
 void vertex() {
 	vec3 base = MODEL_MATRIX[3].xyz;
@@ -50,6 +51,11 @@ void vertex() {
 	v_dry = COLOR.a;
 	v_side = UV.x;
 	v_blade = blade_random;
+	// Broad multi-scale meadow drift so open turf breaks into lush hollows and
+	// slightly warmer sun-baked swells without extra texture fetches.
+	float m1 = sin(base.x * 0.17 + cos(base.z * 0.13) * 1.4) * cos(base.z * 0.15 - base.x * 0.09);
+	float m2 = sin(base.x * 0.43 - base.z * 0.37 + 1.2) * 0.5;
+	v_patch = clamp((m1 * 0.65 + m2 * 0.35) * 0.5 + 0.5, 0.0, 1.0);
 
 	// The planted edge dissolves over staggered thresholds. Playable near
 	// grass can also shed individual clumps with camera distance below; both
@@ -151,6 +157,7 @@ void fragment() {
 	vec3 root = mix(root_color, dry_tip_color * 0.28, old_leaf * 0.65);
 	// Dark roots, bright tips: the last third of a blade carries the light.
 	vec3 albedo = mix(root, tip, smoothstep(0.0, 0.9, v_height)) * v_tint;
+	albedo *= mix(vec3(0.86, 0.93, 0.88), vec3(1.06, 1.02, 0.92), v_patch);
 	albedo *= 1.0 + 0.22 * smoothstep(0.62, 1.0, v_height);
 	albedo *= 0.88 + 0.24 * v_blade;
 	albedo *= 0.94 + 0.12 * abs(v_side - 0.5) * 2.0;

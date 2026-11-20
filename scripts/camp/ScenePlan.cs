@@ -119,7 +119,7 @@ public partial class ScenePlan
         _add_tree(new Vector2(17.5f, -11.5f), TreeSpecies.Kind.OAK, 1.18);
         _add_tree(new Vector2(-13.0f, -19.0f), TreeSpecies.Kind.PINE, 1.1);
         _add_tree(new Vector2(21.0f, 13.5f), TreeSpecies.Kind.ALDER, 1.05);
-        _add_tree(new Vector2(-20.0f, 23.0f), TreeSpecies.Kind.OAK, 1.0);
+        _add_tree(_field.places_enabled ? new Vector2(-24.0f, -22.0f) : new Vector2(-20.0f, 23.0f), TreeSpecies.Kind.OAK, 1.0);
         _add_tree(new Vector2(10.0f, -26.0f), TreeSpecies.Kind.SPRUCE, 1.05);
         _add_tree(new Vector2(-9.0f, -31.0f), TreeSpecies.Kind.SNAG, 1.0);
         _add_tree(new Vector2(29.0f, 22.0f), TreeSpecies.Kind.SNAG, 0.9);

@@ -15,12 +15,32 @@ public partial class FingerprintProbe : SceneTree
         {
             var probe = new Fingerprint();
             probe.run();
+            string[] userArgs = OS.GetCmdlineUserArgs();
+            string? dumpPath = null;
+            bool writeFixture = false;
+            foreach (string arg in userArgs)
+            {
+                if (arg == "--write") writeFixture = true;
+                else if (arg.StartsWith("--dump=", StringComparison.Ordinal)) dumpPath = arg["--dump=".Length..];
+            }
+            if (dumpPath != null)
+            {
+                using var f = FileAccess.Open(dumpPath, FileAccess.ModeFlags.Write);
+                f.StoreString(Json.Stringify(probe.result, "  ", true));
+                GD.Print($"CONTENT_DUMP path={dumpPath} count={probe.result.Count}");
+            }
+            if (writeFixture)
+            {
+                using var f = FileAccess.Open("res://tests/fixtures/content.json", FileAccess.ModeFlags.Write);
+                f.StoreString(Json.Stringify(probe.result, "  ", true) + "\n");
+                GD.Print($"CONTENT_WROTE count={probe.result.Count}");
+            }
             using var json = new Json();
             if (json.Parse(FileAccess.GetFileAsString("res://tests/fixtures/content.json")) != Error.Ok)
                 throw new InvalidOperationException("Invalid content fingerprint fixture");
             var expected = json.Data.AsGodotDictionary();
             if (expected.Count != probe.result.Count)
-                throw new InvalidOperationException("Fingerprint set changed");
+                throw new InvalidOperationException($"Fingerprint set changed (expected {expected.Count}, got {probe.result.Count})");
             foreach (var key in expected.Keys)
             {
                 var a = expected[key].AsGodotDictionary();

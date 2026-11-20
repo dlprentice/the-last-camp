@@ -99,13 +99,23 @@ public partial class Places : Node3D
             var mesh = (ArrayMesh)bark.Mesh;
             float scale = xform.Basis.Y.Length();
             double ground = field.height(entry.position.X, entry.position.Y);
-            double local_y = (ground + PlacesLayout.BLAZE_HEIGHT - xform.Origin.Y) / scale;
-            Vector3 axis = BlazeNotch.trunk_axis(mesh, local_y);
             Basis inv = xform.Basis.Inverse();
             Vector3 face = new Vector3(sites[i].face.X, 0, sites[i].face.Y);
+            Vector3 localFace = (inv * face).Normalized();
+            Vector3 localUp = (inv * Vector3.Up).Normalized();
             // The notch is cut into this tree's own copy of its trunk; the faces
-            // take the cut's material and everything else keeps the bark's.
-            BlazeNotch.Carved notch = BlazeNotch.carve(mesh, 0, axis, (inv * face).Normalized(), (inv * Vector3.Up).Normalized(), scale, (ulong)(i + 1) * 7919UL);
+            // take the cut's material and everything else keeps the bark's. If a
+            // branch stub or root flare breaks the exact chest-height patch, try
+            // a slightly higher or lower smooth band on the same trunk.
+            BlazeNotch.Carved notch = null;
+            double[] heightOffsets = { 0.0, 0.22, -0.18, 0.40 };
+            for (int attempt = 0; attempt < heightOffsets.Length && notch == null; attempt++)
+            {
+                double local_y = (ground + PlacesLayout.BLAZE_HEIGHT + heightOffsets[attempt] - xform.Origin.Y) / scale;
+                Vector3 axis = BlazeNotch.trunk_axis(mesh, local_y);
+                bool last = attempt == heightOffsets.Length - 1;
+                notch = BlazeNotch.carve(mesh, 0, axis, localFace, localUp, scale, (ulong)(i + 1) * 7919UL, warn_on_skip: last);
+            }
             if (notch == null) continue;
             Material bark_material = bark.MaterialOverride;
             bark.Mesh = notch.mesh;

@@ -254,9 +254,10 @@ public partial class GrassPlanter
             double trodden = 0.0;
             if ((p.X > -19.0 && p.X < 14.0 && p.Y > -10.0 && p.Y < 73.0) || (field.places_enabled && TerrainField.PLACE_TRAIL_BOUNDS.HasPoint(p)))
             {
-                // A ragged margin: tufts creep into the path in places.
-                double invade = patches.GetNoise2D((float)(p.X * 9.0), (float)(p.Y * 9.0));
-                if (field.walking_distance(p) < 0.46 + 0.14 * invade || TerrainField.camp_wear(p) > 0.94)
+                // A ragged margin: tufts step in and out along the outer edge
+                // while keeping the half-metre walking ribbon clear.
+                double invade = clampf(patches.GetNoise2D((float)(p.X * 9.0), (float)(p.Y * 9.0)) * 0.5 + 0.5, 0.0, 1.0);
+                if (field.walking_distance(p) < 0.52 + 0.16 * invade || TerrainField.camp_wear(p) > 0.94)
                 {
                     continue;
                 }

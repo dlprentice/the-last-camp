@@ -67,6 +67,7 @@ public partial class ReadingSheet : CanvasLayer
         JuneHand = june;
         Page = 0;
         IsOpen = true;
+        VoicePlayer.SubtitlesHeld = true;
         _openedFrame = Engine.GetProcessFrames();
         _reader = reader;
         _reader?.suspend();
@@ -109,6 +110,7 @@ public partial class ReadingSheet : CanvasLayer
     {
         if (!IsOpen) return;
         IsOpen = false;
+        VoicePlayer.SubtitlesHeld = false;
         int pages = _pages.Length;
         Tween tween = UiTheme.Fade(_root, 0.0);
         tween.TweenCallback(Callable.From(() => { if (!IsOpen) _root.Visible = false; }));
@@ -117,6 +119,11 @@ public partial class ReadingSheet : CanvasLayer
         Closed?.Invoke(pages);
         _done?.TrySetResult(true);
         _done = null;
+    }
+
+    public override void _ExitTree()
+    {
+        if (IsOpen) VoicePlayer.SubtitlesHeld = false;
     }
 
     public override void _Input(InputEvent @event)

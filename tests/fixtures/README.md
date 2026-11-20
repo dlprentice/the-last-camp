@@ -1,8 +1,16 @@
 # Content fixtures
 
-`main.scene.txt` and `content.json` were measured from the last GDScript source
-commit, `265d2f4a9cc59bc69306d2cb43b45aba8f0f3937`, on Godot 4.8 dev6
-`8898c2b3d`. They contain no local paths or device-specific results.
+`main.scene.txt` was measured from the last GDScript source commit,
+`265d2f4a9cc59bc69306d2cb43b45aba8f0f3937`, on Godot 4.8 dev6 `8898c2b3d`, and
+still matches the C# scene builder unchanged. `content.json` was rebaselined on
+2026-11-20 on Godot 4.8 beta4 .NET (`4.8.beta4.mono.official.b070e63b1`) after
+the micro-cut places, look-round-4 tent/grass/path work and Tom's Rock lookout
+corridor were reviewed in full-size 1080p RTX 4060 stills (`973` keys: expected
+changes only in `terrain`, `tree_layout`, `rock_layout`, `shrub_layout`,
+`scanned/*`, `meadow_plan`, `grass`, `grass_chunk/*`, `tent_canvas` and
+`tent_hem`; all tree meshes, habitat/seed meshes, canoe, tent poles, camera
+routes, score cues, waves and `main.scene.txt` unchanged). Neither fixture
+contains local paths or device-specific results.
 
 The scene dump records native stored properties, resource values, child order,
 owners, groups and persistent connections of the detached main scene. Script
