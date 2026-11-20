@@ -387,6 +387,8 @@ public partial class Player : CharacterBody3D
         bool holdingLantern = holdingVisible && lantern_on && !holdingLog && !holdingStone;
         _heldLog.Visible = holdingLog;
         _heldStone.Visible = holdingStone;
+        if (hand_lantern != null) hand_lantern.Visible = holdingLantern;
+        if (hand_light != null) hand_light.Visible = lantern_on && Game.Instance.mode != Game.Mode.PHOTO;
         _heldStone.Position = new Vector3(0.02f, (float)(0.12 + stone_charge * 0.035), (float)(-0.09 + stone_charge * 0.025));
         if (_playerArm != null)
         {

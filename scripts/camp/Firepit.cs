@@ -274,6 +274,30 @@ public partial class Firepit : Node3D
         return moved;
     }
 
+    /// Instant state restoration when loading an epilogue save where the ash was raked / ring scattered.
+    public void restore_epilogue(bool ashRaked, bool warmAsh, bool stonesScattered)
+    {
+        if (ashRaked && !ash_raked)
+        {
+            rake_ash(warmAsh);
+            if (raked_ash != null) raked_ash.Scale = new Vector3(1.25f, 0.05f, 1.2f);
+            foreach (MeshInstance3D log in fire_logs) log.Visible = false;
+        }
+        if (stonesScattered && !stones_scattered)
+        {
+            while (stones_moved < ring_stones.Count)
+            {
+                int i = stones_moved++;
+                ring_stones[i].Position = scatter_target(i);
+            }
+            if (_pit_shape != null)
+            {
+                if (IsInsideTree()) _pit_shape.QueueFree(); else _pit_shape.Free();
+                _pit_shape = null;
+            }
+        }
+    }
+
     public void feed()
     {
         intensity = minf(intensity + FEED_AMOUNT, MAX_INTENSITY);

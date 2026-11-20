@@ -265,8 +265,14 @@ public partial class Postcard : Control
             address.AddChild(l);
         }
         _home = new KitButton("Return to the title", UiTheme.SMALL) { Visible = false, Alignment = HorizontalAlignment.Right };
-        _home.SetAnchorsPreset(LayoutPreset.BottomRight);
-        _home.Position = new Vector2(-340, -90);
+        _home.AnchorLeft = 1.0f;
+        _home.AnchorRight = 1.0f;
+        _home.AnchorTop = 1.0f;
+        _home.AnchorBottom = 1.0f;
+        _home.OffsetLeft = -340.0f;
+        _home.OffsetRight = -40.0f;
+        _home.OffsetTop = -90.0f;
+        _home.OffsetBottom = -36.0f;
         _home.AddThemeColorOverride("font_color", UiTheme.PAPER);
         _home.AddThemeColorOverride("font_focus_color", UiTheme.PAPER);
         _home.AddThemeColorOverride("font_hover_color", UiTheme.PAPER);

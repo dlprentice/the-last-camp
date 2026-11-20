@@ -200,7 +200,7 @@ public partial class Game : Node
         {
             save_screenshot();
         }
-        else if (@event.IsActionPressed(NativeArgs.Name("toggle_hud")))
+        else if (@event.IsActionPressed(NativeArgs.Name("toggle_hud")) && hud?.EndingShown != true)
         {
             hud_visible = !hud_visible;
         }

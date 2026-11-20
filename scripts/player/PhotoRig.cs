@@ -110,8 +110,15 @@ public partial class PhotoRig : Node3D
         if (@event is InputEventMouseMotion)
         {
             InputEventMouseMotion motion = ((InputEventMouseMotion)@event);
-            yaw -= motion.Relative.X * 0.0022;
-            pitch = clampf(pitch - motion.Relative.Y * 0.0022, -deg_to_rad(85.0), deg_to_rad(85.0));
+            GameSettings look = GameSettings.Current;
+            double sensitivity = 0.0022 * look.MouseSensitivity;
+            yaw -= motion.Relative.X * sensitivity;
+            pitch = clampf(pitch - motion.Relative.Y * sensitivity * (look.InvertY ? -1.0 : 1.0), -deg_to_rad(85.0), deg_to_rad(85.0));
+        }
+        else if (@event.IsActionPressed(NativeArgs.Name("pause")) || @event.IsActionPressed(NativeArgs.Name("ui_cancel")))
+        {
+            exit();
+            GetViewport().SetInputAsHandled();
         }
         else if (@event is InputEventMouseButton && ((InputEventMouseButton)@event).IsPressed())
         {

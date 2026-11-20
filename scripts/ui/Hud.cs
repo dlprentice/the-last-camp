@@ -41,6 +41,7 @@ public partial class Hud : CanvasLayer
     private Control _ending;
     public bool EndingShown => _ending != null;
     private CampSession _attached;
+    private bool _returningToCamp;
 
     public bool _stats_visible = false;
 
@@ -73,7 +74,7 @@ public partial class Hud : CanvasLayer
         _root.AddChild(_verb);
 
 
-        _photo_label = UiTheme.label("Photo mode    WASD, Space and C fly    wheel changes speed    F12 saves    P leaves",
+        _photo_label = UiTheme.label("Photo mode    WASD, Space and C fly    wheel changes speed    F12 saves    P / Esc leaves",
             UiTheme.SMALL, UiTheme.PAPER, HorizontalAlignment.Center, shadow: true);
         _place(_photo_label, new Vector2(0.5f, 1.0f), new Vector2(-560, -44), new Vector2(560, -16));
         _photo_label.Visible = false;
@@ -205,15 +206,23 @@ public partial class Hud : CanvasLayer
     public async void ReturnToCamp()
     {
         Player player = Game.Instance.player;
-        if (player == null || Game.Instance.session?.Resting == true) return;
-        if (Game.Instance.mode == Game.Mode.PAUSED) _toggle_pause();
-        player.suspend();
-        await FadeRest(true);
-        if (!IsInsideTree() || !GodotObject.IsInstanceValid(player)) return;
-        player.return_to_camp();
-        await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
-        await FadeRest(false);
-        if (Game.Instance.mode == Game.Mode.PLAY && GodotObject.IsInstanceValid(player)) player.begin();
+        if (player == null || _returningToCamp || Game.Instance.session?.Resting == true) return;
+        _returningToCamp = true;
+        try
+        {
+            if (Game.Instance.mode == Game.Mode.PAUSED) _toggle_pause();
+            player.suspend();
+            await FadeRest(true);
+            if (!IsInsideTree() || !GodotObject.IsInstanceValid(player)) return;
+            player.return_to_camp();
+            await ToSignal(GetTree().CreateTimer(0.4), SceneTreeTimer.SignalName.Timeout);
+            await FadeRest(false);
+            if (Game.Instance.mode == Game.Mode.PLAY && GodotObject.IsInstanceValid(player)) player.begin();
+        }
+        finally
+        {
+            _returningToCamp = false;
+        }
     }
 
     public async Task FadeRest(bool dark)
@@ -237,7 +246,8 @@ public partial class Hud : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (Game.Instance.session?.Resting == true || _ending != null) return;
+        if (Game.Instance.session?.Resting == true || _returningToCamp || _ending != null) return;
+        if (Game.Instance.session?.Reading?.IsOpen == true) return;
         if (@event.IsActionPressed(NativeArgs.Name("camp_journal")) && Game.Instance.session != null
             && (Game.Instance.mode == Game.Mode.PLAY || _journal.Visible))
         {

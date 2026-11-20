@@ -8,7 +8,7 @@ namespace LastCamp;
 /// predetermined score. Rendering and contact sounds live in Pond.
 public sealed class StoneFlight
 {
-    public const int MaxSkips = 7;
+    public const int MaxSkips = 12;
     public enum Contact { None, Skip, Sink, Ground }
     public Vector3 Position { get; private set; }
     public Vector3 Velocity { get; private set; }

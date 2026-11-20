@@ -161,6 +161,17 @@ public partial class Tent : Node3D
 
     public void offer_strike(bool offered) => strike_body.CollisionLayer = offered && !struck ? 1u << 1 : 0;
 
+    /// Instant state restoration when loading an epilogue save where the tent was already struck.
+    public void restore_struck()
+    {
+        struck = true;
+        offer_strike(false);
+        offer_tin(false);
+        Visible = false;
+        foreach (Node n in FindChildren("*", "CollisionObject3D", true, false))
+            ((CollisionObject3D)n).CollisionLayer = 0;
+    }
+
     /// Strikes the tent: the pegs come up out of the ground, the poles and the
     /// canvas come down flat, then everything is packed away. Calls `pegs_out`
     /// and `fallen` at those moments; completes when the pitch is bare.

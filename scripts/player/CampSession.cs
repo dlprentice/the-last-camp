@@ -91,6 +91,11 @@ public partial class CampSession : Node
         // Restoring a saved story puts back what was already done.
         if (Story.Facts.Contains(StoryEvents.LetterRead)) site.kitchen.take_letter();
         if (Story.Facts.Contains(StoryEvents.TinOpened)) site.tent.open_tin();
+        if (Story.Facts.Contains(StoryEvents.TentStruck)) site.tent.restore_struck();
+        bool ashRaked = Story.Facts.Contains(StoryEvents.AshRaked);
+        bool stonesScattered = Story.Facts.Contains(StoryEvents.StonesScattered);
+        if (ashRaked || stonesScattered)
+            site.firepit.restore_epilogue(ashRaked, Story.StormOutcome != "went_out", stonesScattered);
 
         Dock dock = site.dock;
         PierSeat = new Interactable { Name = "PierEndSeat", CollisionLayer = 1u << 1, CollisionMask = 0,

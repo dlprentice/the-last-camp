@@ -178,6 +178,15 @@ public partial class TitleScreen : Control
         focus.FocusQuietly();
     }
 
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (_confirm != null && _confirm.Visible && @event.IsActionPressed("ui_cancel"))
+        {
+            ShowMain(_newGame);
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
     public void OpenSettings()
     {
         _panel.Visible = false;
