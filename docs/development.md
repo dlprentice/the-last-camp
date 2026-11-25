@@ -3,10 +3,10 @@
 ## Toolchain
 
 Use **Godot 4.8 beta4 .NET**, the matching .NET export templates, and the **.NET 10
-SDK** pinned by `global.json`. Godot is the engine; C# constructs the complete
-world, UI, materials and behavior. No editor workflow, addons or GDExtensions
-are required. GPU shaders remain shader source; offline asset tools use Python
-and Blender.
+SDK** pinned by `global.json`. C# owns gameplay, procedural woodland, UI and checks;
+Godot-native visual assets/scenes may be used alongside C# builders where they improve
+look-dev, with no addons or GDExtensions required. GPU shaders remain shader source;
+offline model cleanup, rigging, and batch conversion use stock Blender and Python.
 
 Optional media/asset tools need Python 3.10+, NumPy, Pillow, FFmpeg/ffprobe with
 libx264 and AAC, Bash and ripgrep. Model conversion uses Blender's bundled glTF
@@ -287,10 +287,13 @@ again before drawing; otherwise a newly loaded coarse mip can be reported as
 fully resident. The prior override is restored after baking. The hardware probe
 checks actual pixels independently of the streamer's memory counter.
 
-Shipped textures, models and recordings are ready to import. Build new content
-locally using committed generators. The historical photoscan conversion tools
-work from the retained source cache in ignored `tools/downloads/` (the original
-credited downloads, kept so converted files can be rebuilt); they do not fetch new art:
+Shipped textures, models and recordings are ready to import. Source new 3D props and
+characters from CC0/MIT/CC BY 4.0 libraries (or license-cleared generative 3D compatible
+with public MIT redistribution) and clean, decimate, rig, and export them in stock
+Blender rather than sculpting hero meshes in Python `bmesh`. Keep Python scripts for
+texture baking, model conversion, LOD generation, and socket checks. The conversion
+tools work from the retained source cache in ignored `tools/downloads/` and do not fetch
+art automatically:
 
 ```bash
 python3 tools/bake_textures.py --only leaves_oak,water
@@ -305,8 +308,9 @@ sets. Experimental fallback materials need a separate output:
 python3 tools/bake_textures.py --only wood --out local-data/wood-study --check-tiling
 ```
 
-Prefer original content, but compare replacements in the complete scene and
-measure their runtime cost before retiring an existing asset and its credit.
+Keep the credited CC0 photoscans permanently rather than trying to replace them with
+procedural scripts; compare any candidate asset in the complete scene in moving footage
+and measure its runtime cost before adopting it.
 
 Blender repacks models with separate objects/LOD nodes, PNG PBR maps and optional
 Decimate reduction. It does not reproduce the earlier meshoptimizer topology;

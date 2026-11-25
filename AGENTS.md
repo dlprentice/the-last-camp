@@ -25,11 +25,16 @@ here.
 
 - Public repository: tracked files carry no machine paths, private notes or session
   notes. `CLAUDE.local.md` and everything in `local-data/` stay untracked.
-- Credits: every third-party file keeps its row in `textures/`, `models/` or
+- Credits & real 3D assets: every third-party file keeps its row in `textures/`, `models/` or
   `audio/SOURCES.md`, with `CREDITS.md` and `THIRD_PARTY_NOTICES.md` in step. Converted
   files and their rows change together. Default atlas rebaking must not replace the
-  credited PBR sets. A credited asset is retired only when a locally made replacement
-  is at least as good in play and costs no more frame time; then its credit goes too.
+  credited PBR sets. Keep the 35 credited CC0 photoscans permanently — do not sculpt
+  replacement hero models in Python `bmesh`. Source new foreground items (including
+  rigged first-person hands and story props) from CC0, MIT, or CC BY 4.0 libraries or
+  license-clean generative 3D (e.g., MIT-licensed models) cleaned, decimated, rigged,
+  and exported in stock Blender, keeping Python for conversion, LODs, and socket checks.
+  Keep primary visual fidelity focused on first-person eye height and arm's-length
+  camp scale, and review new hero assets in a short moving video clip before expanding.
 - `tests/fixtures/` is the content baseline. Change it only through the rebaseline
   procedure in [its README](tests/fixtures/README.md), never to hide a mismatch.
 - Placement and generated content stay seeded and deterministic. A change that moves

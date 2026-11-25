@@ -32,9 +32,9 @@ godot --path . --fullscreen
 ```
 
 The first import builds Godot's local asset cache. Rebuild the C# assembly with
-`dotnet build` after changing source. Everything is constructed in code; opening
-the editor is optional, and the one-node main scene is only a bootstrap. The converted
-textures and models are included. The audio is not: it is licensed, ships only
+`dotnet build` after changing source. The current scene tree and procedural woodland
+are constructed in C# from the one-node main bootstrap; opening the editor is optional.
+The converted CC0 textures and models are included. The audio is not: it is licensed, ships only
 in builds, and a clone plays silently with subtitles. After the loading screen, you
 start on the trail with control of the player. The optional `-- --intro` camera arrival
 can be skipped with Space or a click.

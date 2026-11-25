@@ -1,10 +1,10 @@
 # Architecture
 
-The scene builds from a deterministic plan when the project starts. Most
-geometry is generated in C#; converted photoscans supply selected
-materials, plants, deadwood and small props. `scenes/main.tscn` is a one-node bootstrap. `scripts/content/MainScene.cs`
-constructs the world, camp, player, camera and UI in code, preserving their ready
-order. There are no editor tools, authored resource files or GDScript components.
+The scene builds from a deterministic plan when the project starts. Terrain, trees,
+and groundcover are generated in C#; converted CC0 photoscans and Blender-authored
+meshes supply PBR surfaces, plants, deadwood, and hero props. `scenes/main.tscn` is a
+one-node bootstrap; `scripts/content/MainScene.cs` constructs the current world, camp,
+player, camera and UI in C#, preserving their ready order. There are no GDScript components.
 
 ## Source map
 

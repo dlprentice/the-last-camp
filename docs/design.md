@@ -370,40 +370,24 @@ along Tom's route, and the boundary checks are extended to match.
 ## Art direction
 
 Semi-realistic late-summer woodland, lit by sun, fire and lantern. It stays grounded:
-props rest on real supports and wear matches use. Every new asset comes from a
-committed generator.
+props rest on real supports and wear matches use. Keep primary hero fidelity locked to
+first-person eye height and arm's-length camp scale (0.4–3.2 m), and verify new hero
+assets in a short moving video clip before expanding scope.
 
-- **Blender generators** (`tools/blender/*.py`, output in `models/generated/`):
-  - first-person hands and forearms, rigged, with poses and animations: carry a log,
-    hold a stone, hold the lantern, paddle, rod and reel, hold a fish, camera, axe
-    swing, bucket, tarp, a ring stone, the tin and the letter;
-  - catchable fish for the hands and the journal: perch, sunfish and brook trout,
-    each at two or three sizes (the existing PondFish stay as the small shader
-    minnows on their routes);
-  - rod, reel, line and bobber; tackle tin and its contents (flat stones, the old
-    bobber, the licence);
-  - forage: two mushroom species and a blueberry bush with picked and unpicked
-    states, for 12 spots;
-  - the tarp cloth's mesh, its grommets, tie points and lines;
-  - on the camp table: June's letter, the journal book, a pen and the film camera;
-    the enamel mug for the spring;
-  - the trailhead post with the carved lettering and the register box; the heron
-    blind and its bench; spring basin rocks; the old fire ring; Tom's twenty steps,
-    his stone bench and the loose step; Tom's tally book and his tin;
-  - the fire-ring stones as separate physics bodies with collision shapes;
-  - the tent interior: bedroll, sleeping bag, June's kit bag; the struck and rolled
-    tent;
-  - the carved birch trunk section, Tom's notched blaze and June's painted blaze.
-- **Python texture generators** (alongside `tools/bake_textures.py`): canvas and tarp
-  cloth, weathered planks, carving and blaze normal and ambient-occlusion maps, the
-  journal paper and ink map, the letters and tally book pages, the enamel chips on
-  the mug, the fish skins, and the ash-scar and duff decal.
+- **Real 3D models (CC0 / MIT / CC BY 4.0 libraries or license-cleared generative 3D, cleaned & rigged in stock Blender -> `models/`):**
+  Do **not** sculpt hero organic hands or story props from scratch in Python `bmesh` (keep Python strictly for
+  conversion, texture capping, Decimate LODs, and grip-socket verification):
+  - first-person hands and forearms, rigged in stock Blender with grip sockets (`log`, `stone`, `lantern`, `tin`, etc.);
+  - camp & story props (tackle tin, journal, letter, pen, film camera, enamel mug, bedroll, kit bag, trailhead post,
+    heron blind/bench, fire-ring stones, and fish/rod if the wider cut resumes).
+- **Textures & utilities** (CC0 PBR libraries + `tools/bake_textures.py` for utility/detail maps): canvas and tarp
+  cloth, weathered planks, carving/blaze normal and AO maps, paper/ink pages, and duff decals.
 - **Rework**: broadleaf canopies read as chunky leaf cards up close. Re-bake the oak
   and birch leaf atlases with smaller clusters, and raise the near-tree card count
   within the performance budget. Light the tent interior from the lantern.
-- **Credited photoscans** (35 models, 9 PBR sets) stay until a generated replacement
-  is at least as good in play. The credited hatchet stays as Tom's hatchet at the
-  woodpile.
+- **Credited CC0 photoscans** (35 models, 9 PBR sets) stay permanently — do not replace
+  real scans with Python-sculpted geometry. The credited hatchet stays as Tom's hatchet
+  at the woodpile. Keep procedural C# generation for terrain, trees, grass, and wind/carving shaders.
 - **David's standing visual direction** for this game: never cull trees hard, keep the
   view distance maximal, and no visible fakes even in the distance. High and Ultra
   keep the full view distance; only Medium and Low may trade it.
